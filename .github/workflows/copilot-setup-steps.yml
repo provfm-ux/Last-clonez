@@ -1,0 +1,14 @@
+# Environment for the GitHub Copilot coding agent. Confirm the file/job naming in the current GitHub docs
+# ("Customizing the development environment for Copilot coding agent") if the agent does not pick it up.
+name: "Copilot Setup Steps"
+on: workflow_dispatch
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20

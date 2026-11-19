@@ -1,0 +1,16 @@
+{
+  "name": "last-clonez",
+  "version": "0.30.0",
+  "private": true,
+  "description": "Last CloneZ - isometric zombie survival in the browser (no dependencies)",
+  "scripts": {
+    "test": "node tests/smoke-test.js game --quiet && node tests/render-test.js game --quiet",
+    "test:full": "node tests/smoke-test.js game && node tests/render-test.js game",
+    "test:compat": "node tests/smoke-test.js game ../old-version --quiet",
+    "index": "node scripts/code-index.js",
+    "index:check": "node scripts/code-index.js --check",
+    "build": "node scripts/build.js",
+    "serve": "npx --yes serve game"
+  },
+  "engines": { "node": ">=20" }
+}

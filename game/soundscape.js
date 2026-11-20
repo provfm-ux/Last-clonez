@@ -13,8 +13,8 @@ const Soundscape = (() => {
     wings:{seconds:.65,gain:.3,cut:2600}, heartbeat:{seconds:.8,gain:.36,cut:340},
     footsteps:{seconds:.85,gain:.29,cut:1250}, glass:{seconds:.65,gain:.24,cut:3000},
     stone:{seconds:1.65,gain:.25,cut:1400},
-    doorOpen:{seconds:.38,gain:.18,cut:3100}, doorClose:{seconds:.23,gain:.18,cut:2200},
-    windowSlide:{seconds:.28,gain:.14,cut:3600}, glassSmash:{seconds:.53,gain:.24,cut:6200},
+    doorOpen:{seconds:.38,gain:.16,cut:3100}, doorClose:{seconds:.23,gain:.18,cut:2200},
+    windowSlide:{seconds:.28,gain:.14,cut:3600}, glassSmash:{seconds:.53,gain:.21,cut:5900},
     pry:{seconds:.29,gain:.17,cut:3300}, hammer:{seconds:.45,gain:.17,cut:2800},
     stepSoft:{seconds:.14,gain:.065,cut:1500}, stepHard:{seconds:.15,gain:.075,cut:2800},
     strike:{seconds:.15,gain:.18,cut:2400}, shot:{seconds:.42,gain:.26,cut:4700},
@@ -29,10 +29,13 @@ const Soundscape = (() => {
     const config = configs[kind], buffer = ctx.createBuffer(1,Math.ceil(config.seconds*sampleRate),sampleRate);
     const output = buffer.getChannelData(0);
     const rng = Level.seeded(kind.length * 137 + config.cut);
-    let grain = 0;
+    let grain = 0, body = 0, previousNoise = 0;
     for (let i = 0; i < output.length; i++) {
       const t = i/sampleRate, fuzz = 2*rng()-1;
       grain += (fuzz-grain)*.18;
+      body += (grain-body)*.055;
+      const edge = (fuzz-previousNoise)*.5, texture = grain-body;
+      previousNoise = fuzz;
       const voice = .55*tone(63+9*Math.sin(t*4),t) + .16*tone(130+11*Math.cos(t*4),t) + .13*tone(197,t);
       let sample = 0;
       switch (kind) {
@@ -57,37 +60,47 @@ const Soundscape = (() => {
           sample = (.55*grain+.2*tone(94,t))*(tap(t,.04,17)+.75*tap(t,.41,19)); break;
         case "glass":
           sample = (.38*tone(1294,t)+.23*tone(2325,t))*(tap(t,.02,15)+.48*tap(t,.17,21)); break;
-        case "doorOpen":
-          sample = (.58*fuzz+.34*tone(880,t))*tap(t,.008,125) +
-            (.18*grain+.22*tone(185+90*t,t))*breath(t,config.seconds,35); break;
+        case "doorOpen": {
+          const latch = (.48*edge+.24*tone(1047,t))*tap(t,.011,140) +
+            (.39*texture+.13*tone(721,t))*tap(t,.042,85);
+          const hinge = (.51*texture+.065*tone(166,t))*breath(t,config.seconds,16);
+          sample = latch + hinge; break;
+        }
         case "doorClose":
-          sample = (.57*tone(104,t)+.31*grain)*tap(t,.051,31) +
-            (.42*fuzz+.19*tone(900,t))*tap(t,.067,82); break;
+          sample = (.38*tone(124,t)+.19*tone(218,t)+.45*body)*tap(t,.048,41) +
+            (.48*texture+.16*edge)*tap(t,.054,89) + .18*edge*tap(t,.081,110); break;
         case "windowSlide":
-          sample = (.44*fuzz+.27*tone(565,t))*breath(t,config.seconds,21) +
-            .47*grain*tap(t,.211,67); break;
-        case "glassSmash":
-          sample = .64*fuzz*tap(t,.008,28) +
-            (.27*tone(2450,t)+.2*tone(3860,t)+.28*fuzz)*
-            (.8*tap(t,.025,23)+.53*tap(t,.082,32)+.35*tap(t,.15,21)+.19*tap(t,.25,25)); break;
+          sample = (.63*texture+.13*edge)*breath(t,config.seconds,37) +
+            (.40*texture+.16*tone(391,t))*tap(t,.215,57) + .19*edge*tap(t,.231,112); break;
+        case "glassSmash": {
+          const crack = (.67*edge+.61*texture)*tap(t,.008,110);
+          const shards = .71*tap(t,.017,55)+.45*tap(t,.038,81)+.41*tap(t,.077,58)+
+            .29*tap(t,.091,64)+.25*tap(t,.135,66)+.19*tap(t,.189,56)+.12*tap(t,.274,37);
+          const shimmer = .14*tone(2311,t)+.095*tone(3289,t)+.07*tone(4471,t);
+          sample = crack + (.76*edge+.34*texture+shimmer)*shards; break;
+        }
         case "pry":
-          sample = (.4*grain+.25*tone(1330,t))*breath(t,config.seconds,49) +
-            (.62*fuzz+.21*tone(290,t))*tap(t,.20,85); break;
+          sample = (.73*texture+.14*edge)*breath(t,config.seconds,49) +
+            (.50*texture+.27*tone(256,t))*tap(t,.191,59) + .24*edge*tap(t,.208,110); break;
         case "hammer":
-          sample = (.51*grain+.32*tone(260,t)+.19*fuzz)*
-            (tap(t,.012,57)+.78*tap(t,.18,52)+.65*tap(t,.31,58)); break;
+          sample = (.55*texture+.31*tone(216,t)+.16*tone(323,t)+.21*edge)*
+            (tap(t,.012,67)+.68*tap(t,.145,73)+.48*tap(t,.331,58)); break;
         case "stepSoft":
+          sample = (.54*texture+.16*edge)*(.69*tap(t,.013,55)+.5*tap(t,.032,41)+.29*tap(t,.067,55)) +
+            (.82*body+.11*tone(88,t))*tap(t,.022,39); break;
         case "stepHard":
-          sample = (.66*grain+.22*tone(93,t))*tap(t,.014,37) +
-            (kind === "stepHard" ? .45 : .26)*fuzz*tap(t,.037,47); break;
+          sample = (.37*tone(101,t)+.17*tone(179,t)+.51*texture)*tap(t,.016,57) +
+            (.65*texture+.11*edge)*tap(t,.055,45); break;
         case "strike":
-          sample = (.48*grain+.33*tone(127,t))*tap(t,.024,37) + .38*fuzz*tap(t,.019,65); break;
+          sample = (.47*texture+.33*tone(139,t)+.24*body)*tap(t,.027,54) +
+            .23*edge*tap(t,.026,104); break;
         case "shot":
-          sample = (.69*fuzz+.32*tone(116,t))*tap(t,.008,23) +
-            .32*grain*(tap(t,.11,25)+.45*tap(t,.20,18)); break;
+          sample = (.61*edge+.54*texture+.24*tone(167,t))*tap(t,.008,52) +
+            (.52*body+.34*texture)*(.56*tap(t,.026,28)+.4*tap(t,.067,44)+.21*tap(t,.109,33)); break;
         case "crash":
-          sample = (.49*grain+.34*tone(83,t)+.27*fuzz)*tap(t,.02,11) +
-            (.24*tone(580,t)+.20*fuzz)*(tap(t,.048,15)+.5*tap(t,.19,21)); break;
+          sample = (.61*texture+.39*body+.30*tone(97,t))*tap(t,.02,22) +
+            (.52*texture+.21*edge+.13*tone(437,t))*
+            (tap(t,.041,39)+.59*tap(t,.112,46)+.31*tap(t,.201,23)); break;
         case "stone": {
           const impact = tap(t,.03,23)+.55*tap(t,.19,18)+.37*tap(t,.37,16)+.2*tap(t,.63,13)+.12*tap(t,.87,13);
           sample = (.56*grain+.36*tone(224,t)+.14*tone(317,t))*impact; break;

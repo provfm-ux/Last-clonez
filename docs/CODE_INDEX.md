@@ -37,8 +37,8 @@ place:55 | clearCell:58 | add:62 | nextWave:118 | create:122 | restore:128
 ## game/recordings.js (8 lines)
 (no named functions)
 
-## game/soundscape.js (240 lines)
-makeBuffer:28 | decodeRecording:108 | preload:118 | bankFor:131 | zombieClip:144 | playZombie:155 | play:182 | output:201 | stop:227
+## game/soundscape.js (253 lines)
+makeBuffer:28 | decodeRecording:121 | preload:131 | bankFor:144 | zombieClip:157 | playZombie:168 | play:195 | output:214 | stop:240
 
 ## game/afterlife.js (268 lines)
 search:35 | pathTo:49 | start:55 | range:111 | finish:117 | objective:124 | ready:131 | screenInput:138 | action:144 | tick:175

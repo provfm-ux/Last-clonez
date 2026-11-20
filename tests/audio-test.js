@@ -21,7 +21,7 @@ async function run() {
   };
   const sandbox = vm.createContext({
     Recordings:{near:"audio/near.wav",tin:"audio/missing.wav",glass:"data:audio/wav;base64,AQID"},
-    Level:{seeded:() => () => .5}, atob, performance,
+    Level:{seeded:seed => () => (seed = seed*16807%2147483647)/2147483647}, atob, performance,
     async fetch(url) {
       fetched.push(url);
       if (url.endsWith("eventos.json")) return {ok:true,async json() { return {events}; }};
@@ -70,7 +70,10 @@ async function run() {
   assert.ok(await attackGain(1,true) < await attackGain(1));
   const generated = ["doorOpen","doorClose","windowSlide","glassSmash","pry","hammer","stepSoft","stepHard","strike","shot","crash"];
   for (const kind of generated) {
-    assert.ok(play(kind).getChannelData(0).some(sample => Math.abs(sample) > .01),kind);
+    const samples = play(kind).getChannelData(0);
+    const peak = samples.reduce((max,value) => Math.max(max,Math.abs(value)),0);
+    assert.ok(peak > .01 && peak < 1,kind);
+    assert.equal(samples.at(-1) < .005 && samples.at(-1) > -.005,true,kind);
     sources.at(-1).onended();
   }
   await zombie("idle");

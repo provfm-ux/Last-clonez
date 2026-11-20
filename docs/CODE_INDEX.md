@@ -2,7 +2,7 @@
 
 Use `grep -n "name" docs/CODE_INDEX.md` to find a function, then open only that line range of the file.
 
-Load order (index.html): data -> research -> legacy-level -> level -> expedition -> regions -> homes -> chronicle -> world -> atmosphere -> soundscape -> afterlife -> sim -> view -> game
+Load order (index.html): data -> research -> legacy-level -> level -> expedition -> regions -> homes -> chronicle -> world -> atmosphere -> recordings -> soundscape -> afterlife -> sim -> view -> game
 
 ## game/data.js (309 lines)
 worldRules:163 | character:230
@@ -34,8 +34,11 @@ tileAt:7 | sync:13 | infectedOutfit:35 | infected:47 | build:57 | clear:116 | dr
 ## game/atmosphere.js (148 lines)
 place:55 | clearCell:58 | add:62 | nextWave:118 | create:122 | restore:128
 
-## game/soundscape.js (107 lines)
-makeBuffer:19 | play:68 | stop:96
+## game/recordings.js (5 lines)
+(no named functions)
+
+## game/soundscape.js (131 lines)
+makeBuffer:20 | decodeRecording:69 | preload:79 | play:91 | stop:120
 
 ## game/afterlife.js (268 lines)
 search:35 | pathTo:49 | start:55 | range:111 | finish:117 | objective:124 | ready:131 | screenInput:138 | action:144 | tick:175
@@ -46,5 +49,5 @@ weapon:19 | unequipWeapon:26 | wornItem:35 | addXp:45 | add:68 | remove:81 | not
 ## game/view.js (2332 lines)
 resize:22 | updateCamera:33 | poly:56 | line:65 | shadow:75 | box:83 | tint:91 | prepare:97 | bloodPool:162 | microDetail:167 | tileArt:192 | tendril:258 | tile:272 | glowSprite:290 | glow:307 | wall:317 | paintWall:344 | gardenTree:377 | paintFurniture:413 | drawFurniture:532 | prop:551 | roof:1046 | roofArt:1068 | roofCoversPlayer:1102 | marker:1110 | actorFrame:1135 | drawHeldWeapon:1230 | weaponIcon:1259 | drawZombieSprite:1278 | microActor:1309 | equipmentPortrait:1350 | actor:1363 | beamReach:1517 | flashlightBeam:1527 | warmBeamSprite:1547 | warmFlashlight:1570 | windowGlow:1596 | weatherEffects:1620 | drawDestination:1656 | chunkSignature:1683 | buildChunk:1691 | groundLayer:1719 | dimAround:1736 | afterlifePixels:1774 | afterlifePortrait:1801 | renderAfterlife:1813 | render:1961 | locate:2224 | mapFit:2244 | mapPoint:2249 | minimapLayer:2257 | minimap:2276
 
-## game/game.js (2450 lines)
-read:63 | write:67 | backUp:71 | save:80 | clearStick:101 | resetInput:108 | updateDisplayMode:121 | toggleFullscreen:133 | activate:158 | setNavigation:179 | opening:186 | startLesson:200 | endLesson:212 | updateLesson:225 | startAfterlife:249 | deathSummary:259 | skipAfterlife:270 | endAfterlife:276 | afterlifeAction:283 | start:287 | startRecommended:305 | showStartDetail:318 | savedAssists:331 | assistsOn:338 | difficultyPanel:343 | applyDifficulty:364 | rememberSetup:385 | worldRulesEditor:391 | applyWorldRules:409 | resumeSaved:425 | show:443 | close:457 | menu:470 | titleScreen:480 | wakeSound:498 | cue:508 | syncSound:520 | objectives:529 | objectiveHtml:539 | skillsHtml:543 | conditions:553 | nearbyObjects:568 | interactionLabel:582 | canTalk:593 | setHtml:599 | updateHud:605 | help:733 | landmarks:743 | map:753 | savePinForm:803 | itemIcon:814 | weaponCondition:819 | itemDescription:825 | matches:853 | inventoryItems:863 | nearbyItems:886 | updateInventoryLists:907 | bag:949 | useBelt:982 | updateBelt:989 | beltPanel:1011 | gear:1025 | editSurvivor:1078 | crafting:1087 | health:1108 | diary:1138 | dispatchStatus:1161 | fieldLedger:1176 | ledgerEntry:1215 | ledgerReport:1221 | ledgerPanel:1230 | playtestReport:1266 | copyPlaytest:1310 | knownStory:1323 | storyText:1328 | outbreakLog:1332 | storyEntry:1341 | supplyRun:1350 | gardenStatus:1378 | gardenProject:1387 | waterProject:1407 | utilities:1428 | releases:1447 | research:1454 | npcPanel:1462 | gardenPanel:1479 | stationPanel:1503 | objectPanel:1550 | interact:1661 | interactions:1670 | nearbyAction:1687 | strike:1716 | quickUse:1724 | pause:1731 | visualAtmosphere:1741 | atmospherePanel:1745 | applyAtmosphere:1755 | exportSave:1766 | refreshPanel:1773 | bagChanged:1781 | changeInventory:1791 | bindTap:2102 | updateStick:2175 | shoveOrBrake:2203 | frame:2325
+## game/game.js (2453 lines)
+read:63 | write:67 | backUp:71 | save:80 | clearStick:101 | resetInput:108 | updateDisplayMode:121 | toggleFullscreen:133 | activate:158 | setNavigation:179 | opening:186 | startLesson:200 | endLesson:212 | updateLesson:225 | startAfterlife:249 | deathSummary:259 | skipAfterlife:270 | endAfterlife:276 | afterlifeAction:283 | start:287 | startRecommended:305 | showStartDetail:318 | savedAssists:331 | assistsOn:338 | difficultyPanel:343 | applyDifficulty:364 | rememberSetup:385 | worldRulesEditor:391 | applyWorldRules:409 | resumeSaved:425 | show:443 | close:457 | menu:470 | titleScreen:480 | wakeSound:498 | cue:511 | syncSound:523 | objectives:532 | objectiveHtml:542 | skillsHtml:546 | conditions:556 | nearbyObjects:571 | interactionLabel:585 | canTalk:596 | setHtml:602 | updateHud:608 | help:736 | landmarks:746 | map:756 | savePinForm:806 | itemIcon:817 | weaponCondition:822 | itemDescription:828 | matches:856 | inventoryItems:866 | nearbyItems:889 | updateInventoryLists:910 | bag:952 | useBelt:985 | updateBelt:992 | beltPanel:1014 | gear:1028 | editSurvivor:1081 | crafting:1090 | health:1111 | diary:1141 | dispatchStatus:1164 | fieldLedger:1179 | ledgerEntry:1218 | ledgerReport:1224 | ledgerPanel:1233 | playtestReport:1269 | copyPlaytest:1313 | knownStory:1326 | storyText:1331 | outbreakLog:1335 | storyEntry:1344 | supplyRun:1353 | gardenStatus:1381 | gardenProject:1390 | waterProject:1410 | utilities:1431 | releases:1450 | research:1457 | npcPanel:1465 | gardenPanel:1482 | stationPanel:1506 | objectPanel:1553 | interact:1664 | interactions:1673 | nearbyAction:1690 | strike:1719 | quickUse:1727 | pause:1734 | visualAtmosphere:1744 | atmospherePanel:1748 | applyAtmosphere:1758 | exportSave:1769 | refreshPanel:1776 | bagChanged:1784 | changeInventory:1794 | bindTap:2105 | updateStick:2178 | shoveOrBrake:2206 | frame:2328

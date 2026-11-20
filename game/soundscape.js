@@ -2,6 +2,7 @@
 
 const Soundscape = (() => {
   const buffers = new WeakMap(), playing = new WeakMap(), sampleRate = 16000, tau = 2 * Math.PI;
+  const recordings = new WeakMap();
   const configs = {
     distant:{seconds:2.4,gain:.27,cut:560}, near:{seconds:1.28,gain:.34,cut:1800},
     horde:{seconds:3.2,gain:.43,cut:990}, twig:{seconds:.57,gain:.37,cut:2500},
@@ -65,16 +66,39 @@ const Soundscape = (() => {
     return buffer;
   }
 
+  async function decodeRecording(ctx, path) {
+    if (path.startsWith("data:audio/")) {
+      const bytes = Uint8Array.from(atob(path.split(",",2)[1]), c => c.charCodeAt(0));
+      return ctx.decodeAudioData(bytes.buffer);
+    }
+    const response = await fetch(path);
+    if (!response.ok) throw new Error("Recording unavailable");
+    return ctx.decodeAudioData(await response.arrayBuffer());
+  }
+
+  async function preload(ctx) {
+    if (!ctx) return;
+    if (!recordings.has(ctx)) {
+      const clips = new Map();
+      const ready = Promise.all(Object.entries(Recordings).filter(([id]) => Object.hasOwn(configs,id)).map(async ([id,path]) => {
+        try { clips.set(id,await decodeRecording(ctx,path)); } catch { /* Keep the current synth for this cue. */ }
+      }));
+      recordings.set(ctx,{clips,ready});
+    }
+    await recordings.get(ctx).ready;
+  }
+
   function play(ctx, cue, listener) {
-    const config = configs[cue.kind];
+    const config = Object.hasOwn(configs,cue.kind) ? configs[cue.kind] : null;
     if (!config || !ctx || ctx.state !== "running") return;
     try {
       let library = buffers.get(ctx);
       if (!library) { library = new Map(); buffers.set(ctx,library); }
-      if (!library.has(cue.kind)) library.set(cue.kind,makeBuffer(ctx,cue.kind));
+      const recording = recordings.get(ctx)?.clips.get(cue.kind);
+      if (!recording && !library.has(cue.kind)) library.set(cue.kind,makeBuffer(ctx,cue.kind));
       const source = ctx.createBufferSource(), volume = ctx.createGain(), filter = ctx.createBiquadFilter();
       const dx = cue.x-listener.x, dy = cue.y-listener.y, distance = Math.hypot(dx,dy);
-      source.buffer = library.get(cue.kind);
+      source.buffer = recording ?? library.get(cue.kind);
       filter.type = "lowpass";
       filter.frequency.value = config.cut * (cue.muffled ? .52 : 1);
       const attenuation = cue.kind === "horde" ? .8 : 1 / (1 + distance*.06);
@@ -102,5 +126,5 @@ const Soundscape = (() => {
     sources.clear();
   }
 
-  return {play,stop};
+  return {preload,play,stop};
 })();

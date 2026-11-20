@@ -12,5 +12,7 @@ const blocks = names.map(n => { const js = fs.readFileSync(path.join(game, n + "
 html = html.replace("</body>", () => blocks.join("") + "</body>");
 const icon = "data:image/svg+xml;base64," + fs.readFileSync(path.join(game, "icon.svg")).toString("base64");
 html = html.replace(/(<link rel="icon"[^>]*href=")icon\.svg(")/, (m, a, b) => a + icon + b);
+const atlas = "data:image/png;base64," + fs.readFileSync(path.join(game, "micro-zombies.png")).toString("base64");
+html = html.replace(/(<link id="micro-zombie-atlas"[^>]*href=")micro-zombies\.png(")/, (_, prefix, suffix) => prefix + atlas + suffix);
 fs.writeFileSync(path.join(dist, "single.html"), html);
 console.log("dist/ ready: " + fs.readdirSync(dist).length + " files, single.html " + Math.round(html.length / 1024) + " KB");

@@ -5,13 +5,14 @@ const View = (() => {
   let ctx = canvas.getContext("2d", {alpha: false});
   const mainCtx = ctx;
   let lowCanvas = null, lowCtx = null, darkLook = false;
-  const halfW = 32, halfH = 17;
+  const halfW = 32, halfH = 16;
   const wallWidth = .14, wallInset = (1 - wallWidth) / 2;
   const camera = {x: 0, y: 0, zoom: 1, ready: false};
   const size = {width: 0, height: 0, dpr: 1};
   const objectLabels = [];
   let labelledWorld = null;
   const p = (x, y, z = 0) => [(x - y) * halfW, (x + y) * halfH - z];
+  const unproject = (x, y) => ({x:(x / halfW + y / halfH) / 2, y:(y / halfH - x / halfW) / 2});
   const sq = (x, y, radius) => x * x + y * y <= radius * radius;
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -107,6 +108,10 @@ const View = (() => {
     for (const [index, t] of world.tiles.entries()) {
       if (t.kind === "void") continue;
       const building = buildings.get(t.building);
+      if (t.nearHome && t.surface === "path") {
+        t.kerbEdges = [[-1, 0], [0, -1], [1, 0], [0, 1]].map(([dx, dy]) =>
+          World.tileAt(world, t.x + dx, t.y + dy)?.surface === "asphalt");
+      }
       if (building) world.roofTiles.get(building.id).push(index);
       if (t.kind === "wall") {
         const joins = (dx, dy, axis) => {
@@ -131,6 +136,7 @@ const View = (() => {
             [lo, hi], ...(left ? [[0, hi], [0, lo]] : [])
           ];
         }
+        t.wallShape = t.wallOutline.map(point => point.join(",")).join(";");
       }
       const floors = {home: t.room ? "#80735f" : "#787d69", clinic: "#708078", market: "#7d8071", workshop: "#6b6354", police: "#6d7669", fuel: "#747566"};
       if (building?.compact) floors.home = t.room === "Bedroom" ? "#6c665b" : building.color;
@@ -141,19 +147,23 @@ const View = (() => {
   }
 
   const BLOOD = ["#4a0c0f", "#6a1216", "#8c1a1c", "#2c070a"];
-  const GROUND_BLOOD = ["#4a191d80", "#662f3466", "#75363b55", "#32191b80"];
+  const GROUND_BLOOD = "#53333765";
   const dot = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
-  function bloodPool(wx, wy, rx, ry, seed, colors = BLOOD) {
+  function bloodPool(wx, wy, rx, ry, seed) {
     const ring = (k, color) => poly(Array.from({length: 10}, (_, i) => p(wx + Math.cos(i / 10 * 6.283) * rx * k * (1 + .18 * Math.sin(seed + i * 2.3)), wy + Math.sin(i / 10 * 6.283) * ry * k)), color);
-    ring(1, colors[3]); ring(.72, colors[0]); ring(.34, colors[1]);
-    const [hx, hy] = p(wx - rx * .2, wy - ry * .1); dot(hx, hy, 3, 2, colors[2]);
+    ring(1, BLOOD[3]); ring(.72, BLOOD[0]); ring(.34, BLOOD[1]);
+    const [hx, hy] = p(wx - rx * .2, wy - ry * .1); dot(hx, hy, 3, 2, BLOOD[2]);
   }
   function microDetail(t) {
     const {x, y} = t, h = ((x * 73856093) ^ (y * 19349663)) >>> 0, at = (u, v) => p(x + u, y + v);
-    const spot = (u, v, n, r, seed) => { for (let k = 0; k < n; k++) { const q = ((seed + k * 40503) * 2654435761) >>> 0, [px, py] = at(Math.min(.95, Math.max(.05, u + ((q % 100) / 100 - .5) * r)), Math.min(.95, Math.max(.05, v + (((q >> 8) % 100) / 100 - .5) * r))); dot(px, py, 2 + (q >> 16 & 1), 2, GROUND_BLOOD[k % 3 ? (q >> 20 & 1) : 3]); } };
     if (t.surface === "grass" || t.surface === "field") {
       for (let k = 0; k < 6; k++) { const q = ((h + k * 977) * 2246822519) >>> 0, [px, py] = at(.12 + (q % 76) / 100, .12 + ((q >> 7) % 76) / 100);
         dot(px, py - 3, 2, 4, k % 3 === 0 ? "#2a3a22" : k % 3 === 1 ? "#4b5f38" : "#364a2a"); if (k === 2) dot(px + 2, py - 2, 2, 3, "#5d6e42"); }
+      if (t.nearHome && h % 17 === 0) {
+        const [px, py] = at(.64, .62);
+        dot(px, py - 2, 1, 3, "#647252");
+        dot(px + 1, py - 3, 2, 1, "#a29371");
+      }
       if (h % 6 === 0) { const [px, py] = at(.3 + (h % 40) / 100, .35); dot(px, py, 7, 3, "#4a3d26"); dot(px + 2, py - 1, 3, 2, "#5e4f30"); }
       if (h % 9 === 1) { const [px, py] = at(.55, .45); dot(px, py, 4, 3, "#6a6a62"); dot(px + 1, py - 1, 3, 1, "#8c8c82"); dot(px, py + 2, 4, 1, "#3a3a36"); }
     } else if (t.surface === "asphalt") {
@@ -162,11 +172,11 @@ const View = (() => {
     } else if (t.surface === "tile" || t.surface === "sand") {
       for (let k = 0; k < 4; k++) { const q = ((h + k * 733) * 2654435761) >>> 0, [px, py] = at((q % 80) / 100 + .1, ((q >> 8) % 80) / 100 + .1); dot(px, py, 2, 2, t.surface === "sand" ? "#c9b98c" : k % 2 ? "#2c2820" : "#5a5444"); }
     }
-    if (!t.nearHome || t.surface === "water") return;
-    const heavy = t.surface === "asphalt" || t.surface === "tile";
-    if (h % (heavy ? 8 : 12) === 0) spot(.5, .5, 3 + (h >> 4) % 4, .7, h);
-    if (h % 71 === 0) { bloodPool(x + .5, y + .5, .20, .13, h % 7, GROUND_BLOOD); spot(.5, .5, 5, .9, h + 5); }
-    if (h % 97 === 0) { for (let k = 1; k < 6; k++) spot(.15 + k * .14, .3 + k * .08, 1, .1, h + k * 13); }
+    if (t.nearHome && (t.surface === "tile" || t.surface === "path") && h % 29 === 0) {
+      const [px, py] = at(.36, .57);
+      dot(px, py, 3, 2, GROUND_BLOOD);
+      dot(px + 5, py + 2, 1, 1, GROUND_BLOOD);
+    }
   }
 
   function tileArt(t) {
@@ -203,12 +213,33 @@ const View = (() => {
       }
     } else if (t.surface === "sand" && t.marks > .65) {
       line(p(x+.2,y+.5),p(x+.65,y+.5),"#d8c89c65");
+    } else if (darkLook && t.nearHome && t.surface === "path") {
+      line(p(x, y + .5), p(x + 1, y + .5), "#30353250");
+      for (const offset of [.25, .75]) line(p(x + offset, y), p(x + offset, y + .5), "#30353255");
+      line(p(x + .5, y + .5), p(x + .5, y + 1), "#30353255");
+      if (t.kerbEdges) {
+        const edges = [[a, d], [a, b], [b, c], [d, c]];
+        for (const [index, [from, to]] of edges.entries()) {
+          if (t.kerbEdges[index]) line(from, to, "#b4b2a666", 2);
+        }
+      }
+      if (t.marks > .6) {
+        line(p(x + .12, y + .73), p(x + .44, y + .73), "#b2b2a342");
+        const [sx, sy] = p(x + .74, y + .59);
+        dot(sx, sy, 2, 1, "#5c6056");
+      }
     } else if (t.surface === "tile") {
-      if (t.room) {
+      if (darkLook && t.nearHome && t.room) {
+        for (const row of [.24, .49, .74]) {
+          line(p(x, y + row), p(x + 1, y + row), "#322b2549");
+          const seam = (y + Math.round(row * 4)) % 2 ? .32 : .68;
+          line(p(x + seam, y + row), p(x + seam, y + row + .24), "#332d2770");
+        }
+      } else if (t.room) {
         line(p(x+.25,y),p(x+.25,y+1),"#423c2e4a");
         line(p(x+.62,y),p(x+.62,y+1),"#b9a48130");
       }
-      if (t.marks > .985 && t.kind === "floor") shadow(x+.4,y+.6,8,3,"#77453a8a");
+      if (!darkLook && t.marks > .985 && t.kind === "floor") shadow(x+.4,y+.6,8,3,"#77453a8a");
     }
     if (darkLook) microDetail(t);
   }
@@ -273,19 +304,52 @@ const View = (() => {
     ctx.restore();
   }
 
+  const brickWalls = new Map();
   function wall(t, player, menu) {
     const {x, y, wallOutline: outline} = t;
     const fullHeight = t.outside ? 34 : 26;
     const dx = x + .5 - player.x, dy = y + .5 - player.y;
     const cutaway = !menu && dx + dy > 0 && sq(dx, dy, 3.3);
     const height = cutaway ? 10 : fullHeight;
-    const [cap, south, east] = t.outside ? ["#667369", "#454e44", "#343f35"] : ["#727b6c", "#475248", "#39463e"];
+    if (!darkLook || !t.outside || !t.nearHome) {
+      paintWall(x, y, outline, height, t.outside ? ["#667369", "#454e44", "#343f35"] : ["#727b6c", "#475248", "#39463e"]);
+      return;
+    }
+    const key = t.wallShape + ":" + height;
+    let sprite = brickWalls.get(key);
+    if (!sprite) {
+      sprite = document.createElement("canvas");
+      sprite.width = 2 * halfW + 2; sprite.height = height + 2 * halfH + 2;
+      const previous = ctx;
+      try {
+        ctx = sprite.getContext("2d");
+        ctx.translate(halfW + 1, height + 1);
+        paintWall(0, 0, outline, height, ["#81665a", "#705147", "#513f3a"], true);
+      } finally { ctx = previous; }
+      brickWalls.set(key, sprite);
+    }
+    const [sx, sy] = p(x, y);
+    ctx.drawImage(sprite, sx - halfW - 1, sy - height - 1);
+  }
+
+  function paintWall(x, y, outline, height, [cap, south, east], brick = false) {
     const top = outline.map(([u, v]) => p(x + u, y + v, height));
     for (let i = 0; i < outline.length; i++) {
       const j = (i + 1) % outline.length;
       const [u, v] = outline[i], [nextU, nextV] = outline[j];
       if (nextU < u || nextV > v) {
-        poly([top[i], top[j], p(x + nextU, y + nextV), p(x + u, y + v)], nextU < u ? south : east);
+        const bottom = p(x + u, y + v), end = p(x + nextU, y + nextV);
+        poly([top[i], top[j], end, bottom], nextU < u ? south : east);
+        if (brick && Math.abs(nextU - u) + Math.abs(nextV - v) > .4) {
+          const mortar = "#2c25233d";
+          for (let level = 5; level < height; level += 6) {
+            line([bottom[0], bottom[1] - level], [end[0], end[1] - level], mortar);
+            const offset = level % 12 === 5 ? .32 : .68;
+            const seamX = bottom[0] + (end[0] - bottom[0]) * offset;
+            const seamY = bottom[1] + (end[1] - bottom[1]) * offset - level;
+            line([seamX, seamY], [seamX, seamY + 3], mortar);
+          }
+        }
       }
     }
     poly(top, cap);
@@ -300,8 +364,191 @@ const View = (() => {
   const teal = ["#779e91", "#466f64", "#355952"];
   const cream = ["#bfc1a9", "#8f927e", "#747c6d"];
 
+  const gardenTrees = [];
+  function gardenTree(x, y, tintValue) {
+    const variant = Number.isFinite(tintValue) ? clamp(Math.floor(tintValue * 4), 0, 3) : 0;
+    let sprite = gardenTrees[variant];
+    if (!sprite) {
+      sprite = document.createElement("canvas");
+      sprite.width = 54; sprite.height = 61;
+      const c = sprite.getContext("2d");
+      c.fillStyle = "#41382c"; c.fillRect(25, 29, 5, 31);
+      c.fillStyle = "#786653"; c.fillRect(25, 34, 2, 24);
+      const crown = [[16, 29, 12], [38, 30, 12], [27, 35, 14], [13, 20, 9],
+        [36, 16, 12], [23, 13, 12], [28, 22, 15]];
+      const leaves = [["#344334", "#43533b", "#566649", "#687652"],
+        ["#3e4834", "#50583d", "#656b48", "#7b7e55"],
+        ["#35463b", "#455a48", "#58705a", "#6f8062"],
+        ["#444838", "#555b40", "#696d4a", "#7a7c54"]][variant];
+      for (const [cx, cy, radius] of crown) {
+        for (let py = cy - radius; py <= cy + radius; py += 2) {
+          for (let px = cx - radius; px <= cx + radius; px += 2) {
+            const noise = ((px * 73856093 ^ py * 19349663 ^ variant * 83492791) >>> 0) % 7;
+            const dx = px - cx, dy = (py - cy) * 1.25;
+            if (dx * dx + dy * dy > (radius - noise * .65) ** 2) continue;
+            const shade = clamp(Math.floor(1.3 - (dx + dy) / radius + noise * .22), 0, 3);
+            c.fillStyle = leaves[shade]; c.fillRect(px, py, 2, 2);
+          }
+        }
+      }
+      gardenTrees[variant] = sprite;
+    }
+    const [sx, sy] = p(x, y);
+    shadow(x, y, 24, 9, "#10171090");
+    ctx.drawImage(sprite, Math.round(sx) - 27, Math.round(sy) - 60);
+  }
+
+  const furnitureSprites = new Map();
+  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug"]);
+
+  function paintFurniture(kind, variant, powered) {
+    const oak = ["#947859", "#735943", "#514035"];
+    const cloth = variant === 0 ? ["#879174", "#656e59", "#475143"] :
+      variant === 1 ? ["#8f6e62", "#6c514b", "#533e3a"] : ["#668182", "#50686b", "#374c52"];
+    const enamel = ["#c7c9b4", "#a3a796", "#777e76"];
+    const metal = ["#b1b7aa", "#818c86", "#576965"];
+    const edge = (a, b, color) => line(p(...a), p(...b), color);
+    if (kind !== "rug") shadow(0, 0, kind === "bed" || kind === "sofa" ? 28 : 23, 9, "#0d120f70");
+
+    switch (kind) {
+      case "bed": {
+        for (const side of [-.32, .26]) for (const end of [-.43, .38]) box(side, end, 0, .07, .07, 9, oak);
+        box(-.37, -.51, 7, .74, 1.02, 3, oak);
+        box(-.34, -.46, 10, .68, .93, 5, enamel);
+        box(-.29, -.42, 15, .55, .24, 3, enamel);
+        edge([-.23, -.33, 18], [.18, -.33, 18], "#e9dfc080");
+        box(-.35, -.13, 15, .70, .60, 2, cloth);
+        box(-.35, -.16, 17, .70, .10, 1, cloth);
+        for (const seam of [0, .16, .33]) edge([-.31, seam, 17], [.31, seam, 17], "#ddd0ad48");
+        for (const seam of [-.16, .13]) edge([seam, -.04, 17], [seam, .43, 17], "#222d2f62");
+        box(-.38, -.53, 7, .76, .064, 18, oak);
+        for (const upright of [-.27, .26]) edge([upright, -.46, 13], [upright, -.46, 24], "#b5956766");
+        break;
+      }
+      case "fridge": {
+        box(-.32, -.29, 0, .64, .58, 3, rubber);
+        box(-.37, -.32, 3, .74, .64, 30, enamel);
+        box(-.35, .30, 5, .70, .054, 18, enamel);
+        box(-.35, .30, 24, .70, .054, 8, enamel);
+        edge([-.34, .36, 23], [.34, .36, 23], "#4f5d55");
+        box(-.26, .36, 18, .20, .035, 2, metal);
+        box(-.26, .36, 26, .16, .035, 2, metal);
+        const [px, py] = p(.24, .36, 28);
+        dot(px, py, 2, 1, powered ? "#ceda91" : "#666f61");
+        dot(px - 10, py + 7, 3, 2, "#a480697d");
+        break;
+      }
+      case "sink":
+      case "washstand": {
+        box(-.34, -.28, 2, .68, .56, 15, oak);
+        edge([0, .287, 3], [0, .287, 16], "#3e342b");
+        for (const pull of [-.19, .10]) box(pull, .28, 12, .09, .035, 1, metal);
+        box(-.39, -.31, 17, .78, .62, 3, enamel);
+        box(-.30, -.20, 20, .37, .36, 1, ["#596d69", "#455552", "#343f40"]);
+        edge([-.29, .15, 21], [.07, .15, 21], "#d4d8ba");
+        for (const rib of [.17, .25, .33]) edge([rib, -.22, 20], [rib, .16, 20], "#65746f");
+        box(-.12, -.26, 20, .055, .06, 6, metal);
+        box(-.12, -.22, 25, .055, .19, 1, metal);
+        break;
+      }
+      case "cupboard":
+      case "wardrobe":
+      case "sideboard": {
+        const tall = kind !== "sideboard", height = tall ? 34 : 18;
+        for (const foot of [-.32, .26]) box(foot, .19, 0, .06, .07, 4, oak);
+        box(-.39, -.29, 4, .78, .58, height - 4, oak);
+        box(-.41, -.31, height, .82, .62, 2, oak);
+        for (const door of [-.34, .025]) {
+          box(door, .286, 6, .31, .036, height - 9, oak);
+          edge([door + .035, .33, 8], [door + .035, .33, height - 5], "#a9895c");
+          edge([door + .035, .33, height - 5], [door + .275, .33, height - 5], "#a9895c");
+        }
+        box(-.09, .33, height * .60, .045, .027, 3, metal);
+        box(.05, .33, height * .60, .045, .027, 3, metal);
+        if (!tall) box(.14, -.13, height + 2, .13, .16, 1, cloth);
+        break;
+      }
+      case "shelf": {
+        box(-.36, -.29, 1, .72, .06, 23, oak);
+        for (const side of [-.38, .30]) box(side, -.29, 0, .07, .56, 25, oak);
+        for (const level of [4, 13, 23]) {
+          box(-.32, -.27, level, .64, .54, 2, oak);
+          if (level < 23) {
+            box(-.24, -.12, level + 2, .12, .12, 5, cloth);
+            box(-.05, -.14, level + 2, .12, .14, 4, enamel);
+          }
+        }
+        break;
+      }
+      case "table": {
+        for (const side of [-.34, .28]) for (const end of [-.31, .25]) box(side, end, 0, .065, .065, 17, oak);
+        box(-.43, -.40, 17, .86, .80, 3, oak);
+        for (const joint of [-.24, 0, .21]) edge([-.40, joint, 20], [.40, joint, 20], "#48362f60");
+        edge([-.39, .36, 20], [.38, .36, 20], "#ad8b62");
+        box(-.23, -.10, 20, .21, .17, 1, enamel);
+        edge([-.20, -.05, 21], [-.06, -.05, 21], "#707164");
+        box(.13, -.18, 20, .10, .10, 4, cloth);
+        break;
+      }
+      case "sofa":
+      case "armchair": {
+        const half = kind === "sofa" ? .49 : .37;
+        for (const side of [-half + .06, half - .12]) for (const end of [-.24, .22]) box(side, end, 0, .06, .06, 5, oak);
+        box(-half, -.32, 4, 2 * half, .65, 9, cloth);
+        box(-half + .04, -.34, 12, 2 * half - .08, .17, 13, cloth);
+        const seats = kind === "sofa" ? 2 : 1, width = (2 * half - .24) / seats;
+        for (let seat = 0; seat < seats; seat++) {
+          const side = -half + .12 + width * seat;
+          box(side, -.14, 13, width - .015, .44, 3, cloth);
+          edge([side + .02, .285, 16], [side + width - .03, .285, 16], "#d5c3ad60");
+        }
+        for (const side of [-half, half - .11]) box(side, -.21, 13, .11, .52, 7, cloth);
+        box(half - .28, -.14, 16, .14, .18, 4, enamel);
+        break;
+      }
+      case "rug": {
+        const corners = [p(-.46, -.42), p(.46, -.42), p(.46, .42), p(-.46, .42)];
+        poly(corners, "#5b4844", "#372e30");
+        poly([p(-.40, -.36), p(.40, -.36), p(.40, .36), p(-.40, .36)], "#876d59", "#b29a78");
+        for (const row of [-.27, -.13, .01, .15, .29]) edge([-.37, row, 0], [.37, row, 0], row > 0 ? "#b89b704f" : "#4338385e");
+        for (const side of [-.3, -.15, 0, .15, .3]) {
+          edge([side, -.48, 0], [side, -.42, 0], "#c0aa89");
+          edge([side, .42, 0], [side, .48, 0], "#c0aa89");
+        }
+        break;
+      }
+    }
+  }
+
+  function drawFurniture(kind, x, y, variant, powered) {
+    const key = kind + ":" + variant + ":" + Number(powered);
+    let sprite = furnitureSprites.get(key);
+    if (!sprite) {
+      sprite = document.createElement("canvas");
+      sprite.width = 72;
+      sprite.height = 64;
+      const previous = ctx;
+      try {
+        ctx = sprite.getContext("2d");
+        ctx.translate(36, 49);
+        paintFurniture(kind, variant, powered);
+      } finally { ctx = previous; }
+      furnitureSprites.set(key, sprite);
+    }
+    const [sx, sy] = p(x, y);
+    ctx.drawImage(sprite, Math.round(sx) - 36, Math.round(sy) - 49);
+  }
+
   function prop(o, state, clock) {
     const {x, y, kind, tint: tone} = o;
+    if (darkLook) {
+      const furniture = kind === "locker" && !o.opened && World.tileAt(state.world, x, y)?.room === "Bedroom" ? "cupboard" : kind;
+      if (furnitureKinds.has(furniture)) {
+        const variant = Number.isFinite(tone) ? clamp(Math.floor(tone * 3), 0, 2) : 0;
+        drawFurniture(furniture, x, y, variant, kind === "fridge" && Sim.hasPower(state, o));
+        return;
+      }
+    }
     const f = (dx, dy, z, w, d, h, c) => box(x + dx, y + dy, z, w, d, h, c);
     if (kind === "fungus") {
       const sap = state.atmosphere.awake ? olive : ["#c3c98b","#778752","#566449"];
@@ -603,6 +850,7 @@ const View = (() => {
       return;
     }
     if(kind==="tree") {
+      if (darkLook && o.treeType !== "pine") { gardenTree(x, y, tone); return; }
       shadow(x,y,30,11);
       f(-.1,-.1,0,.2,.2,24,wood);
       if (o.treeType === "pine") {
@@ -733,19 +981,60 @@ const View = (() => {
     }
   }
 
+  const roofSprites = new WeakMap();
+
   function roof(building) {
+    if (!darkLook) { roofArt(building); return; }
+    let sprite = roofSprites.get(building);
+    if (!sprite) {
+      const {x, y, w, h} = building;
+      const left = Math.floor((x - y - h) * halfW - 16);
+      const top = Math.floor((x + y) * halfH - 72);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil((w + h) * halfW + 32);
+      canvas.height = Math.ceil((w + h) * halfH + 100);
+      const previous = ctx;
+      try {
+        ctx = canvas.getContext("2d");
+        ctx.translate(-left, -top);
+        roofArt(building);
+      } finally { ctx = previous; }
+      sprite = {canvas, left, top};
+      roofSprites.set(building, sprite);
+    }
+    ctx.drawImage(sprite.canvas, sprite.left, sprite.top);
+  }
+
+  function roofArt(building) {
     const {x,y,w,h}=building;
     const z=41, peak=building.compact ? 52 : 58;
     shadow(x+w*.5,y+h*.5,w*24,h*10,"#080c0980");
     const a=p(x-.1,y-.1,z), b=p(x+w+.1,y-.1,z);
     const c=p(x+w+.1,y+h+.1,z), d=p(x-.1,y+h+.1,z);
     const ridgeA=p(x+w*.5,y-.1,peak), ridgeB=p(x+w*.5,y+h+.1,peak);
-    poly([a,ridgeA,ridgeB,d],building.roof,"#343d32");
-    poly([ridgeA,b,c,ridgeB],tint(building.roof,-10),"#343d32");
+    const slate = darkLook && building.type === "home" ? (building.compact ? "#56575a" : "#655653") : building.roof;
+    poly([a,ridgeA,ridgeB,d],slate,"#343d32");
+    poly([ridgeA,b,c,ridgeB],tint(slate,-10),"#343d32");
     poly([d,ridgeB,c,p(x+w+.1,y+h+.1,33),p(x-.1,y+h+.1,33)],"#696852");
     for(let i=1;i<h;i++) {
       line(p(x-.1,y+i,z),p(x+w*.5,y+i,peak),"#a8a48c22");
       line(p(x+w*.5,y+i,peak),p(x+w+.1,y+i,z),"#a8a48c1a");
+    }
+    if (darkLook) {
+      for (const side of [-1, 1]) {
+        const slope = w / 2 + .1;
+        const rows = Math.ceil(slope / .38);
+        for (let row = 1; row < rows; row++) {
+          const t = row / rows, xx = x + w / 2 + side * slope * t;
+          const zz = peak + (z - peak) * t;
+          line(p(xx, y, zz), p(xx, y + h, zz), "#24262966");
+          for (let yy = y + .22 + (row % 2) * .22; yy < y + h; yy += .49) {
+            const next = (row + 1) / rows;
+            line(p(xx, yy, zz), p(x + w / 2 + side * slope * next, yy, peak + (z - peak) * next), "#22252950");
+          }
+        }
+      }
+      line(ridgeA, ridgeB, "#9b8c7e", 2);
     }
     if (!building.compact || (x+y) % 2 === 0) box(x+w*.72,y+h*.2,42,.55,.55,21,["#866b58","#5b493d","#493d32"]);
   }
@@ -779,6 +1068,203 @@ const View = (() => {
     return {x:sx, y:sy, width:w};
   }
 
+  // Original 1px sprite art packed into fixed-size atlas pages. A pose is drawn only on first use.
+  const actorFrames = new Map(), actorAtlases = [], strides = new WeakMap();
+  const spriteWidth = 24, spriteHeight = 32;
+
+  function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack) {
+    const key = [shirt, trousers, skin, hair, direction, pose, step, lift, pack].join("|");
+    if (actorFrames.has(key)) return actorFrames.get(key);
+    const index = actorFrames.size, slot = index % 128, page = Math.floor(index / 128);
+    if (!actorAtlases[page]) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 16 * spriteWidth;
+      canvas.height = 8 * spriteHeight;
+      actorAtlases[page] = canvas;
+    }
+    const canvas = actorAtlases[page], c = canvas.getContext("2d");
+    const left = slot % 16 * spriteWidth, top = Math.floor(slot / 16) * spriteHeight;
+    const ink = "#151a19", boots = "#2b2c29";
+    const back = direction >= 2, side = direction % 2 === 0 ? 1 : -1;
+    const rect = (x, y, w, h, color) => {
+      c.fillStyle = color;
+      c.fillRect(left + (side > 0 ? x : spriteWidth - x - w), top + y, w, h);
+    };
+    let grip = null;
+    if (pose === "dead") {
+      rect(2, 26, 20, 5, ink); rect(3, 27, 7, 3, trousers);
+      rect(10, 25, 7, 5, shirt); rect(17, 26, 4, 4, skin); rect(20, 26, 2, 3, hair);
+    } else {
+      const low = pose === "sneak" ? 3 : 0;
+      const leap = pose === "run" ? 2 : 0;
+      const lean = pose === "hurt" ? -1 : pose === "chase" || pose === "strike" ? 1 : 0;
+      const shoulder = 9 + low - leap - Number(lift !== 0), hip = shoulder + 10;
+      rect(8, hip - 1, 8, 3, ink);
+      for (const [index, x] of [8, 13].entries()) {
+        const stride = index ? -step : step;
+        const foot = x + stride;
+        const y = 28 + Math.sign(stride) - (lift === (index ? 1 : -1) ? 2 : 0);
+        rect(x - 1, hip, 4, 4, ink);
+        rect(x, hip, 2, 4, trousers);
+        rect(foot - 1, hip + 3, 4, y - hip - 1, ink);
+        rect(foot, hip + 3, 2, y - hip - 2, trousers);
+        rect(foot - 1, y, 4, 2, boots);
+      }
+      rect(7 + lean, shoulder, 10, hip - shoulder + 1, ink);
+      rect(8 + lean, shoulder + 1, 8, hip - shoulder - 1, shirt);
+      rect(9 + lean, shoulder + 1, 2, 7, "#ffffff18");
+      rect(15 + lean, shoulder + 2, 1, 8, "#151a194f");
+      if (pack) {
+        const px = back ? 9 + lean : 6 + lean;
+        rect(px, shoulder + 2, back ? 6 : 3, 7, "#3d4836");
+        rect(px + 1, shoulder + 3, 2, 3, "#73785a");
+      }
+      const reaches = pose === "strike" || pose === "chase";
+      const arm = reaches ? 2 : step;
+      rect(5 + lean, shoulder + 2 + step, 3, 7, ink);
+      rect(6 + lean, shoulder + 3 + step, 2, 4, shirt);
+      rect(6 + lean, shoulder + 7 + step, 2, 2, skin);
+      rect(16 + lean, shoulder + 2 - arm, reaches ? 6 : 3, reaches ? 4 : 7, ink);
+      rect(16 + lean, shoulder + 3 - arm, reaches ? 4 : 2, reaches ? 2 : 4, shirt);
+      const handX = reaches ? 21 : 17 + lean, handY = shoulder + (reaches ? 3 : 7) - arm;
+      rect(handX, handY, 2, 2, skin);
+      grip = [side > 0 ? handX + 1 : spriteWidth - handX - 1, handY + 1];
+      const head = shoulder - 7 + (step ? 1 : 0);
+      rect(9 + lean, head, 6, 7, ink);
+      rect(10 + lean, head + 1, 5, 5, back ? hair : skin);
+      rect(9 + lean, head, 6, 2, hair);
+      if (!back) {
+        rect(14 + lean, head + 3, 2, 2, skin);
+        rect(14 + lean, head + 3, 1, 1, ink);
+      }
+      if (pose === "hurt") rect(13 + lean, head + 4, 2, 1, "#a35749");
+    }
+    const frame = {canvas, left, top, grip};
+    actorFrames.set(key, frame);
+    return frame;
+  }
+
+  const woodGrip = "#775239", lightWood = "#b18a5a";
+  const steel = "#747f80", lightSteel = "#a6b0ad", darkSteel = "#394446";
+  const weaponArt = {
+    bat: [[1,0,4,2,woodGrip],[5,-1,8,3,woodGrip],[6,-1,6,1,lightWood]],
+    pipe: [[1,-1,11,2,steel],[10,-2,3,4,darkSteel],[11,-1,2,2,lightSteel]],
+    spear: [[1,0,12,1,lightWood],[12,-1,3,3,steel],[15,0,1,1,lightSteel]],
+    axe: [[1,0,10,2,woodGrip],[8,-3,4,4,darkSteel],[11,-4,2,5,lightSteel]],
+    pistol: [[1,-2,7,2,darkSteel],[2,-3,6,1,steel],[2,0,2,3,darkSteel]],
+    knife: [[1,0,2,2,woodGrip],[3,-1,4,2,lightSteel],[7,-1,1,1,steel]],
+    machete: [[1,0,3,2,darkSteel],[4,-2,7,3,steel],[5,-2,7,1,lightSteel]],
+    shovel: [[1,0,9,2,lightWood],[9,-2,4,5,steel],[12,-1,2,3,lightSteel]],
+    golfclub: [[1,0,3,2,darkSteel],[4,0,9,1,steel],[12,0,3,3,lightSteel]],
+    crowbar: [[1,0,11,2,"#87564a"],[11,-2,2,3,"#a56e5b"],[12,-2,2,1,lightSteel]]
+  };
+  const weaponSprites = new Map();
+  const weaponAngles = [-1.15, -.45, .38, .95, 0, -.25];
+  const weaponExtent = 36;
+
+  function drawHeldWeapon(id, x, y, side, phase) {
+    const art = weaponArt[id];
+    if (!art) return;
+    const key = id + ":" + side + ":" + phase;
+    let sprite = weaponSprites.get(key);
+    if (!sprite) {
+      sprite = document.createElement("canvas");
+      sprite.width = sprite.height = weaponExtent;
+      const c = sprite.getContext("2d"), pivot = weaponExtent / 2;
+      const angle = weaponAngles[phase], cos = Math.cos(angle), sin = Math.sin(angle);
+      for (const [left, top, w, h, color] of art) {
+        c.fillStyle = color;
+        for (let dy = top; dy < top + h; dy++) for (let dx = left; dx < left + w; dx++) {
+          c.fillRect(pivot + side * Math.round(dx * cos - dy * sin),
+            pivot + Math.round(dx * sin + dy * cos), 1, 1);
+        }
+      }
+      if (id === "pistol" && phase === 5) {
+        c.fillStyle = "#e59f52";
+        c.fillRect(pivot + side * 10 - 1, pivot - 6, 3, 3);
+        c.fillStyle = "#ffdf98";
+        c.fillRect(pivot + side * 10, pivot - 5, 1, 1);
+      }
+      weaponSprites.set(key, sprite);
+    }
+    ctx.drawImage(sprite, x - weaponExtent / 2, y - weaponExtent / 2);
+  }
+
+  const zombieAtlasLink = document.getElementById("micro-zombie-atlas");
+  let zombieAtlas, mirroredZombieAtlas;
+
+  function drawZombieSprite(zombie, x, y, scale, facesLeft, lift) {
+    if (!zombieAtlasLink?.href || typeof Image !== "function") return false;
+    // Four rows of 28 complete 18×32 cells, all with the manifest's (9, 30) foot pivot.
+    const columns = 28, rows = 4, width = 18, height = 32;
+    if (!zombieAtlas) {
+      zombieAtlas = new Image();
+      zombieAtlas.src = zombieAtlasLink.href;
+    }
+    if (zombieAtlas.naturalWidth !== columns * width || zombieAtlas.naturalHeight !== rows * height) return false;
+    let atlas = zombieAtlas;
+    if (facesLeft) {
+      if (!mirroredZombieAtlas) {
+        mirroredZombieAtlas = document.createElement("canvas");
+        mirroredZombieAtlas.width = columns * width;
+        mirroredZombieAtlas.height = rows * height;
+        const mirror = mirroredZombieAtlas.getContext("2d");
+        mirror.translate(mirroredZombieAtlas.width, 0);
+        mirror.scale(-1, 1);
+        mirror.drawImage(zombieAtlas, 0, 0);
+      }
+      atlas = mirroredZombieAtlas;
+    }
+    // Phase is selected at spawn and already stored in saves, so appearance does not flicker.
+    const variant = clamp(Math.floor((Number.isFinite(zombie.phase) ? zombie.phase : 0) * 14), 0, columns * rows - 1);
+    const column = variant % columns, row = Math.floor(variant / columns);
+    ctx.drawImage(atlas, (facesLeft ? columns - 1 - column : column) * width, row * height, width, height,
+      Math.round(x - 9 * scale), Math.round(y - (30 + Math.abs(lift)) * scale),
+      Math.round(width * scale), Math.round(height * scale));
+    return true;
+  }
+
+  function microActor(a, isPlayer, state, alive, x, y, scale) {
+    const moving = alive && a.moving;
+    const running = moving && (isPlayer ? state.running : a.kind === "runner" && a.alert > 0);
+    const stride = strides.get(a) ?? {x:a.x, y:a.y, phase:(a.phase || 0) % 1};
+    const distance = Math.hypot(a.x - stride.x, a.y - stride.y);
+    if (moving && distance < 1) stride.phase = (stride.phase + distance / (running ? .94 : .70)) % 1;
+    stride.x = a.x; stride.y = a.y;
+    strides.set(a, stride);
+    const frameIndex = moving ? Math.floor(stride.phase * 6) : 0;
+    const step = [0, 1, 1, 0, -1, -1][frameIndex] * (running ? 2 : 1);
+    const lift = [0, -1, 0, 0, 1, 0][frameIndex];
+    const pose = !alive ? "dead" : a.flash > 0 ? "hurt" : a.swing > 0 || a.windup > 0 ? "strike" :
+      isPlayer && state.quiet ? "sneak" : running ? "run" : moving && a.stats && a.alert > 0 ? "chase" : "idle";
+    const swing = isPlayer && a.swing > 0 ? state.swingVisual : null;
+    const dx = swing?.dx ?? a.headingX ?? (a.face < 0 ? -1 : 1), dy = swing?.dy ?? a.headingY ?? 0;
+    const direction = Number(dx < dy) + 2 * Number(dx + dy < 0);
+    const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, lift);
+    if (!imported) {
+      const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : "#748d7a") :
+        Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
+      const frame = actorFrame(shirt, isPlayer ? "#465a5d" : "#56564c",
+        pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
+        isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step, lift,
+        a.outfit === "hiker" || Boolean(isPlayer && a.backpack));
+      const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - (spriteHeight - 1) * scale);
+      ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
+        Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
+      if (isPlayer && frame.grip) {
+        const id = swing?.weapon ?? Sim.weapon(state).id;
+        const phase = swing ? (id === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
+          a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : step > 0 ? 2 : 1;
+        drawHeldWeapon(id, left + frame.grip[0], top + frame.grip[1], dx < dy ? -1 : 1, phase);
+      }
+    }
+    if (alive && (a.windup > 0 || a.stats && a.alert > 0)) {
+      const height = Math.round(32 * scale);
+      ctx.fillStyle = a.windup > 0 ? "#ff987d" : "#cb735b";
+      ctx.fillRect(Math.round(x), Math.round(y) - height - 5, 2, a.windup > 0 ? 5 : 3);
+    }
+  }
+
   function actor(a, isPlayer, state, clock, inReach) {
     const alive = isPlayer || a.hp > 0;
     const [x, y] = p(a.x, a.y);
@@ -792,6 +1278,16 @@ const View = (() => {
       ctx.ellipse(x, y + 1, 16 * scale, 7 * scale, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
+    }
+    if (darkLook) {
+      microActor(a, isPlayer, state, alive, x, y, scale);
+      if (alive && a.stats && (state.target === a || a.hp < a.stats.hp && a.alert > 0)) {
+        ctx.fillStyle = "#1d261d";
+        ctx.fillRect(x - 8, y - 42 * scale, 16, 2);
+        ctx.fillStyle = "#e27a5c";
+        ctx.fillRect(x - 8, y - 42 * scale, 16 * a.hp / a.stats.hp, 2);
+      }
+      return;
     }
     ctx.save();
     ctx.translate(x, y);
@@ -1009,13 +1505,14 @@ const View = (() => {
     const world=state.world,player=state.player,menu=state.mode==="menu",cave=world.underground;
     ctx = mainCtx;
     darkLook = state.look === "dark";
-    // Dark pixel look: the world is drawn at ~640 px wide and enlarged with hard pixels (also much cheaper to rasterise).
-    const pixCss = darkLook ? Math.max(1, Math.round(width / 640)) : 1;
+    // Retain individual sprite pixels on phones and ordinary desktop viewports.
+    const pixCss = darkLook ? Math.max(1, Math.floor(width / 840)) : 1;
     if (darkLook) {
       const lw = Math.ceil(width / pixCss), lh = Math.ceil(height / pixCss);
       if (!lowCanvas) { lowCanvas = document.createElement("canvas"); lowCtx = lowCanvas.getContext("2d"); }
       if (lowCanvas.width !== lw || lowCanvas.height !== lh) { lowCanvas.width = lw; lowCanvas.height = lh; }
       ctx = lowCtx;
+      ctx.imageSmoothingEnabled = false;
       ctx.setTransform(1 / pixCss,0,0,1 / pixCss,0,0);
       ctx.setTransform(1,0,0,1,0,0);
     } else ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1115,7 +1612,7 @@ const View = (() => {
       else if(entry.kind==="roof") {
         if (entry.fade) {
           ctx.save();
-          ctx.globalAlpha = .24;
+          ctx.globalAlpha = darkLook ? .42 : .24;
           roof(entry.obj);
           ctx.restore();
         } else roof(entry.obj);
@@ -1193,10 +1690,10 @@ const View = (() => {
       ctx.setTransform(1,0,0,1,0,0);
       if (!cave) {
         ctx.globalCompositeOperation = "saturation"; ctx.globalAlpha = .42; ctx.fillStyle = "#808080"; ctx.fillRect(0,0,lw,lh);
-        ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = 1; ctx.fillStyle = "#aab3c4"; ctx.fillRect(0,0,lw,lh);
+        ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = 1; ctx.fillStyle = "#c6ccd4"; ctx.fillRect(0,0,lw,lh);
         ctx.globalCompositeOperation = "source-over";
-        let g = ctx.createLinearGradient(0,lh * .6,0,lh); g.addColorStop(0,"rgba(120,135,150,0)"); g.addColorStop(1,"rgba(120,135,150,.13)"); ctx.fillStyle = g; ctx.fillRect(0,0,lw,lh);
-        g = ctx.createRadialGradient(lw / 2,lh * .54,lh * .3,lw / 2,lh * .54,lw * .66); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.58)"); ctx.fillStyle = g; ctx.fillRect(0,0,lw,lh);
+        let g = ctx.createLinearGradient(0,lh * .6,0,lh); g.addColorStop(0,"rgba(120,135,150,0)"); g.addColorStop(1,"rgba(120,135,150,.075)"); ctx.fillStyle = g; ctx.fillRect(0,0,lw,lh);
+        g = ctx.createRadialGradient(lw / 2,lh * .54,lh * .3,lw / 2,lh * .54,lw * .66); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.38)"); ctx.fillStyle = g; ctx.fillRect(0,0,lw,lh);
       }
       ctx = mainCtx;
       ctx.setTransform(1,0,0,1,0,0);
@@ -1233,7 +1730,8 @@ const View = (() => {
       for(let i=0;i<40;i++){
         const x=(i*97+clock*95)%width,y=(i*137+clock*240)%height;
         const isoX=(x-camera.x)/zoom,isoY=(y-camera.y)/zoom;
-        const rainTile=World.tileAt(world,(isoX/halfW+isoY/halfH)/2,(isoY/halfH-isoX/halfW)/2);
+        const ground = unproject(isoX, isoY);
+        const rainTile = World.tileAt(world, ground.x, ground.y);
         if(currentBuilding&&rainTile?.building===currentBuilding)continue;
         ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-4,y+13);ctx.stroke();
       }
@@ -1244,7 +1742,7 @@ const View = (() => {
   function locate(clientX,clientY,state) {
     const rect=canvas.getBoundingClientRect();
     const sx=(clientX-rect.left-camera.x)/camera.zoom,sy=(clientY-rect.top-camera.y)/camera.zoom;
-    const ground = {x:(sx/halfW+sy/halfH)/2, y:(sy/halfH-sx/halfW)/2};
+    const ground = unproject(sx, sy);
     if (state.blueprint) return ground;
     const optics = Sim.sight(state);
     const hit=(o,z,rx=19,ry=25)=>{const [x,y]=p(o.x,o.y,z);return Math.abs(sx-x)<rx&&Math.abs(sy-y)<ry;};

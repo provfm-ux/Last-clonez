@@ -8,12 +8,20 @@ const html = fs.readFileSync(path.join(dir, "index.html"), "utf8");
 const files = [...html.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "game");
 const pascal = f => f.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join("");
 const counts = {};
+let heldWeapon = null;
 const mk = () => new Proxy({}, {
   get(t, k) { if (k in t) return t[k]; if (k === "canvas") return {width: 1280, height: 720}; if (k === "measureText") return () => ({width: 10});
     if (k === "createRadialGradient" || k === "createLinearGradient") return () => { counts[k] = (counts[k] || 0) + 1; return {addColorStop() {}}; };
-    return () => { counts[k] = (counts[k] || 0) + 1; }; },
+    return (...args) => {
+      counts[k] = (counts[k] || 0) + 1;
+      if (k === "drawImage" && args.length === 3 && args[0]?.width === 72 && args[0]?.height === 64) {
+        counts.furnitureBlit = (counts.furnitureBlit || 0) + 1;
+      }
+      if (k === "drawImage" && args.length === 3 && args[0]?.width === 36 && args[0]?.height === 36) heldWeapon = args[0];
+      if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 32) counts.actorBlit = (counts.actorBlit || 0) + 1;
+    }; },
   set(t, k, v) { t[k] = v; return true; }});
-const mkCanvas = () => ({width: 0, height: 0, getContext: () => mk(), getBoundingClientRect: () => ({width: 1280, height: 720}), style: {}, clientWidth: 160});
+const mkCanvas = () => ({width: 0, height: 0, getContext: () => mk(), getBoundingClientRect: () => ({left: 0, top: 0, width: 1280, height: 720}), style: {}, clientWidth: 160});
 const worldCanvas = mkCanvas();
 const context = {console, Math: Object.assign(Object.create(Math), {random: (() => { let s = 3; return () => (s = s * 16807 % 2147483647) / 2147483647; })()}), Date, JSON, structuredClone, devicePixelRatio: 1,
   ResizeObserver: class { observe() {} }, document: {getElementById: id => id === "world" ? worldCanvas : mkCanvas(), createElement: () => mkCanvas()}};
@@ -40,6 +48,11 @@ check("paredes: o canto liga as duas paredes sem sobressair",
   corner.wallOutline.some(([, y]) => y === 1) &&
   corner.wallOutline.every(([x, y]) => x > 0 && y > 0));
 const first = per(() => View.render(s, 0, 1 / 60));
+s.blueprint = "test";
+const point = View.locate(640 + 32 * 1.12, 720 * .54 + 16 * 1.12, s);
+delete s.blueprint;
+check("projeção isométrica 2:1: o centro do tile vizinho converte para o mundo",
+  Math.abs(point.x - s.player.x - 1) < 1e-6 && Math.abs(point.y - s.player.y) < 1e-6);
 const steady = per(n => { for (let i = 0; i < n; i++) View.render(s, i / 60, 1 / 60); }, 10);
 s.fastGround = false; const classic = per(n => { for (let i = 0; i < n; i++) View.render(s, i / 60, 1 / 60); }, 10); s.fastGround = true;
 check("chão em cache: frames estáveis não reconstroem blocos", (steady.setTransform || 0) <= 3, "setTransform/frame " + (steady.setTransform || 0).toFixed(1));
@@ -64,6 +77,7 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   try { for (let i = 0; i < 6; i++) View.render(d, i / 60, 1 / 60); } catch (x) { e = x.stack.split("\n").slice(0, 2).join(" | "); }
   check("dark pixel: desenha sem erros", e === null, e ?? "");
   const dsteady = per(n => { for (let i = 0; i < n; i++) View.render(d, i / 60, 1 / 60); }, 10);
+  check("dark pixel: personagens usam os sprites do atlas", (dsteady.actorBlit || 0) > 0);
   check("dark pixel: frame estável não reconstrói blocos", (dsteady.setTransform || 0) < 12, (dsteady.setTransform || 0).toFixed(1) + " setTransform/frame");
   check("dark pixel: usa um buffer de baixa resolução (drawImage do buffer)", (dsteady.drawImage || 0) >= 1, (dsteady.drawImage || 0) + " drawImage/frame");
   const ww = d.world, cx = Math.floor(d.player.x), cy = Math.floor(d.player.y);
@@ -74,6 +88,43 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   e = null; try { View.render(d, 0, 1 / 60); } catch (x) { e = x.message; } check("dark pixel: cadáver com poça de sangue desenha sem erros", e === null, e ?? "");
   d.look = "fast"; e = null; try { View.render(d, 0, 1 / 60); View.minimap({width: 160, height: 160, getContext: () => mk(), clientWidth: 160}, d); } catch (x) { e = x.message; }
   check("dark pixel: voltar a Fast/Classic e desenhar o minimapa funciona (contexto restaurado)", e === null, e ?? ""); }
+{
+  const interior = Sim.createControl("survival", "carer", "shelter"), world = interior.world;
+  const house = world.buildings.find(b => b.compact);
+  const floor = world.tiles.find(t => t.building === house.id && !t.solid);
+  Object.assign(interior.player, {x:floor.x + .5, y:floor.y + .5});
+  interior.look = "dark";
+  world.explored.fill(1);
+  View.prepare(world);
+  View.render(interior, 0, 1 / 60);
+  const furniture = per(() => View.render(interior, 1 / 60, 1 / 60));
+  check("dark pixel: interior desenha vários móveis a partir do cache", (furniture.furnitureBlit || 0) >= 4);
+}
+{
+  const run = Sim.createControl("training", "carer", "shelter");
+  run.look = "dark";
+  View.prepare(run.world);
+  const weapons = Object.keys(context.Data.items).filter(id => context.Data.items[id].damage);
+  const sprites = weapons.map(id => {
+    run.player.bag.push({id, qty:1, uid:"render-" + id, condition:100});
+    Sim.use(run, run.player.bag.length - 1);
+    heldWeapon = null;
+    View.render(run, 0, 1 / 60);
+    return heldWeapon;
+  });
+  check("dark pixel: cada arma equipada tem um sprite distinto", sprites.every(Boolean) && new Set(sprites).size === weapons.length);
+  run.swingVisual = {weapon:"bat", dx:1, dy:0};
+  run.player.swing = .17;
+  View.render(run, 0, 1 / 60);
+  const raised = heldWeapon;
+  run.player.swing = .08;
+  View.render(run, 0, 1 / 60);
+  check("dark pixel: a arma muda de pose durante o ataque", heldWeapon && raised !== heldWeapon);
+  run.swingVisual.weapon = "fists";
+  heldWeapon = null;
+  View.render(run, 0, 1 / 60);
+  check("dark pixel: empurrar não mostra um golpe de arma", heldWeapon === null);
+}
 if (!quiet) console.log("\nOperações por frame (jogo parado): " + Math.round(Object.values(steady).reduce((a, b) => a + b, 0)) + " (clássico: " + Math.round(Object.values(classic).reduce((a, b) => a + b, 0)) + ")");
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

@@ -683,19 +683,19 @@ const Sim = (() => {
       p.moving = false;
     } else if (manual) {
       p.path = [];
-      const target = Math.atan2(input.y - input.x * .53, input.x * .53 + input.y);
+      const target = Math.atan2(input.y - input.x * .5, input.x * .5 + input.y);
       const heading = car.heading ?? (car.axis === "x" ? Math.PI : -Math.PI / 2);
       const delta = Math.atan2(Math.sin(target - heading), Math.cos(target - heading));
       const backing = Math.abs(delta) > Math.PI * .55;
       const turn = backing ? delta - Math.sign(delta) * Math.PI : delta;
-      const steering = clamp(turn, -dt * 4, dt * 4);
-      const angle = heading + steering;
-      car.heading = Math.atan2(Math.sin(angle), Math.cos(angle));
-      // Steering rotates the car before the wheels can carry it sideways.
-      const traction = Math.max(0, Math.cos(turn - steering));
+      // Turn radius is tied to wheel travel, including while reversing.
+      const traction = Math.max(.4, Math.cos(turn));
       const step = p.driveSpeed * dt * traction * (backing ? -.65 : 1);
+      const maxTurn = Math.abs(step) / 1.35;
+      const angle = heading + clamp(turn, -maxTurn, maxTurn);
       wantsToMove = Math.abs(step) > .0001;
       p.moving = wantsToMove && move(s, p, Math.cos(angle) * step, Math.sin(angle) * step);
+      if (p.moving) car.heading = Math.atan2(Math.sin(angle), Math.cos(angle));
     } else p.moving = follow(s, p, p.driveSpeed * dt);
     p.velocityX = (p.x - beforeX) / dt;
     p.velocityY = (p.y - beforeY) / dt;
@@ -1764,6 +1764,7 @@ const Sim = (() => {
       return false;
     }
     faceTowards(p, z);
+    s.swingVisual = {weapon:item.id, dx:z.x - p.x, dy:z.y - p.y};
     p.cooldown = w.delay; p.staminaDelay = .7; p.swing = .18;
     p.stamina = Math.max(0, p.stamina - w.effort);
     if (w.firearm) remove(p.bag, "ammo", 1);
@@ -1798,6 +1799,7 @@ const Sim = (() => {
     if (!near) return false;
     if (s.target) endPursuit(s);
     faceTowards(p, near);
+    s.swingVisual = {weapon:"fists", dx:near.x - p.x, dy:near.y - p.y};
     p.stamina -= 10; p.cooldown = .7; p.swing = .18;
     near.stagger = 1.1; near.swing = 0;
     endWindup(near);
@@ -1874,7 +1876,7 @@ const Sim = (() => {
     const screenX = actor.x - beforeX - actor.y + beforeY;
     if (!(actor.swing > 0) && Math.abs(screenX) > .008) actor.face = Math.sign(screenX);
     const length = Math.hypot(actor.x - beforeX, actor.y - beforeY);
-    if (actor === s.player && !driving && length > .0001) {
+    if (length > .0001) {
       actor.headingX = (actor.x - beforeX) / length;
       actor.headingY = (actor.y - beforeY) / length;
     }
@@ -1970,7 +1972,7 @@ const Sim = (() => {
     const footing = surface === "sand" ? .78 : surface === "field" ? .88 : 1;
     const speed = (s.running ? 4 : s.quiet ? 1.6 : 2.55) * (injury ? .8 : 1) * (load > .9 ? .9 : 1) * (p.fatigue > 85 || cold ? .8 : 1) * (p.grabbed > 0 ? .4 : 1) * (p.fracture > 0 ? (p.splinted ? Data.fracture.splintSpeed : Data.fracture.brokenSpeed) : 1) * footing;
     if (manual) {
-      const dx = input.x * .53 + input.y, dy = input.y - input.x * .53, mag = Math.hypot(dx, dy);
+      const dx = input.x * .5 + input.y, dy = input.y - input.x * .5, mag = Math.hypot(dx, dy);
       const strength = Math.min(1, Math.hypot(input.x, input.y));
       p.moving = move(s, p, dx / mag * speed * dt * strength, dy / mag * speed * dt * strength);
     } else p.moving = follow(s, p, speed * dt);

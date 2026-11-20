@@ -94,6 +94,13 @@ const View = (() => {
     camera.ready = false;
     const buildings = new Map(world.buildings.map(b => [b.id, b]));
     world.roofTiles = new Map(world.buildings.map(b => [b.id, []]));
+    for (const home of world.buildings.filter(b => b.type === "home")) {
+      for (let y = Math.max(0, home.y - 2); y < Math.min(world.height, home.y + home.h + 2); y++) {
+        for (let x = Math.max(0, home.x - 2); x < Math.min(world.width, home.x + home.w + 2); x++) {
+          world.tiles[y * world.width + x].nearHome = true;
+        }
+      }
+    }
     const surfaces = {grass:world.region === "ridge" ? "#435944" : world.region === "fields" ? "#526244" : "#45553a",
       asphalt:"#484d43",path:"#77806e",trail:"#77684e",water:world.region === "coast" ? "#325961" : "#3b6164",
       rock:world.underground ? "#393f40" : "#656d64",concrete:"#61635d",rail:"#615952",sand:"#a39771",bridge:"#88745c",field:"#726247"};
@@ -134,15 +141,16 @@ const View = (() => {
   }
 
   const BLOOD = ["#4a0c0f", "#6a1216", "#8c1a1c", "#2c070a"];
+  const GROUND_BLOOD = ["#4a191d80", "#662f3466", "#75363b55", "#32191b80"];
   const dot = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
-  function bloodPool(wx, wy, rx, ry, seed) {
+  function bloodPool(wx, wy, rx, ry, seed, colors = BLOOD) {
     const ring = (k, color) => poly(Array.from({length: 10}, (_, i) => p(wx + Math.cos(i / 10 * 6.283) * rx * k * (1 + .18 * Math.sin(seed + i * 2.3)), wy + Math.sin(i / 10 * 6.283) * ry * k)), color);
-    ring(1, BLOOD[3]); ring(.72, BLOOD[0]); ring(.34, BLOOD[1]);
-    const [hx, hy] = p(wx - rx * .2, wy - ry * .1); dot(hx, hy, 3, 2, BLOOD[2]);
+    ring(1, colors[3]); ring(.72, colors[0]); ring(.34, colors[1]);
+    const [hx, hy] = p(wx - rx * .2, wy - ry * .1); dot(hx, hy, 3, 2, colors[2]);
   }
   function microDetail(t) {
     const {x, y} = t, h = ((x * 73856093) ^ (y * 19349663)) >>> 0, at = (u, v) => p(x + u, y + v);
-    const spot = (u, v, n, r, seed) => { for (let k = 0; k < n; k++) { const q = ((seed + k * 40503) * 2654435761) >>> 0, [px, py] = at(Math.min(.95, Math.max(.05, u + ((q % 100) / 100 - .5) * r)), Math.min(.95, Math.max(.05, v + (((q >> 8) % 100) / 100 - .5) * r))); dot(px, py, 2 + (q >> 16 & 1), 2, BLOOD[k % 3 ? (q >> 20 & 1) : 3]); } };
+    const spot = (u, v, n, r, seed) => { for (let k = 0; k < n; k++) { const q = ((seed + k * 40503) * 2654435761) >>> 0, [px, py] = at(Math.min(.95, Math.max(.05, u + ((q % 100) / 100 - .5) * r)), Math.min(.95, Math.max(.05, v + (((q >> 8) % 100) / 100 - .5) * r))); dot(px, py, 2 + (q >> 16 & 1), 2, GROUND_BLOOD[k % 3 ? (q >> 20 & 1) : 3]); } };
     if (t.surface === "grass" || t.surface === "field") {
       for (let k = 0; k < 6; k++) { const q = ((h + k * 977) * 2246822519) >>> 0, [px, py] = at(.12 + (q % 76) / 100, .12 + ((q >> 7) % 76) / 100);
         dot(px, py - 3, 2, 4, k % 3 === 0 ? "#2a3a22" : k % 3 === 1 ? "#4b5f38" : "#364a2a"); if (k === 2) dot(px + 2, py - 2, 2, 3, "#5d6e42"); }
@@ -154,11 +162,11 @@ const View = (() => {
     } else if (t.surface === "tile" || t.surface === "sand") {
       for (let k = 0; k < 4; k++) { const q = ((h + k * 733) * 2654435761) >>> 0, [px, py] = at((q % 80) / 100 + .1, ((q >> 8) % 80) / 100 + .1); dot(px, py, 2, 2, t.surface === "sand" ? "#c9b98c" : k % 2 ? "#2c2820" : "#5a5444"); }
     }
-    if (t.surface === "water") return;
+    if (!t.nearHome || t.surface === "water") return;
     const heavy = t.surface === "asphalt" || t.surface === "tile";
-    if (h % (heavy ? 5 : 8) === 0) spot(.5, .5, 3 + (h >> 4) % 4, .7, h);
-    if (h % 47 === 0) { const [px, py] = at(.5, .5); bloodPool(x + .5, y + .5, .26, .16, h % 7); spot(.5, .5, 5, .9, h + 5); }
-    if (h % 61 === 0) { for (let k = 1; k < 6; k++) spot(.15 + k * .14, .3 + k * .08, 1, .1, h + k * 13); }
+    if (h % (heavy ? 8 : 12) === 0) spot(.5, .5, 3 + (h >> 4) % 4, .7, h);
+    if (h % 71 === 0) { bloodPool(x + .5, y + .5, .20, .13, h % 7, GROUND_BLOOD); spot(.5, .5, 5, .9, h + 5); }
+    if (h % 97 === 0) { for (let k = 1; k < 6; k++) spot(.15 + k * .14, .3 + k * .08, 1, .1, h + k * 13); }
   }
 
   function tileArt(t) {

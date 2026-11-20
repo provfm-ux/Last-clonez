@@ -30,6 +30,11 @@ const per = (fn, n = 1) => { reset(); fn(n); return Object.fromEntries(Object.en
 const s = Sim.createControl("survival", "carer", "shelter"); View.prepare(s.world);
 const home = s.world.buildings.find(b => b.compact);
 const corner = home && context.World.tileAt(s.world, home.x, home.y);
+const doorstep = home && context.World.tileAt(s.world, home.x - 1, home.y);
+const wilderness = s.world.tiles.find(t => t.surface === "grass" && s.world.buildings.every(b =>
+  b.type !== "home" || t.x < b.x - 2 || t.x >= b.x + b.w + 2 || t.y < b.y - 2 || t.y >= b.y + b.h + 2));
+check("sangue no terreno: limitado à zona das casas",
+  corner?.nearHome === true && doorstep?.nearHome === true && wilderness && !wilderness.nearHome);
 check("paredes: o canto liga as duas paredes sem sobressair",
   corner?.wallOutline.some(([x]) => x === 1) &&
   corner.wallOutline.some(([, y]) => y === 1) &&

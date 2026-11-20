@@ -668,10 +668,12 @@
     if ($("condition-count").textContent !== count) $("condition-count").textContent = count;
     const description = "View conditions and injuries. " + (statuses.map(status => status.label).join(", ") || "Stable");
     if (bar.getAttribute("aria-label") !== description) bar.setAttribute("aria-label",description);
-    const w = Sim.weaponData(state), item = Sim.weapon(state);
-    $("weapon").textContent = car ? "Vehicle" : !active() ? "Gear" : w.name;
-    $("condition").textContent = !active() ? "" : car ? Math.round(car.fuel) + "% fuel · " + Math.round(car.hp/1.4) + "% condition" :
-      item.id === "fists" ? "Unarmed" : weaponCondition(item) + (w.firearm ? " · " + itemCount("ammo") + " rounds" : "");
+    const item = Sim.weapon(state), w = Data.items[item.id];
+    const showEquipment = active() && Boolean(car || w);
+    $("weapon").hidden = $("condition").hidden = !showEquipment;
+    $("weapon").textContent = car ? "Vehicle" : w?.name ?? "";
+    $("condition").textContent = car ? Math.round(car.fuel) + "% fuel · " + Math.round(car.hp/1.4) + "% condition" :
+      w ? weaponCondition(item) + (w.firearm ? " · " + itemCount("ammo") + " rounds" : "") : "";
     $("shove-label").textContent = car ? "Brake" : "Shove";
     $("destination-btn").hidden = !active() || state.hideNavigation;
     $("world-tools").hidden = !active();
@@ -1045,7 +1047,7 @@
             " condition max · " + (recipe.mend ? "1 cloth" : "1 scrap") + " · 1 tape") + '</div>' : "") + "</div></div>";
       (d.damage ? weapons : equipment).push(row);
     });
-    const slots = [["In hand",current.id === "fists" ? "Fists" : Data.items[current.id].name],
+    const slots = [["In hand",Data.items[current.id]?.name],
       ["Head",Data.items[p.gear.head]?.name],["Body",Data.items[p.gear.body]?.name],["Arms",Data.items[p.gear.arms]?.name],
       ["Hands",Data.items[p.gear.hands]?.name],["Wrist",Data.items[p.gear.wrist]?.name],["Legs",Data.items[p.gear.legs]?.name],
       ["Feet",Data.items[p.gear.feet]?.name],["Back",p.backpack ? "Backpack" : null]];

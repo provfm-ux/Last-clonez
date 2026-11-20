@@ -23,7 +23,7 @@
 <script src="afterlife.js?v=0.33-sprites" defer></script>
 <script src="sim.js?v=diy-books" defer></script>
 <script src="view.js?v=equipment" defer></script>
-<script src="game.js?v=diy-books" defer></script>
+<script src="game.js?v=gear-label" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -152,7 +152,7 @@
         <button class="vital fatigue" data-panel="health"><div><span>REST</span><b id="rest-num">92</b></div><div class="track"><div id="rest-bar"></div></div></button>
       </div>
       <div class="equip-row">
-        <button class="equipped" id="gear-btn" type="button" title="Equipment · G" disabled><span class="equip-label">Gear</span><b id="weapon">Gear</b><small id="condition"></small></button>
+        <button class="equipped" id="gear-btn" type="button" title="Equipment · G" disabled><span class="equip-label">Gear</span><b id="weapon" hidden></b><small id="condition" hidden></small></button>
         <div class="carry"><svg class="icon" aria-hidden="true"><use href="#pack"/></svg><b id="carry">5.6 / 16 kg</b></div>
         <button class="craft-shortcut" id="craft-btn"><svg class="icon"><use href="#build"/></svg> Build <kbd>B</kbd></button>
       </div>

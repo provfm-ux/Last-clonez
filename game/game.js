@@ -984,20 +984,23 @@
 
   function updateBelt() {
     $("quick-belt").hidden = !active();
-    const lamp = Sim.activeLight(state), p = state.player;
-    p.belt.forEach((id, index) => {
-      const control = $("belt-" + index), d = Data.items[id], item = Sim.beltItem(state, id);
-      const qty = d ? itemCount(id) : 0;
-      const on = Boolean(item && (item === lamp || d.damage && item === Sim.weapon(state)));
-      const info = !id ? "+" : !item ? "—" : id === "flashlight" ? (on ? "ON · " : "") +
-        Math.ceil(item.charge / Data.flashlight.capacity * 100) + "%" : d.damage ? Math.round(item.condition ?? 100) + "%" : "×" + qty;
-      $("belt-label-" + index).textContent = d?.name || "Set slot";
+    const lamp = Sim.activeLight(state), equipped = Sim.weapon(state);
+    state.player.belt.forEach((id, index) => {
+      const control = $("belt-" + index), d = Data.items[id];
+      const item = id && equipped.id === id ? equipped : Sim.beltItem(state,id);
+      const on = Boolean(item && (item === lamp || item === equipped));
+      const label = !id ? "Set slot" : !item ? "Empty" : d.damage && !on ? "Equip weapon" : d.name;
+      const info = !id ? "+" : !item ? "" : id === "flashlight" ? (on ? "ON · " : "") +
+        Math.ceil(item.charge / Data.flashlight.capacity * 100) + "%" : d.damage ? on ? Math.round(item.condition ?? 100) + "%" : "" : "×" + itemCount(id);
+      $("belt-label-" + index).textContent = label;
       $("belt-info-" + index).textContent = info;
-      $("belt-icon-" + index).setAttribute("href", "#" + (d?.icon || "pack"));
+      $("belt-icon-" + index).setAttribute("href", "#" + (item && (!d.damage || on) ? d.icon : "pack"));
       control.classList.toggle("belt-empty", Boolean(id && !item));
       control.classList.toggle("belt-on", on);
-      control.setAttribute("aria-label", "Slot " + (index + 1) + " · " + (d?.name || "assign item") + " · " + info);
-      control.title = (d?.name || "Assign item") + " · " + (index + 1) + " · " + info;
+      control.disabled = Boolean(id && !item);
+      const description = "Slot " + (index + 1) + " · " + label + (info ? " · " + info : "");
+      control.setAttribute("aria-label", description);
+      control.title = description;
     });
   }
 

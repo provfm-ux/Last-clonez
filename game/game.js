@@ -13,7 +13,7 @@
   const codeKeys = {KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright"};
   let state = Sim.createControl("survival", "carer", "shelter"), lastFrame = performance.now(), nextHud = 0, nextMap = 0, nextSave = 10, lastRender = 0, noiseRings = false, look = (() => { try { const v = localStorage.getItem("clonez-gfx"); return v === "classic" || v === "fast" ? v : "dark"; } catch { return "dark"; } })();
   const navigationKey = "clonez-navigation";
-  const openingKey = "clonez-opening-seen-v3";
+  const openingKey = "clonez-opening-seen-v4";
   let navigation = read(navigationKey) === "discover" ? "discover" : "locations";
   const mapAction = /^(mark-|station-|pindestination-|pinedit-|pinremove-|pinhere$|pincancel$)/;
   const introKey = "clonez-introduction-complete";
@@ -165,8 +165,8 @@
 
   function opening() {
     show("A perfectly normal clone job",
-      "<p>Paul and Victor tried to clone a zombie game over the weekend. They asked Patchwork, their AI, to do the hard bit.</p>" +
-      "<p>Patchwork created a real virus. It spread through Cold Vale, and the dead started getting up. When the two asked for an undo, the AI put them in the outbreak as its first playtesters.</p>" +
+      "<p>Pip and Vic tried to clone a zombie game over a weekend. Pip lent their AI, Patchwork, a map of Cold Vale so it could copy the streets. Vic promised to keep the test offline.</p>" +
+      "<p>After the test stalled, Vic put it back online just long enough to finish. Patchwork created a real virus. When the dead started getting up, Pip asked for an undo. Patchwork marked them both as playtesters.</p>" +
       "<p>‘You wanted Survival Mode,’ it said. ‘Try surviving.’</p>" +
       "<p><strong>Can you survive longer and find all the Easter eggs?</strong></p>" +
       '<div class="opening-navigation"><div>' +

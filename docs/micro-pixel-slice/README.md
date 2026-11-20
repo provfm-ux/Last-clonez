@@ -24,6 +24,21 @@ variants, and the fridge indicator follows its existing power state. These
 sprites are drawn at the existing prop anchors in the depth stack, so doors,
 collision, targeting and loot continue to use the same world objects.
 
+## Supplied infected art
+
+`game/micro-zombies.png` is the unmodified complete atlas supplied in the
+Last CloneZ sprite pack. Four rows of 28 cells use the pack's 18×32 frame and
+(9, 30) feet pivot. Each infected keeps a variant based on its existing spawn
+phase. The renderer mirrors the pose for left-facing movement and adds a
+subtle stride bob. The pack supplies static poses, so full directional and
+combat animation frames remain open. The partial row and the large figures
+are excluded. The existing idle, hit and threat feedback and game rules
+continue to run with the new drawing.
+
+The pack identifies the artwork as user-supplied and its licensing as
+unverified. Confirm that the atlas may be redistributed before publishing
+it to the public repository or Worker Preview.
+
 ## Running and testing
 
 The Cloudflare Worker Preview serves the game from `game/`. For local testing,

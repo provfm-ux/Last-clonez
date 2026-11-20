@@ -1141,6 +1141,40 @@ const View = (() => {
     return frame;
   }
 
+  const zombieAtlasLink = document.getElementById("micro-zombie-atlas");
+  let zombieAtlas, mirroredZombieAtlas;
+
+  function drawZombieSprite(zombie, x, y, scale, facesLeft, lift) {
+    if (!zombieAtlasLink?.href || typeof Image !== "function") return false;
+    // Four rows of 28 complete 18×32 cells, all with the manifest's (9, 30) foot pivot.
+    const columns = 28, rows = 4, width = 18, height = 32;
+    if (!zombieAtlas) {
+      zombieAtlas = new Image();
+      zombieAtlas.src = zombieAtlasLink.href;
+    }
+    if (zombieAtlas.naturalWidth !== columns * width || zombieAtlas.naturalHeight !== rows * height) return false;
+    let atlas = zombieAtlas;
+    if (facesLeft) {
+      if (!mirroredZombieAtlas) {
+        mirroredZombieAtlas = document.createElement("canvas");
+        mirroredZombieAtlas.width = columns * width;
+        mirroredZombieAtlas.height = rows * height;
+        const mirror = mirroredZombieAtlas.getContext("2d");
+        mirror.translate(mirroredZombieAtlas.width, 0);
+        mirror.scale(-1, 1);
+        mirror.drawImage(zombieAtlas, 0, 0);
+      }
+      atlas = mirroredZombieAtlas;
+    }
+    // Phase is selected at spawn and already stored in saves, so appearance does not flicker.
+    const variant = clamp(Math.floor((Number.isFinite(zombie.phase) ? zombie.phase : 0) * 14), 0, columns * rows - 1);
+    const column = variant % columns, row = Math.floor(variant / columns);
+    ctx.drawImage(atlas, (facesLeft ? columns - 1 - column : column) * width, row * height, width, height,
+      Math.round(x - 9 * scale), Math.round(y - (30 + Math.abs(lift)) * scale),
+      Math.round(width * scale), Math.round(height * scale));
+    return true;
+  }
+
   function microActor(a, isPlayer, state, alive, x, y, scale) {
     const moving = alive && a.moving;
     const running = moving && (isPlayer ? state.running : a.kind === "runner" && a.alert > 0);
@@ -1156,15 +1190,18 @@ const View = (() => {
       isPlayer && state.quiet ? "sneak" : running ? "run" : moving && a.stats && a.alert > 0 ? "chase" : "idle";
     const dx = a.headingX ?? (a.face < 0 ? -1 : 1), dy = a.headingY ?? 0;
     const direction = Number(dx < dy) + 2 * Number(dx + dy < 0);
-    const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : "#748d7a") :
-      Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
-    const frame = actorFrame(shirt, isPlayer ? "#465a5d" : "#56564c",
-      pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
-      isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step, lift,
-      a.outfit === "hiker" || Boolean(isPlayer && a.backpack));
-    ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight,
-      Math.round(x - spriteWidth * scale / 2), Math.round(y - (spriteHeight - 1) * scale),
-      Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
+    const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, lift);
+    if (!imported) {
+      const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : "#748d7a") :
+        Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
+      const frame = actorFrame(shirt, isPlayer ? "#465a5d" : "#56564c",
+        pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
+        isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step, lift,
+        a.outfit === "hiker" || Boolean(isPlayer && a.backpack));
+      ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight,
+        Math.round(x - spriteWidth * scale / 2), Math.round(y - (spriteHeight - 1) * scale),
+        Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
+    }
     if (alive && (a.windup > 0 || a.stats && a.alert > 0)) {
       const height = Math.round(32 * scale);
       ctx.fillStyle = a.windup > 0 ? "#ff987d" : "#cb735b";

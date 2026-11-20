@@ -897,6 +897,7 @@ const Sim = (() => {
         const damage = Math.round(crashSpeed * 5);
         car.hp = Math.max(0, car.hp - damage); p.driveSpeed = 0;
         noise(s, p.x, p.y, 14);
+        hear(s,"crash",p);
         if (damage >= 25 && !(p.fracture > 0) && s.world.rng() < .25) breakLeg(s, "The crash broke your leg.");
         s.effects.push({x: p.x, y: p.y, text: "CRASH −" + damage, color: "#e3a289", life: 1});
         if (car.hp > 0 && car.hp < 45 && !car.warnedSmoke) { car.warnedSmoke = true; notify(s, "The engine is smoking. Repair the vehicle soon.", true); }
@@ -1085,8 +1086,9 @@ const Sim = (() => {
     }
   }
 
-  function hear(s, kind, point) {
-    s.sounds.push({kind,x:point.x,y:point.y,muffled:!lineOfSight(s,s.player,point)});
+  function hear(s, kind, point, intensity = 1) {
+    const zombieVoice = kind === "near" || kind === "distant" || kind === "horde";
+    s.sounds.push({kind,x:point.x,y:point.y,muffled:!lineOfSight(s,s.player,point),zombieVoice,intensity});
     if (s.sounds.length > 5) s.sounds.shift();
   }
 
@@ -1460,6 +1462,7 @@ const Sim = (() => {
     if (method === "smash") { o.broken = true; o.hp = 0; }
     World.sync(s.world);
     noise(s, o.x, o.y, method === "pry" ? 6.5 : 13);
+    hear(s,method === "pry" ? "pry" : "glassSmash",o);
     const cut = method === "smash" && !tool;
     if (cut) {
       p.hp = Math.max(0, p.hp - 5);
@@ -1471,6 +1474,7 @@ const Sim = (() => {
     if (station?.door.alarmArmed && gridPower(s)) {
       station.door.alarmArmed = false;
       noise(s, o.x, o.y, 25);
+      hear(s,"alarm",o);
       notify(s, "Police alarm. The infected are coming.", true);
     }
     return true;
@@ -1499,6 +1503,7 @@ const Sim = (() => {
     o.open = !o.open;
     World.sync(s.world);
     noise(s, o.x, o.y, auto ? 1.2 : 2);
+    hear(s,o.kind === "window" ? "windowSlide" : o.open ? "doorOpen" : "doorClose",o,auto ? .75 : 1);
     return true;
   }
 
@@ -1513,6 +1518,7 @@ const Sim = (() => {
     addXp(s, "crafting", 5);
     World.sync(s.world);
     noise(s, o.x, o.y, 5);
+    hear(s,"hammer",o);
     notify(s, "Barricade reinforced. The noise may attract the infected.");
     return true;
   }
@@ -2053,6 +2059,7 @@ const Sim = (() => {
     else if (conditionBefore >= 20 && item.condition < 20) notify(s, "Your " + Data.items[item.id].name + " is nearly worn out. Repair it or switch weapons.", true);
     noise(s, p.x, p.y, w.noise);
     const hit = !w.firearm || s.world.rng() < aimChance(s, z);
+    hear(s,w.firearm ? "shot" : "strike",w.firearm ? p : z);
     const matchup = Data.combatStyles[w.combat].damage[z.kind] ?? 1;
     const amount = hit ? Math.round(w.damage * matchup * damageFactor(s) * (w.firearm ? 1 : 1 + level(s, "strength") * .03) * (item.condition < 20 ? .8 : 1)) : 0;
     z.hp = Math.max(0, z.hp - amount);
@@ -2299,6 +2306,10 @@ const Sim = (() => {
           surface === "tile" || surface === "rail" ? 1.15 : 1;
         const rain = s.weather === "Rain" && surface !== "tile" ? .8 : 1;
         noise(s, p.x, p.y, (s.running ? 6.5 : s.quiet ? 1 : 2.4) * quiet * terrain * rain);
+        if (!s.sounds.length) {
+          const soft = surface === "grass" || surface === "sand";
+          hear(s,soft ? "stepSoft" : "stepHard",p,s.quiet ? .38 : s.running ? 1.22 : .78);
+        }
       }
     }
     const fit = 1 + level(s, "fitness") * .05;
@@ -2395,6 +2406,7 @@ const Sim = (() => {
             if (o.hp <= 0) {
               Object.assign(o, {boards:0, open:true, hp:0, locked:false, latched:false, broken:true});
               World.sync(s.world);
+              hear(s,o.kind === "window" ? "glassSmash" : "crash",o);
               z.bash = null;
               notify(s, o.name + " gave way.", true);
             }

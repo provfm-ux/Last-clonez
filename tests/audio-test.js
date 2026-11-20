@@ -12,7 +12,7 @@ async function run() {
   const ctx = {
     state:"running", destination:{},
     async decodeAudioData(bytes) { decoded.push(bytes.byteLength); return {recorded:bytes.byteLength}; },
-    createBuffer(channel,length) { return {getChannelData:() => new Float32Array(length)}; },
+    createBuffer(channel,length) { const channelData = new Float32Array(length); return {getChannelData:() => channelData}; },
     createBufferSource() {
       const source = {...node(),playbackRate:{value:1},start() { sources.push(this); },stop() { this.stopped = true; }};
       return source;
@@ -57,6 +57,22 @@ async function run() {
     assert.ok(clip.playbackRate.value >= .96 && clip.playbackRate.value <= 1.04);
     clip.onended();
   }
+  const attackGain = async (x,muffled = false) => {
+    await zombie("attack",{x,muffled});
+    const source = sources.at(-1);
+    source.onended();
+    return source.next.next.gain.value;
+  };
+  const atFour = await attackGain(4);
+  assert.ok(atFour <= .37*.1);
+  assert.ok(await attackGain(1) > atFour*4);
+  assert.ok(await attackGain(8) < atFour*.6);
+  assert.ok(await attackGain(1,true) < await attackGain(1));
+  const generated = ["doorOpen","doorClose","windowSlide","glassSmash","pry","hammer","stepSoft","stepHard","strike","shot","crash"];
+  for (const kind of generated) {
+    assert.ok(play(kind).getChannelData(0).some(sample => Math.abs(sample) > .01),kind);
+    sources.at(-1).onended();
+  }
   await zombie("idle");
   const first = sources.at(-1).buffer;
   await zombie("idle");
@@ -73,7 +89,7 @@ async function run() {
   audio.stop(ctx);
   await pending;
   assert.equal(sources.length,beforeRange+8);
-  console.log("Recorded cues, offline decoding, codec fallback, event mapping, spatial mix, voice limits and mute OK");
+  console.log("Recorded cues, offline decoding, codec fallback, event mapping, distance mix, generated effects, voice limits and mute OK");
 }
 
 run().catch(error => { console.error(error); process.exitCode = 1; });

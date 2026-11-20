@@ -263,6 +263,13 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   p.bag.push(keyOf(other)); check("chaves: a chave de outra casa não serve", Sim.contextual(s, door) === false && door.locked === true);
   p.bag.push(keyOf(door)); const ok = Sim.contextual(s, door);
   check("chaves: a chave certa destranca e abre", ok !== false && door.locked === false && door.open === true);
+  check("áudio: só uma abertura bem-sucedida produz o som de porta", s.sounds.splice(0).map(cue => cue.kind).join() === "doorOpen");
+  check("áudio: fechar a porta tem um som próprio", Sim.door(s,door) && s.sounds.splice(0).map(cue => cue.kind).join() === "doorClose");
+  const window = s.world.objects.find(o => o.kind === "window" && o.active && !o.open && !o.boards);
+  Object.assign(p,{x:window.x,y:window.y});
+  check("áudio: partir o vidro produz um som uma única vez",
+    Sim.breach(s,window,"smash") && !Sim.breach(s,window,"smash") &&
+    s.sounds.splice(0).filter(cue => cue.kind === "glassSmash").length === 1);
   const back = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s)))), kept = back.player.bag.find(i => i.id === "housekey" && i.lock === door.lockId);
   check("chaves: a etiqueta e a casa sobrevivem à gravação", kept && kept.label === homes.find(b => b.id === door.lockId).name); }
 { const lured = open => { const s = fresh("survival"), w = s.world, p = s.player; for (const z of w.enemies) z.hp = 0;

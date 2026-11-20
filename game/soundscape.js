@@ -12,7 +12,13 @@ const Soundscape = (() => {
     crib:{seconds:1.45,gain:.24,cut:1700}, alarm:{seconds:1.9,gain:.32,cut:2200},
     wings:{seconds:.65,gain:.3,cut:2600}, heartbeat:{seconds:.8,gain:.36,cut:340},
     footsteps:{seconds:.85,gain:.29,cut:1250}, glass:{seconds:.65,gain:.24,cut:3000},
-    stone:{seconds:1.65,gain:.25,cut:1400}
+    stone:{seconds:1.65,gain:.25,cut:1400},
+    doorOpen:{seconds:.38,gain:.18,cut:3100}, doorClose:{seconds:.23,gain:.18,cut:2200},
+    windowSlide:{seconds:.28,gain:.14,cut:3600}, glassSmash:{seconds:.53,gain:.24,cut:6200},
+    pry:{seconds:.29,gain:.17,cut:3300}, hammer:{seconds:.45,gain:.17,cut:2800},
+    stepSoft:{seconds:.14,gain:.065,cut:1500}, stepHard:{seconds:.15,gain:.075,cut:2800},
+    strike:{seconds:.15,gain:.18,cut:2400}, shot:{seconds:.42,gain:.26,cut:4700},
+    crash:{seconds:.49,gain:.23,cut:2700}
   };
 
   const tone = (hz,t) => Math.sin(tau*hz*t);
@@ -51,6 +57,37 @@ const Soundscape = (() => {
           sample = (.55*grain+.2*tone(94,t))*(tap(t,.04,17)+.75*tap(t,.41,19)); break;
         case "glass":
           sample = (.38*tone(1294,t)+.23*tone(2325,t))*(tap(t,.02,15)+.48*tap(t,.17,21)); break;
+        case "doorOpen":
+          sample = (.58*fuzz+.34*tone(880,t))*tap(t,.008,125) +
+            (.18*grain+.22*tone(185+90*t,t))*breath(t,config.seconds,35); break;
+        case "doorClose":
+          sample = (.57*tone(104,t)+.31*grain)*tap(t,.051,31) +
+            (.42*fuzz+.19*tone(900,t))*tap(t,.067,82); break;
+        case "windowSlide":
+          sample = (.44*fuzz+.27*tone(565,t))*breath(t,config.seconds,21) +
+            .47*grain*tap(t,.211,67); break;
+        case "glassSmash":
+          sample = .64*fuzz*tap(t,.008,28) +
+            (.27*tone(2450,t)+.2*tone(3860,t)+.28*fuzz)*
+            (.8*tap(t,.025,23)+.53*tap(t,.082,32)+.35*tap(t,.15,21)+.19*tap(t,.25,25)); break;
+        case "pry":
+          sample = (.4*grain+.25*tone(1330,t))*breath(t,config.seconds,49) +
+            (.62*fuzz+.21*tone(290,t))*tap(t,.20,85); break;
+        case "hammer":
+          sample = (.51*grain+.32*tone(260,t)+.19*fuzz)*
+            (tap(t,.012,57)+.78*tap(t,.18,52)+.65*tap(t,.31,58)); break;
+        case "stepSoft":
+        case "stepHard":
+          sample = (.66*grain+.22*tone(93,t))*tap(t,.014,37) +
+            (kind === "stepHard" ? .45 : .26)*fuzz*tap(t,.037,47); break;
+        case "strike":
+          sample = (.48*grain+.33*tone(127,t))*tap(t,.024,37) + .38*fuzz*tap(t,.019,65); break;
+        case "shot":
+          sample = (.69*fuzz+.32*tone(116,t))*tap(t,.008,23) +
+            .32*grain*(tap(t,.11,25)+.45*tap(t,.20,18)); break;
+        case "crash":
+          sample = (.49*grain+.34*tone(83,t)+.27*fuzz)*tap(t,.02,11) +
+            (.24*tone(580,t)+.20*fuzz)*(tap(t,.048,15)+.5*tap(t,.19,21)); break;
         case "stone": {
           const impact = tap(t,.03,23)+.55*tap(t,.19,18)+.37*tap(t,.37,16)+.2*tap(t,.63,13)+.12*tap(t,.87,13);
           sample = (.56*grain+.36*tone(224,t)+.14*tone(317,t))*impact; break;
@@ -156,7 +193,8 @@ const Soundscape = (() => {
       if (!library) { library = new Map(); buffers.set(ctx,library); }
       const recording = recordings.get(ctx)?.clips.get(cue.kind);
       if (!recording && !library.has(cue.kind)) library.set(cue.kind,makeBuffer(ctx,cue.kind));
-      output(ctx,cue,listener,recording ?? library.get(cue.kind),config);
+      const step = cue.kind === "stepSoft" || cue.kind === "stepHard";
+      output(ctx,cue,listener,recording ?? library.get(cue.kind),config,step ? .90+Math.random()*.20 : 1);
     } catch { /* The on-screen cue remains available without audio. */ }
   }
 
@@ -167,8 +205,12 @@ const Soundscape = (() => {
     if (source.playbackRate) source.playbackRate.value = pitch;
     filter.type = "lowpass";
     filter.frequency.value = cue.muffled ? zombie ? 850 : config.cut*.52 : config.cut;
-    const attenuation = cue.kind === "horde" ? .8 : 1 / (1 + distance*(zombie ? .20 : .06));
-    volume.gain.value = config.gain * attenuation;
+    const zombieVoice = zombie || cue.zombieVoice;
+    const proximity = Math.max(0,1-distance/4);
+    const attenuation = zombieVoice
+      ? (.09/(1+Math.max(0,distance-4)*.24) + .49*proximity**1.35) * (cue.muffled ? .62 : 1)
+      : cue.kind === "horde" ? .8 : 1/(1+distance*.06);
+    volume.gain.value = config.gain * attenuation * (cue.intensity ?? 1);
     source.connect(filter).connect(volume);
     if (ctx.createStereoPanner) {
       const pan = ctx.createStereoPanner();

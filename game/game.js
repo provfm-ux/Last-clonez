@@ -862,11 +862,11 @@
       const worn = d.slot && state.player.gear[d.slot] === item.id;
       const pinned = state.player.pinned.includes(item.id);
       const useLabel = item.id === "flashlight" ? item === Sim.activeLight(state) ? "Switch off" : "Switch on" :
-        d.damage ? equipped ? "Equipped" : "Equip" : d.slot ? worn ? "Remove" : "Equip" :
+        d.damage ? equipped ? "Unequip" : "Equip" : d.slot ? worn ? "Remove" : "Equip" :
         ({food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take"}[d.use] || "");
       return '<div class="item-row bag-item ' + (equipped || worn ? "equipped-item" : "") + '"><div><div class="item-top">' +
         itemIcon(item.id) + "<b>" + esc(d.name) + " ×" + item.qty + '</b></div><div class="item-meta">' + itemDescription(item) + '</div></div><div class="item-actions">' +
-        (useLabel ? button(useLabel, "use-" + index, equipped || d.use === "food" && Sim.isSpoiled(state, item), "primary") : "") +
+        (useLabel ? button(useLabel, (equipped ? "unequip-" : "use-") + index, d.use === "food" && Sim.isSpoiled(state, item), "primary") : "") +
         (store ? button(item.qty > 1 ? "Store stack" : "Store", "store-" + index) : "") + button("Drop", "drop-" + index) +
         (hasRecipes(item.id) ? button("Recipes", "recipes-" + item.id) : "") +
         '<button type="button" class="small-button pin-button" data-action="pin-' + index + '" aria-pressed="' + pinned + '">' +
@@ -1033,7 +1033,8 @@
       const row = '<div class="item-row' + (equipped || worn ? " equipped-item" : "") + '"><div><div class="item-top">' +
         itemIcon(item.id) + "<b>" + esc(d.name) + '</b></div><div class="item-meta">' + details + '</div></div>' +
         '<div class="item-actions">' +
-        button(equipped ? "Equipped" : worn ? "Remove" : "Equip", "equip-" + index, equipped, worn ? "" : "primary") +
+        button(item === current ? "Unequip" : equipped ? "Equipped" : worn ? "Remove" : "Equip",
+          (item === current ? "unequip-" : "equip-") + index, equipped && item !== current, worn || equipped ? "" : "primary") +
         (needsRepair ? button("Repair", "repairweapon-" + index, Boolean(repairProblem)) +
           '<div class="item-meta">' + (repairProblem ? "Need " + esc(repairProblem) : "+35 condition max · 1 scrap · 1 tape") + '</div>' : "") + "</div></div>";
       (d.damage ? weapons : equipment).push(row);
@@ -1944,6 +1945,16 @@
       }
       if (kind === "listen" && dialogView === "object-" + index && Sim.canListen(state,o)) {
         objectPanel(o,Sim.listenAtDoor(state,o));
+        return;
+      }
+      if (kind === "unequip" && ["bag","gear"].includes(dialogView)) {
+        if (state.player.bag[index] !== Sim.weapon(state)) return;
+        Sim.unequipWeapon(state);
+        if (dialogView === "gear") {
+          save();
+          gear();
+          updateHud();
+        } else bagChanged(true, state.notice);
         return;
       }
       if (dialogView === "bag" && ["use", "drop", "store", "pin", "take", "takegear", "all"].includes(kind)) {

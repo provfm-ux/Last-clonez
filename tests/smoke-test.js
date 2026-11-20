@@ -779,6 +779,32 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     supply("scrap") === scrap-2 && supply("tape") === tape-2);
 }
 
+{
+  const run = Sim.createControl("training","carer","shelter",undefined,{seed:17});
+  const p = run.player;
+  const bat = {id:"bat",qty:1,condition:100,born:0,uid:"carried-bat"};
+  const axe = {id:"axe",qty:1,condition:100,born:0,uid:"carried-axe"};
+  p.bag.push(bat,axe);
+  Sim.use(run,p.bag.indexOf(axe));
+  Sim.drop(run,p.bag.indexOf(axe));
+  check("equipamento: largar o machado deixa mãos vazias com taco na mochila", Sim.weapon(run).id === "fists");
+  Sim.use(run,p.bag.indexOf(bat));
+  Sim.unequipWeapon(run);
+  const snapshot = () => JSON.parse(JSON.stringify(Sim.snapshot(run)));
+  check("equipamento: desequipar mantém taco na mochila e punhos após carregar",
+    Sim.weapon(Sim.restore(snapshot())).id === "fists" && p.bag.includes(bat));
+  const stale = snapshot();
+  stale.player.weapon = "bat";
+  stale.player.weaponUid = "removed-bat";
+  check("equipamento: identificador obsoleto não equipa outro taco",
+    Sim.weapon(Sim.restore(stale)).id === "fists");
+  const legacy = snapshot();
+  legacy.player.weapon = "bat";
+  delete legacy.player.weaponUid;
+  check("equipamento: uma gravação antiga só com o tipo de arma ainda a equipa",
+    Sim.weapon(Sim.restore(legacy)).id === "bat");
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

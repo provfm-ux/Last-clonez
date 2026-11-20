@@ -16,8 +16,18 @@ const Sim = (() => {
   const reachableObject = (s, o, radius = 1.85) => o?.active && distance(s.player, o) <= radius &&
     (s.world.underground ? canSee(s,o.x,o.y) : lineOfSight(s,s.player,o));
   const lootReachable = (s, o) => o?.action === "loot" && (s.player.vehicle ? o === vehicle(s) && s.player.driveSpeed === 0 : reachableObject(s, o));
-  const weapon = s => s.player.bag.find(item => s.player.weaponUid && item.uid === s.player.weaponUid && Data.items[item.id].damage) ||
-    s.player.bag.find(item => item.id === s.player.weapon && Data.items[item.id].damage) || {id: "fists", condition: 100};
+  function weapon(s) {
+    const {bag, weaponUid, weapon:id} = s.player;
+    const item = bag.find(item => Data.items[item.id].damage &&
+      (weaponUid === undefined ? item.id === id : weaponUid !== null && item.uid === weaponUid));
+    return item ?? {id:"fists", condition:100};
+  }
+
+  function unequipWeapon(s) {
+    s.player.weapon = "fists";
+    s.player.weaponUid = null;
+  }
+
   const fists = {combat: "unarmed", name: "Fists", damage: 9, range: 1.05, delay: .48, effort: 5, noise: 2, wear: 0};
   const weaponData = s => Data.items[weapon(s).id] || fists;
   const level = (s, skill) => Math.min(Data.skillMax, Math.floor(Math.sqrt((s.player.skills[skill] ?? 0) / 12)));
@@ -160,8 +170,7 @@ const Sim = (() => {
     const point = [[1,0],[0,1],[-1,0],[0,-1]].map(([dx,dy]) => ({x:x+dx,y:y+dy})).find(p =>
       World.clear(s.world,p.x,p.y) && !s.world.objects.some(o => o.active && distance(o,p) < .65));
     if (point) Object.assign(pile,point);
-    s.player.weapon = "fists";
-    s.player.weaponUid = null;
+    unequipWeapon(s);
     notify(s,"A wooden bat lies nearby. Pick it up and equip it in your inventory.");
   }
 
@@ -507,11 +516,7 @@ const Sim = (() => {
     if (item.id === "flashlight" && item.uid === s.player.lightUid) s.player.lightUid = null;
     const slot = Data.items[item.id].slot;
     if (slot && s.player.gear[slot] === item.id && !quantity(s.player.bag, item.id)) s.player.gear[slot] = null;
-    if (wasEquipped) {
-      const next = s.player.bag.find(i => Data.items[i.id].damage);
-      s.player.weapon = next?.id || "fists";
-      s.player.weaponUid = next?.uid;
-    }
+    if (wasEquipped) unequipWeapon(s);
     return qty;
   }
 
@@ -2804,6 +2809,9 @@ const Sim = (() => {
     s.player = {...s.player, ...p, ...Data.character(p), bag:p.bag.map(item => ({...item})), skills: {...s.player.skills, ...p.skills}, gear, wounds, pinned:[...new Set(p.pinned ?? [])],
       belt:[...(p.belt ?? Data.beltDefaults)], headingX:validHeading ? p.headingX / heading : 0, headingY:validHeading ? p.headingY / heading : 1,
       lightUid:null, path:[], moving:false, resting:false, grabbed:0, grabCool:0};
+    s.player.weapon = p.weapon;
+    s.player.weaponUid = p.weaponUid;
+    if (weapon(s).id === "fists") unequipWeapon(s);
     if (typeof p.lightUid === "string" && !p.vehicle && p.bag.some(i => i.id === "flashlight" && i.uid === p.lightUid && i.charge > 0)) s.player.lightUid = p.lightUid;
     s.world.objects = data.objects.map(o => ({
       ...o,
@@ -2927,7 +2935,7 @@ const Sim = (() => {
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,
-    weapon, weaponData, weaponProblem, damageFactor, aimChance, attackTarget, touchAttackTarget, inAttackRange,
+    weapon, unequipWeapon, weaponData, weaponProblem, damageFactor, aimChance, attackTarget, touchAttackTarget, inAttackRange,
     threats, notify, level, addXp, moodles, sleep, unstick, season, snapshot, restore, distance, lineOfSight,
     vehicle, enterVehicle, exitVehicle, refuel, repairVehicle, vehicleRepairProblem, vehicleRepairAmount, brake, canListen, listenAtDoor,
     destination, markDestination, markStation, exploredTile, saveMapPin, markPin, removePin,

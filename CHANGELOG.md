@@ -1,6 +1,7 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Added explicit weapon unequip and kept hands empty when dropping or storing a weapon.
 - Added a character Equipment view and direct repairs for damaged and broken weapons.
 - Added weapon matchups, brute resistance and clearer equipment descriptions.
 - Added a Recommended start with optional in-run hints and first-night protection from wandering hordes.

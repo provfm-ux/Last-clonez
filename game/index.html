@@ -8,7 +8,7 @@
 <title>Last CloneZ</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link id="micro-zombie-atlas" rel="preload" as="image" href="micro-zombies.png">
-<link rel="stylesheet" href="style.css?v=0.33-weapon-preview">
+<link rel="stylesheet" href="style.css?v=compact-hud">
 <script src="data.js?v=0.33-weapon-preview" defer></script>
 <script src="research.js?v=0.33" defer></script>
 <script src="legacy-level.js?v=0.33" defer></script>
@@ -23,7 +23,7 @@
 <script src="afterlife.js?v=0.33-sprites" defer></script>
 <script src="sim.js?v=0.33-weapon-preview" defer></script>
 <script src="view.js?v=0.33-weapon-preview" defer></script>
-<script src="game.js?v=0.33-weapon-preview" defer></script>
+<script src="game.js?v=compact-hud" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -79,7 +79,12 @@
 <main class="console">
   <section class="stage" aria-label="Survival world">
     <div class="stage-top"><div class="camera"><span class="camera-dot"></span><span id="location">COLD VALE</span></div><div class="world-clock"><span id="day">DAY 01</span><span class="divider">/</span><b id="timer">08:00</b><span class="weather" id="weather">Overcast</span></div></div>
-    <div class="event-status" id="event-status" role="status" hidden><span id="event-text"></span></div>
+    <div class="hud-strip" id="hud-strip" hidden>
+      <button class="condition-bar" id="condition-bar" type="button" aria-label="View conditions and injuries">
+        <span class="condition-meter" aria-hidden="true"></span><span id="condition-summary">Stable</span><span id="condition-count"></span>
+      </button>
+      <div class="event-status" id="event-status" role="status" hidden><span id="event-text"></span></div>
+    </div>
     <div class="viewport">
       <canvas id="world" aria-label="Isometric view of Cold Vale"></canvas>
       <div class="lens"></div>
@@ -96,7 +101,6 @@
       </div>
       <div class="scope scope-tl"></div><div class="scope scope-tr"></div><div class="scope scope-bl"></div><div class="scope scope-br"></div>
       <div class="live-tag" id="live-tag" hidden><svg class="icon"><use href="#signal"/></svg><span id="noise">WALKING</span></div>
-      <button class="status-chips" id="status-chips" hidden aria-label="View status and injuries"></button>
       <div class="hero" id="hero">
         <div class="hero-inner">
           <div class="hero-copy">

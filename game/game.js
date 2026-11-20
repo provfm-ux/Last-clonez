@@ -23,7 +23,8 @@
   let expandedView = false, changingView = false, pinDraft = null, craftIngredient = null;
   let customRules = null, customBase = "survival", ruleBase = "survival";
   let validatedSave = null, touchRun = false;
-  let crossing = null;
+  let crossing = null, deathOfferUntil = null;
+  const afterlifeOfferMs = 12000;
   let audio, muted = read(soundKey) === "1";
   state.mode = "menu";
   View.prepare(state.world);
@@ -148,6 +149,7 @@
     $("close-dialog").hidden = false;
     dialogView = null;
     deathShown = false;
+    deathOfferUntil = null;
     $("hero").hidden = true;
     canvas.setAttribute("aria-label", "Isometric view of " + Regions.definitions[state.world.region].name);
     $("start-btn").blur();
@@ -231,15 +233,32 @@
     state.afterlifePending = false;
     save();
     close(false);
-    deathShown = false;
+    deathOfferUntil = null;
     afterlife = Afterlife.start(state);
     updateHud();
+  }
+
+  function deathSummary() {
+    deathOfferUntil = null;
+    show("Your story ends here", "<p>" + esc(state.player.name) + " survived until day " + day() + " at " + time(state.minutes) +
+      " and killed " + state.kills + " infected.</p>" +
+      "<p>Cause of death: " + esc(state.deathCause || "unknown causes") + ".</p>" +
+      '<div class="item-actions death-actions">' + button("Back to main menu", "new", false, "primary") +
+      button("Playtest report", "playtest") + button("Export save", "export") + "</div>", "dead");
+    body.querySelector('[data-action="new"]').focus();
+  }
+
+  function skipAfterlife() {
+    state.afterlifePending = false;
+    save();
+    deathSummary();
   }
 
   function endAfterlife() {
     afterlife = null;
     resetInput();
     updateHud();
+    deathSummary();
   }
 
   function afterlifeAction(kind) {
@@ -342,6 +361,11 @@
 
   function close(checkpoint = true) {
     if (crossing) return;
+    if (checkpoint && state.mode === "dead" && !afterlife) {
+      if (dialogView === "afterlife-offer") return skipAfterlife();
+      if (dialogView === "dead") return titleScreen();
+      if (dialogView === "playtest") return deathSummary();
+    }
     dialog.close();
     dialogView = null;
     resetInput();
@@ -430,15 +454,14 @@
     return '<div style="margin-top:14px"><div class="section-label">SKILLS</div>' + rows + "</div>";
   }
 
-  function statusText() {
-    const p = state.player, status = [];
+  function conditions() {
+    const p = state.player, list = Sim.moodles(state);
+    if (p.exposure) list.unshift({label:"Viral infection",level:4});
+    if (p.resting) list.push({label:"Resting",level:1});
+    if (state.blueprint) list.push({label:"Build mode",level:1});
     const {pending,time} = state.atmosphere;
-    if (pending) status.push("HORDE APPROACHING · " + Math.max(1,Math.ceil(pending.due-time)) + " S");
-    for (const m of Sim.moodles(state).slice(0, 4)) status.push(m.label.toUpperCase());
-    if (p.exposure) status.push("VIRAL INFECTION");
-    if (p.resting) status.push("RESTING");
-    if (state.blueprint) status.push("BUILD MODE");
-    return status;
+    if (pending) list.unshift({label:"Horde · " + Math.max(1,Math.ceil(pending.due-time)) + "s",level:4});
+    return list;
   }
 
   const taskTarget = o => o && (o.action === "travel" || Sim.isSupplyCache(state, o) || Sim.unreadClueAt(state, o) || o.action === "radio" && state.supplyRun === "return" ||
@@ -538,9 +561,15 @@
     $("noise").textContent = car ? "ENGINE · " + Math.round(car.fuel) + "% FUEL" : state.running ? "RUNNING · LOUD" : state.quiet ? "SNEAKING" : "WALKING";
     $("live-tag").hidden = !active();
     $("live-tag").classList.toggle("loud", Boolean(state.running));
-    const statuses = statusText();
-    $("status-chips").hidden = !active() || !statuses.length;
-    $("status-chips").textContent = statuses.join(" · ");
+    const statuses = conditions(), worst = statuses[0], bar = $("condition-bar");
+    $("hud-strip").hidden = !active();
+    bar.dataset.level = worst?.level ?? 0;
+    const label = worst?.label ?? "Stable";
+    const count = statuses.length > 1 ? "+" + (statuses.length-1) : "";
+    if ($("condition-summary").textContent !== label) $("condition-summary").textContent = label;
+    if ($("condition-count").textContent !== count) $("condition-count").textContent = count;
+    const description = "View conditions and injuries. " + (statuses.map(status => status.label).join(", ") || "Stable");
+    if (bar.getAttribute("aria-label") !== description) bar.setAttribute("aria-label",description);
     const w = Sim.weaponData(state), item = Sim.weapon(state);
     $("weapon").textContent = car ? "Vehicle" : w.name;
     $("condition").textContent = car ? Math.round(car.fuel) + "% fuel · " + Math.round(car.hp/1.4) + "% condition" :
@@ -941,6 +970,7 @@
       ["Viral transmission", p.exposure ? "Viral exposure " + p.exposure.toFixed(1) + "%. Treating the wound helps with bleeding and pain." :
         ({bites:"Bites transmit the virus.", wounds:"Bites transmit the virus. Cuts and scratches can transmit it too.", off:"Viral transmission is off in this run."}[state.rules.infection])]
     ];
+    const statuses = conditions();
     const wounds = p.wounds.map((w, index) => '<div class="effect-row injury-row"><b>' + (w.part === "arm" ? "Arm" : "Leg") + " · " + esc(w.type) +
       "</b><div><p>" + (w.bandaged ? "Bandaged" : "Bleeding") + " · " + (w.clean ? "Disinfected" : "Needs disinfecting") +
       " · Wound infection " + Math.round(w.infection) + "%" + (state.rules.care === "gradual" && w.bandaged ? " · Healing " +
@@ -948,6 +978,8 @@
       (!w.bandaged ? button("Bandage", "treat-" + index + "-bandage", !itemCount("bandage"), "primary") : "") +
       (!w.clean ? button("Disinfect", "treat-" + index + "-disinfectant", !itemCount("disinfectant")) : "") + "</div></div></div>").join("");
     show("Health", '<div class="stats-summary"><span>HEALTH ' + Math.ceil(p.hp) + "</span><span>COMBAT LV " + Sim.level(state, "combat") + "</span><span>BUILDING LV " + Sim.level(state, "crafting") + "</span><span>FIRST AID LV " + Sim.level(state, "medical") + "</span><span>GARDENING LV " + Sim.level(state, "gardening") + "</span></div>" +
+      (statuses.length ? '<div class="health-conditions"><b>Active conditions</b><ul>' + statuses.map(status =>
+        '<li>' + esc(status.label) + '</li>').join("") + '</ul></div>' : '') +
       (wounds || '<p>No injuries.</p>') + '<p>' + (state.rules.care === "gradual" ?
         "Bandage a bleeding wound, then disinfect it to help it heal. Rest somewhere safe to recover health." : "Bandages restore some health in this run.") +
       '</p><div class="item-actions">' + button("Bandage ×" + itemCount("bandage"), "quick-bandage", !itemCount("bandage")) +
@@ -1639,7 +1671,7 @@
     else if (action === "menu") menu();
     else if (action === "new") { if (lesson) endLesson(); else titleScreen(); }
     else if (action === "afterlife") startAfterlife();
-    else if (action === "afterlife-skip") { state.afterlifePending = false; deathShown = false; close(false); save(); }
+    else if (action === "afterlife-skip") skipAfterlife();
     else if (action === "save") { save(true); updateHud(); }
     else if (action === "export") exportSave();
     else if (action === "import") $("import-input").click();
@@ -1964,7 +1996,7 @@
     "help-btn": help, "pause-btn": pause, "search-btn": nearbyAction, "attack-btn": () => strike(),
     "shove-btn": shoveOrBrake, "pack-btn": bag, "gear-btn": gear, "craft-btn": crafting,
     "sneak-btn": () => { state.quiet = !state.quiet; state.dash = false; touchRun = false; updateHud(); },
-    "status-chips": health, "close-dialog": close, "save-btn": () => save(true), "destination-btn": () => map(),
+    "condition-bar": health, "close-dialog": close, "save-btn": () => save(true), "destination-btn": () => map(),
     "fullscreen-btn": toggleFullscreen,
     "roof-toggle": () => { state.roofsHidden = !state.roofsHidden; updateHud(); save(); },
     "zoom-in": () => { state.zoom = Math.min(1.75, (state.zoom || 1) + .15); updateHud(); },
@@ -1978,7 +2010,7 @@
   dialog.addEventListener("cancel", event => {
     event.preventDefault();
     if (dialogView === "opening") return;
-    if (dialogView === "afterlife-offer") body.querySelector('[data-action="afterlife-skip"]').click();
+    if (dialogView === "afterlife-offer") skipAfterlife();
     else close();
   });
   const displayChanged = () => { resetInput(); updateDisplayMode(); };
@@ -2109,16 +2141,16 @@
       }
     }
     if (state.mode === "dead" && !deathShown && !afterlife) {
-      deathShown = true; save();
+      deathShown = true;
+      save();
       if (state.afterlifePending) {
-        show("Something moves", "<p>A sound reaches you.</p>" + button("Follow the sound","afterlife",false,"primary") +
-          " " + button("End the run","afterlife-skip"),"afterlife-offer");
-        $("close-dialog").hidden = true;
-      } else show("Your story ends here", "<p>" + esc(state.player.name) + " survived until day " + day() + " at " + time(state.minutes) +
-        " and killed " + state.kills + " infected.</p>" +
-        "<p>Cause of death: " + esc(state.deathCause || "unknown causes") + ".</p>" +
-        button("Choose a new start", "new", false, "primary") + " " + button("Playtest report", "playtest") + " " + button("Export save", "export"), "dead");
+        deathOfferUntil = now + afterlifeOfferMs;
+        show("Something moves", "<p>A sound reaches you. Follow it to try the afterlife, or wait for the run summary.</p>" +
+          '<div class="item-actions death-actions">' + button("Follow the sound","afterlife",false,"primary") +
+          button("Skip to summary","afterlife-skip") + "</div>","afterlife-offer");
+      } else deathSummary();
     }
+    if (dialogView === "afterlife-offer" && deathOfferUntil !== null && now >= deathOfferUntil) skipAfterlife();
     if (state.sounds.length) for (const sound of state.sounds.splice(0)) if (!muted) Soundscape.play(audio,sound,state.player);
     if (now >= nextHud) { updateHud(); nextHud = now + 150; }
     if (now >= nextMap) {

@@ -12,6 +12,10 @@
   // Movement follows the physical WASD position (event.code) so AZERTY, Dvorak and similar layouts work.
   const codeKeys = {KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright"};
   let state = Sim.createControl("survival", "carer", "shelter"), lastFrame = performance.now(), nextHud = 0, nextMap = 0, nextSave = 10, lastRender = 0, noiseRings = false, look = (() => { try { const v = localStorage.getItem("clonez-gfx"); return v === "classic" || v === "fast" ? v : "dark"; } catch { return "dark"; } })();
+  const navigationKey = "clonez-navigation";
+  const openingKey = "clonez-opening-seen";
+  let navigation = read(navigationKey) === "discover" ? "discover" : "locations";
+  const mapAction = /^(mark-|station-|pindestination-|pinedit-|pinremove-|pinhere$|pincancel$)/;
   const introKey = "clonez-introduction-complete";
   let lesson = null, afterlife = null;
   let dialogView = null, lastTap = null, deathShown = false, savedText = read(storageKey);
@@ -26,7 +30,7 @@
 
   const esc = value => String(value).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
   const icon = name => '<svg class="icon"><use href="#' + name + '"/></svg>';
-  const button = (label, action, disabled = false, extra = "") => '<button type="button" class="small-button ' + extra + '" data-action="' + action + '"' + (disabled ? " disabled" : "") + ">" + label + "</button>";
+  const button = (label, action, disabled = false, extra = "") => navigation === "discover" && mapAction.test(action) ? "" : '<button type="button" class="small-button ' + extra + '" data-action="' + action + '"' + (disabled ? " disabled" : "") + ">" + label + "</button>";
   const time = minutes => {
     const n = Math.floor(minutes % 1440);
     return String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0");
@@ -150,6 +154,27 @@
     nextHud = nextMap = 0;
     nextSave = state.elapsed + 10;
     updateHud();
+  }
+
+  function setNavigation(value) {
+    navigation = value === "discover" ? "discover" : "locations";
+    $("navigation-mode").value = navigation;
+    write(navigationKey,navigation);
+    updateHud();
+  }
+
+  function opening() {
+    show("It started with a weekend project",
+      "<p>Milo and Kit asked an AI to make a zombie game. Their brief said, ‘Make the outbreak feel real.’</p>" +
+      "<p>By Monday, Cold Vale’s dead were walking. The AI closed the ticket as <strong>Working as intended</strong>.</p>" +
+      "<p><strong>Can you survive longer and find all the Easter eggs?</strong></p>" +
+      '<div class="opening-navigation"><div>' +
+      button("Discover without a map","opening-discover",false,"primary") +
+      "<p>Read signs and follow clues on foot.</p></div><div>" +
+      button("Play with marked locations","opening-locations") +
+      "<p>Use the map, landmarks, and destination markers.</p></div></div>",
+      "opening");
+    $("close-dialog").hidden = true;
   }
 
   function startLesson() {
@@ -458,6 +483,9 @@
   }
 
   function updateHud() {
+    state.hideNavigation = navigation === "discover";
+    $("map-btn").hidden = state.hideNavigation;
+    $("map-card").hidden = state.hideNavigation;
     document.body.classList.toggle("in-afterlife",Boolean(afterlife));
     $("afterlife-tools").hidden = !afterlife;
     $("lesson").hidden = !lesson;
@@ -517,7 +545,7 @@
     $("condition").textContent = car ? Math.round(car.fuel) + "% fuel · " + Math.round(car.hp/1.4) + "% condition" :
       Math.round(item.condition) + "% condition" + (w.firearm ? " · " + itemCount("ammo") + " rounds" : "");
     $("shove-label").textContent = car ? "Brake" : "Shove";
-    $("destination-btn").hidden = !active();
+    $("destination-btn").hidden = !active() || state.hideNavigation;
     $("world-tools").hidden = !active();
     $("roof-toggle").setAttribute("aria-pressed", String(state.roofsHidden));
     $("roof-toggle").setAttribute("aria-label", state.roofsHidden ? "Show roofs" : "Hide roofs");
@@ -584,6 +612,7 @@
   }
 
   function map(pin = null) {
+    if (navigation === "discover") return;
     pinDraft = pin && Number.isFinite(pin.x) && Number.isFinite(pin.y) ? pin : null;
     const editable = active();
     const selected = Sim.destination(state);
@@ -1582,7 +1611,14 @@
       return;
     }
     const action = event.target.closest("[data-action]")?.dataset.action;
-    if (!action) return;
+    if (!action || navigation === "discover" && mapAction.test(action)) return;
+    if (action === "opening-discover" || action === "opening-locations") {
+      setNavigation(action.slice(8));
+      write(openingKey,"1");
+      close(false);
+      $("start-btn").focus();
+      return;
+    }
     if (action === "bag-carried" && lesson?.stage === 3) lesson.stage = 4;
     if (action === "resume") close();
     else if (action === "noise-toggle") { noiseRings = !noiseRings; close(); }
@@ -1911,7 +1947,7 @@
   });
 
   const handlers = {
-    "intro-btn":startLesson, "lesson-exit":endLesson, "afterlife-exit":endAfterlife,
+    "opening-btn":opening, "intro-btn":startLesson, "lesson-exit":endLesson, "afterlife-exit":endAfterlife,
     "start-btn": start, "continue-btn": resumeSaved, "rules-btn": () => worldRulesEditor(), "map-btn": () => map(), "journal-btn": diary, "diary-btn": diary,
     "help-btn": help, "pause-btn": pause, "search-btn": nearbyAction, "attack-btn": () => strike(),
     "shove-btn": shoveOrBrake, "pack-btn": bag, "gear-btn": gear, "craft-btn": crafting,
@@ -1924,9 +1960,12 @@
   };
   for (const [id, handler] of Object.entries(handlers)) $(id).addEventListener("click", handler);
   document.querySelectorAll("[data-panel]").forEach(button => button.addEventListener("click", health));
+  $("navigation-mode").value = navigation;
+  $("navigation-mode").addEventListener("change",event => setNavigation(event.target.value));
   $("sound-btn").addEventListener("click", () => { muted = !muted; write(soundKey, muted ? "1" : "0"); syncSound(); wakeSound(); });
   dialog.addEventListener("cancel", event => {
     event.preventDefault();
+    if (dialogView === "opening") return;
     if (dialogView === "afterlife-offer") body.querySelector('[data-action="afterlife-skip"]').click();
     else close();
   });
@@ -2071,7 +2110,7 @@
     if (state.sounds.length) for (const sound of state.sounds.splice(0)) if (!muted) Soundscape.play(audio,sound,state.player);
     if (now >= nextHud) { updateHud(); nextHud = now + 150; }
     if (now >= nextMap) {
-      if (!afterlife && minimap.clientWidth) View.minimap(minimap, state);
+      if (!afterlife && !state.hideNavigation && minimap.clientWidth) View.minimap(minimap, state);
       nextMap = now + 500;
     }
     // Menu, paused and dead screens barely change, so draw them at ~15 fps to save battery and CPU.
@@ -2124,5 +2163,6 @@
   syncSound();
   updateDisplayMode();
   updateHud();
+  if (!read(openingKey)) opening();
   requestAnimationFrame(frame);
 })();

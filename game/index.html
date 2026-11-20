@@ -8,7 +8,7 @@
 <title>Last CloneZ</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link id="micro-zombie-atlas" rel="preload" as="image" href="micro-zombies.png">
-<link rel="stylesheet" href="style.css?v=0.32-sprites">
+<link rel="stylesheet" href="style.css?v=0.32-opening">
 <script src="data.js?v=0.32" defer></script>
 <script src="research.js?v=0.32" defer></script>
 <script src="legacy-level.js?v=0.32" defer></script>
@@ -20,9 +20,9 @@
 <script src="atmosphere.js?v=0.32" defer></script>
 <script src="soundscape.js?v=0.32-sprites" defer></script>
 <script src="afterlife.js?v=0.32-sprites" defer></script>
-<script src="sim.js?v=0.32" defer></script>
+<script src="sim.js?v=0.32-opening" defer></script>
 <script src="view.js?v=0.32-sprites" defer></script>
-<script src="game.js?v=0.32-sprites" defer></script>
+<script src="game.js?v=0.32-opening" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -112,7 +112,12 @@
             <div class="new-world-options start-options"><label>STARTING POINT<select id="start-point" aria-describedby="start-detail"></select></label><label>MAP SEED<input id="world-seed" type="text" inputmode="numeric" pattern="[0-9]{1,9}" maxlength="9" placeholder="Random" autocomplete="off"></label></div>
             <p class="start-detail" id="start-detail" aria-live="polite"></p>
             <button class="start-button" id="continue-btn" hidden><svg class="icon"><use href="#play"/></svg> Continue <svg class="icon end-icon"><use href="#arrow"/></svg></button>
+            <label class="navigation-choice">Exploration<select id="navigation-mode">
+              <option value="locations">Map with marked locations</option>
+              <option value="discover">Discover without a map</option>
+            </select></label>
             <button class="start-button" id="start-btn"><svg class="icon"><use href="#play"/></svg> Start new run <svg class="icon end-icon"><use href="#arrow"/></svg></button>
+            <button class="small-button" id="opening-btn" type="button">Replay opening</button>
             <button class="small-button" id="intro-btn" type="button">Beginner introduction</button>
             <div class="hero-foot"><span><svg class="icon"><use href="#save"/></svg> AUTOSAVE</span></div>
           </div>
@@ -143,7 +148,7 @@
     </div>
   </section>
   <aside class="rail">
-    <section class="rail-card map-card"><div class="section-label"><svg class="icon"><use href="#map"/></svg> COLD VALE <span>EXPLORED MAP</span></div><div class="minimap-shell"><canvas id="minimap" width="440" height="400" aria-label="Map of explored areas"></canvas></div><div class="legend"><span><i></i> You</span><span><i></i> Shelter</span><span><i></i> Survivor</span></div></section>
+    <section class="rail-card map-card" id="map-card"><div class="section-label"><svg class="icon"><use href="#map"/></svg> COLD VALE <span>EXPLORED MAP</span></div><div class="minimap-shell"><canvas id="minimap" width="440" height="400" aria-label="Map of explored areas"></canvas></div><div class="legend"><span><i></i> You</span><span><i></i> Shelter</span><span><i></i> Survivor</span></div></section>
     <section class="rail-card briefing"><div class="section-label"><svg class="icon"><use href="#book"/></svg> YOUR JOURNAL <span id="quest-count">0 / 4</span></div><h2>Stay alive.</h2><p class="mission-description">Prepare for the next day.</p><div class="objectives" id="objectives"></div><button class="text-button" id="diary-btn">Open journal <span>↗</span></button></section>
     <section class="rail-card radio-card"><div class="section-label"><svg class="icon"><use href="#radio"/></svg> RECENT ACTIVITY <span>87.6 FM</span></div><div class="radio-log" id="radio-log"></div></section>
   </aside>

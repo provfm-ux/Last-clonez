@@ -381,6 +381,16 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   try { Sim.restore(bad); } catch { rejected = true; }
   check("save rejects a shutdown without the signed check-in", rejected);
 }
+{
+  const run = fresh("training");
+  check("marked locations show the selected landmark", Sim.markDestination(run,"market") && Boolean(Sim.destination(run)));
+  const waypoint = run.waypoint;
+  run.hideNavigation = true;
+  check("mapless exploration hides waypoint guidance without changing the run",
+    Sim.destination(run) === null && run.waypoint === waypoint);
+  run.hideNavigation = false;
+  check("marked locations can be restored without losing the waypoint", Boolean(Sim.destination(run)));
+}
 // ---- v0.32: infected deaths and the Oxford cinema ----
 {
   const {Afterlife} = context;

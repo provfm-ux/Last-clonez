@@ -694,3 +694,10 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 .afterlife-copy span:empty,.afterlife-copy strong:empty { display:none; }
 .in-afterlife .touch-controls button.ready { background:#eee; color:#101010; border-color:white; }
 .in-afterlife .touch-controls button.ready .icon { color:#101010; }
+
+.navigation-choice { display:grid; gap:.35rem; margin:.55rem 0; font-size:.85rem; }
+.navigation-choice select { width:100%; }
+.opening-navigation { display:grid; gap:.65rem; margin:1rem 0 0; }
+.opening-navigation .small-button { min-height:44px; }
+.opening-navigation p { margin:.25rem 0 0; }
+#map-btn[hidden],#map-card[hidden],#destination-btn[hidden] { display:none; }

@@ -765,6 +765,7 @@ const Sim = (() => {
   }
 
   function destination(s) {
+    if (s.hideNavigation) return null;
     const id = s.waypoint;
     if (!id) return null;
     if (id.startsWith("pin")) return s.mapPins.find(pin => pin.id === id) || null;

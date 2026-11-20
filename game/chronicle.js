@@ -215,11 +215,11 @@ const Chronicle = (() => {
     livepost:{at:["Oxford Night Reel",15,13],title:"Winner announcement and draft",source:"Projection booth · Fictional social post",
       text:"WE HAVE A WINNER! Our El Gordo champion looks like he’s been partying since 1987. Absolute legend. Somebody get him a beer.\n\nUnsent draft\n‘Right, apparently he doesn’t want a beer. He wants…’"},
     backnote:{at:["Oxford Night Reel",13,2],title:"Note to whoever sold 00666",source:"Backstage table",
-      text:"Whoever sold ticket 00666 needs to explain. The winner looked like absolute death. We gave him the trophy. He tried to eat Martin Fenwick. Everyone thought it was performance art.\nIT WAS NOT PERFORMANCE ART.\nIf you’ve got the keys to the back exit, OPEN THE BLOODY DOOR."},
+      text:"Whoever sold ticket 00666 needs to explain. The winner looked like absolute death. We gave him the trophy. He tried to eat Martin. Everyone thought it was performance art.\nIT WAS NOT PERFORMANCE ART.\nIf you’ve got the keys to the back exit, OPEN THE BLOODY DOOR."},
     finalpost:{at:["Oxford Night Reel",14,11],title:"Final screening update",source:"Projection booth · Fictional social post",
       text:"Well, you magnificent bastards. El Gordo has eaten half the front row. The projector is still running. Nobody can find the keys and somebody’s nicked all the popcorn.\n10/10 atmosphere. Would probably not recommend.\n#NightReel #BestNightEver #SendHelp"},
     halloffame:{at:["Oxford Night Reel",10,16],title:"El Gordo Hall of Fame",source:"Lobby wall",
-      text:"Tess Plover — 00432 — left on the last bus with twelve saucepans.\nGareth Fen — 00280 — donated his inflatable coffin back.\n\nEL GORDO CHAMPION\nTICKET #00666\nWinner: Unknown\nStatus: Unavailable for comment\n\nThe blurry photo shows a figure clutching the golden trophy. First winner to bite the presenter."}
+      text:"Tess — 00432 — left on the last bus with twelve saucepans.\nGareth — 00280 — donated his inflatable coffin back.\n\nEL GORDO CHAMPION\nTICKET #00666\nWinner: Unknown\nStatus: Unavailable for comment\n\nThe blurry photo shows a figure clutching the golden trophy. First winner to bite the presenter."}
   };
   for (const [id,entry] of Object.entries(cinemaNotes)) entries[id] = {...entry,region:"cinema",added:5,generator:6};
 

@@ -555,6 +555,23 @@ const View = (() => {
       for (const [dx,dy,h] of [[-.28,.1,2],[.07,-.14,4],[.13,.19,3]]) f(dx,dy,1,.13,.12,h,sap);
       return;
     }
+    if (kind === "projector") {
+      f(-.26,-.29,0,.53,.55,15,rubber);
+      f(-.14,-.20,15,.33,.34,8,olive);
+      f(-.23,-.26,18,.12,.12,4,state.atmosphere.awake && state.world.cinema === "projector" ? cream : rubber);
+      return;
+    }
+    if (kind === "cinema-body") {
+      f(-.13,-.08,12,.35,.31,8,rubber);
+      f(.08,-.05,17,.22,.20,4,olive);
+      return;
+    }
+    if (kind === "cinema-guest") {
+      if (state.elapsed >= (state.cinemaGuestUntil ?? 0)) return;
+      f(-.09,-.08,0,.3,.28,20,olive);
+      f(-.05,-.07,20,.22,.19,7,cream);
+      return;
+    }
     if (kind === "sleeper") {
       if (state.atmosphere.awake) return;
       shadow(x,y,19,7);
@@ -633,6 +650,29 @@ const View = (() => {
       f(-.21,-.18,24,.43,.34,1,teal);
       f(.07,-.27,24,.07,.11,8,iron);
       f(.07,-.23,31,.07,.19,2,plastic);
+      return;
+    }
+    if (kind === "milk-bottles") {
+      for (const dx of [-.24,0,.24]) f(dx,-.1,0,.15,.16,7,cream);
+      return;
+    }
+    if (kind === "sample-case") {
+      f(-.28,-.24,0,.56,.48,10,iron);
+      f(-.16,-.12,10,.20,.21,6,teal);
+      f(.09,-.12,10,.15,.16,4,olive);
+      return;
+    }
+    if (kind === "broken-recorder") {
+      f(-.26,-.18,0,.52,.36,4,rubber);
+      f(-.2,-.11,4,.12,.12,2,iron);
+      f(.1,-.13,4,.13,.13,2,iron);
+      return;
+    }
+    if (kind === "carriage-door") {
+      f(-.37,-.18,0,.74,.24,4,iron);
+      f(-.30,-.12,4,.64,.11,32,teal);
+      f(-.23,-.13,23,.48,.12,10,rubber);
+      line(p(x-.26,y-.11,12),p(x+.28,y-.11,19),"#ab825d",2);
       return;
     }
     if (kind === "record") {
@@ -1281,6 +1321,13 @@ const View = (() => {
     }
     if (darkLook) {
       microActor(a, isPlayer, state, alive, x, y, scale);
+      if (alive && a.origin === "cinema-winner") {
+        const hand = x+(a.face || 1)*9, bob = a.moving ? Math.round(Math.sin(clock*5)*2) : 0;
+        ctx.fillStyle = "#d5ad52";
+        ctx.fillRect(hand-2,y-22+bob,5,4);
+        ctx.fillRect(hand,y-18+bob,1,4);
+        ctx.fillRect(hand-2,y-14+bob,5,1);
+      }
       if (alive && a.stats && (state.target === a || a.hp < a.stats.hp && a.alert > 0)) {
         ctx.fillStyle = "#1d261d";
         ctx.fillRect(x - 8, y - 42 * scale, 16, 2);
@@ -1346,6 +1393,12 @@ const View = (() => {
     if (isPlayer) {
       ctx.fillStyle = "#b8aa78";
       ctx.fillRect(striking ? 13 : 7, top + (striking ? 5 : 11), striking ? 7 : 4, 2.5);
+    }
+    if (a.origin === "cinema-winner") {
+      ctx.fillStyle = "#d5ad52";
+      ctx.fillRect(handX-3,handY-6,6,4);
+      ctx.fillRect(handX-1,handY-2,2,4);
+      ctx.fillRect(handX-3,handY+2,6,1);
     }
     if (a.outfit === "patrol" || isPlayer && a.gear.arms) {
       line([handX - 5, handY], [handX - 1, handY], "#334652", 5.4);
@@ -1497,6 +1550,106 @@ const View = (() => {
     ctx.restore();
   }
 
+  function renderAfterlife(session) {
+    if (!size.width) resize();
+    const {width,height,dpr} = size, {player,world,target,decoy,id} = session;
+    const c = mainCtx;
+    c.setTransform(dpr,0,0,dpr,0,0);
+    c.fillStyle = "#0b0f0d";
+    c.fillRect(0,0,width,height);
+    const radius = Afterlife.range(session);
+    const scale = Math.min(1.1,width/440);
+    const project = (x,y) => {
+      const [px,py] = p(x-player.x,y-player.y);
+      return [Math.round(width*.5+px*scale),Math.round(height*.51+py*scale)];
+    };
+    const reach = Math.ceil(radius);
+    const px = Math.floor(player.x), py = Math.floor(player.y);
+    for (let y=py-reach;y<=py+reach;y++) for (let x=px-reach;x<=px+reach;x++) {
+      const d = Math.hypot(x+.5-player.x,y+.5-player.y), tile = World.tileAt(world,x,y);
+      if (!tile || d > radius) continue;
+      const [sx,sy] = project(x+.5,y+.5), hw = halfW*scale, hh = halfH*scale;
+      c.fillStyle = tile.baseSolid ? "#262c27" : tile.building ? "#222621" : d < radius*.65 ? "#1e261f" : "#161d18";
+      c.beginPath();
+      c.moveTo(sx-hw,sy); c.lineTo(sx,sy-hh); c.lineTo(sx+hw,sy); c.lineTo(sx,sy+hh); c.closePath(); c.fill();
+      if (tile.baseSolid) c.fillRect(sx-hw*.53,sy-hh*1.45,hw*1.06,hh*1.45);
+    }
+    const visible = a => a && Math.hypot(a.x-player.x,a.y-player.y) < radius && World.sees(world,player.x,player.y,a.x,a.y);
+    const figure = (a,color,lean = 0) => {
+      const [x,y] = project(a.x,a.y);
+      c.fillStyle = color;
+      c.fillRect(x-3+lean,y-21,6,6);
+      c.fillRect(x-5,y-15,10,9);
+      c.fillRect(x-4,y-6,3,6);
+      c.fillRect(x+2,y-6,3,5);
+    };
+    for (const z of world.enemies) if (z.hp > 0 && visible(z)) figure(z,"#333c34",1);
+    if (visible(decoy)) {
+      const [x,y] = project(decoy.x,decoy.y);
+      if (id === "brains" && session.fakeLabel === "A mannequin.") figure(decoy,"#3a4138");
+      else {
+        c.fillStyle = "#3e4439";
+        c.fillRect(x-4,y-5+Math.sin(session.clock*5)*Number(id === "rot"),8,4);
+      }
+    }
+    if (visible(target)) {
+      if (id === "chardonnay") {
+        const [x,y] = project(target.x,target.y);
+        c.fillStyle = session.result === "success" ? "#768577" : "#727749";
+        if (session.result === "success") {
+          c.fillRect(x-8,y-2,4,2); c.fillRect(x-1,y-5,2,3); c.fillRect(x+5,y,3,2);
+        } else {
+          c.fillRect(x-2,y-9,4,9); c.fillRect(x-1,y-12,2,4);
+        }
+      } else if (session.animal) {
+        const [x,y] = project(target.x,target.y);
+        c.fillStyle = "#62614d";
+        c.fillRect(x-6,y-5,10,4); c.fillRect(x+3,y-7,4,4); c.fillRect(x-10,y-3,5,1);
+      } else {
+        figure(target,id === "horde" ? "#454d43" : "#51584b",Math.round(Math.sin(session.clock*3)*2));
+        if (id === "horde") {
+          for (const [dx,dy] of [[.45,0],[-.35,.55]]) {
+            const shadow = {x:target.x+dx,y:target.y+dy};
+            if (visible(shadow)) figure(shadow,"#353e35",-1);
+          }
+        }
+      }
+    }
+    const [x,y] = project(player.x,player.y);
+    figure(player,"#686c57",Math.round(Math.sin(session.clock*7)*2));
+    if (id === "crow" && !session.crowGone) {
+      const flutter = Math.sin(session.clock*13)*5;
+      c.fillStyle = "#595f50";
+      c.fillRect(x-6,y-28+flutter,12,3);
+      c.fillRect(x-2,y-32+flutter,4,5);
+    }
+    if (session.gesture?.until > session.clock) {
+      c.fillStyle = "#938976";
+      const {kind} = session.gesture;
+      if (kind === "grab") c.fillRect(x+3,y-14,8,3);
+      else if (kind === "bite") c.fillRect(x-2,y-18,5,2);
+      else { c.fillRect(x+6,y-24,2,2); c.fillRect(x+11,y-26,2,2); }
+    }
+    if (session.locked && visible(session.latch)) {
+      const [lx,ly] = project(session.latch.x,session.latch.y);
+      c.strokeStyle = "#4b5043";
+      c.lineWidth = 2;
+      const [ox,oy] = project(session.origin.x,session.origin.y);
+      c.strokeRect(ox-24,oy-26,48,29);
+      c.fillStyle = "#867b56";
+      c.fillRect(lx-3,ly-10,6,3);
+    }
+    if (session.pathHint && session.clock-session.pulseAt < .9 && !session.result) {
+      const [sx,sy] = project(session.pathHint.x,session.pathHint.y);
+      const distance = Math.hypot(sx-x,sy-y) || 1;
+      const strength = Math.max(0,1-(session.clock-session.pulseAt)/.9);
+      c.fillStyle = strength > .5 ? "#b8a881" : "#6a614d";
+      for (const offset of [22,30,39]) {
+        c.fillRect(x+(sx-x)/distance*offset-2,y+(sy-y)/distance*offset-2,4,4);
+      }
+    }
+  }
+
   function render(state, clock, dt) {
     if (!size.width) resize();
     if (!size.width || !size.height) return;
@@ -1624,7 +1777,7 @@ const View = (() => {
           const firearm = Sim.weaponData(state).firearm;
           const label = entity !== reachable ? "Closing in" : Sim.weaponProblem(state) ||
             (player.cooldown > 0 ? "Recovering" : firearm ? Math.round(Sim.aimChance(state, entity) * 100) + "% hit chance" : "In range");
-          marker(entity.x, entity.y, entity.kind === "brute" ? 79 : 66, label);
+          marker(entity.x, entity.y, entity.kind === "brute" ? 79 : 66, entity.origin === "cinema-winner" ? "The El Gordo Winner" : label);
         }
       }
     }
@@ -1823,7 +1976,7 @@ const View = (() => {
       dot(exit.x,exit.y,"#e5d48f",4);
       if (w >= 350) {
         const dest = Regions.definitions[exit.id.slice(5)];
-        const label = world.region === Regions.home ? dest.direction[0] :
+        const label = exit.id === "exit-cinema" ? "CINEMA" : world.region === Regions.home ? dest.direction[0] :
           world.underground ? "UP" : exit.id === "exit-" + Regions.cavern ? "DOWN" : dest?.deep ? dest.tag :
           Regions.definitions[world.region].deep ? "BACK" : "TOWN";
         const shift = exit.y > world.height/2 ? -10 : 14;
@@ -1845,5 +1998,5 @@ const View = (() => {
     c.font="700 10px monospace";c.fillStyle="#d6d7ba";c.textAlign="center";
     if(world.base)c.fillText("SHELTER",ox+10*unit,oy+40*unit+15);
   }
-  return {prepare,render,locate,minimap,mapPoint,visible};
+  return {prepare,render,renderAfterlife,locate,minimap,mapPoint,visible};
 })();

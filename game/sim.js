@@ -152,6 +152,29 @@ const Sim = (() => {
       addUtilities(world);
       stockFieldGear(world);
     }
+    if (region === "cinema") {
+      const rng = Level.seeded(seed ^ 0x3beb2d58);
+      world.cinema = Regions.cinemaOutcome(seed);
+      if (rules.count && world.cinema === "winner") {
+        const z = World.infected(world,"cinema-winner",13.5,7.5,"walkers",rng,"cinema-winner");
+        z.outfit = "hiker";
+        Object.assign(z,{homeX:13.5,homeY:8.5});
+        world.enemies.push(z);
+      }
+      if (rules.count && ["projector","noise"].includes(world.cinema)) {
+        const sleepers = [[11.5,10.5],[16.5,12.5],[10.5,14.5]].slice(0,2+Number(rng() < .5));
+        for (const [i,[x,y]] of sleepers.entries()) {
+          const z = World.infected(world,"cinema-sleeper-"+i,x,y,"walkers",rng,"cinema-sleeper");
+          z.dormant = true;
+          world.enemies.push(z);
+        }
+      }
+      if (world.cinema === "trophy" || !rules.count && world.cinema === "winner") {
+        world.objects.push({id:"cinema-trophy",kind:"crate",name:"Abandoned prize case",x:20.5,y:7.5,
+          building:world.buildings[0].id,zone:world.buildings[0].id,tint:.65,active:true,solid:false,action:"loot",searched:false,
+          loot:[{id:"raffletrophy",qty:1,condition:100}]});
+      }
+    }
     Chronicle.place(world);
     Atmosphere.place(world);
     // Place new evidence after existing fixtures so old saves retain their coordinates.
@@ -183,7 +206,7 @@ const Sim = (() => {
       atmosphere:Atmosphere.create(world,rules.hordes),sounds:[],
       flags: {barricade: false, supplies: false, rescued: false, radio: false, water: false,
         gardenSeeded: false, harvested: false, gardenMeal: false, gardenHelp: false}, nextEvent: 180, weather: "Overcast",
-      exploredAt: 0, radioWave: false, zoom: 1, waypoint: town ? "market" : world.underground ? "exit-ridge" : "exit-" + Regions.home, lookahead: true, roofsHidden: false
+      exploredAt: 0, radioWave: false, zoom: 1, waypoint: town ? "market" : world.underground ? "exit-ridge" : "exit-" + (Regions.definitions[region].host ?? Regions.home), lookahead: true, roofsHidden: false
     };
     s.weather = localWeather(s);
     explore(s);
@@ -198,7 +221,7 @@ const Sim = (() => {
   function createControl(difficulty, role, startId, options, profile) {
     if (!Object.hasOwn(Data.control.starts, startId)) throw new Error("Choose a starting point on the control map.");
     const seed = Number.isInteger(profile?.seed) && profile.seed >= 0 && profile.seed <= 999999999 ? profile.seed : Data.control.seed;
-    const s = create(seed, difficulty, role, 5, options, Regions.home, profile);
+    const s = create(seed, difficulty, role, 6, options, Regions.home, profile);
     s.controlStart = startId;
     if (startId === "shelter") return s;
     const start = Data.control.starts[startId];
@@ -880,11 +903,14 @@ const Sim = (() => {
     s.noiseRings = (s.noiseRings ?? []).filter(r => s.elapsed - r.t < 1.2);
     s.noiseRings.push({x, y, r: radius, t: s.elapsed});
     if (s.noiseRings.length > 16) s.noiseRings.shift();
+    const wakeAudience = s.world.cinema && radius >= 4 && s.world.enemies.some(z =>
+      z.origin === "cinema-sleeper" && z.dormant && z.hp > 0 && Math.hypot(z.x-x,z.y-y) <= radius);
     for (const z of s.world.enemies) {
       if (z.hp <= 0) continue;
+      const audience = wakeAudience && z.origin === "cinema-sleeper" && z.dormant;
       const d = Math.hypot(z.x - x, z.y - y);
-      if (d > radius || d > radius * .55 && !World.sees(s.world, x, y, z.x, z.y)) continue;
-      z.alert = Math.max(z.alert, radius > 6 ? 14 : 5);
+      if (!audience && (d > radius || d > radius * .55 && !World.sees(s.world, x, y, z.x, z.y))) continue;
+      z.alert = Math.max(z.alert, audience || radius > 6 ? 14 : 5);
       z.chaseX = x; z.chaseY = y; z.replan = 0;
     }
   }
@@ -974,7 +1000,7 @@ const Sim = (() => {
 
   function updateHordes(s) {
     const a = s.atmosphere, mode = s.rules.hordes, pending = a.pending;
-    if (s.world.underground || mode === "off" || a.time < (pending?.due ?? a.nextWave)) return;
+    if (s.world.cinema || s.world.underground || mode === "off" || a.time < (pending?.due ?? a.nextWave)) return;
     const room = encounterSlots(s,a.awake ? 0 : 6), rng = Level.seeded(a.rng);
     const routes = Atmosphere.arrivals[s.world.region];
     if (pending) {
@@ -1021,6 +1047,19 @@ const Sim = (() => {
   function updateAtmosphere(s,dt) {
     const a = s.atmosphere, p = s.player;
     a.time += dt;
+    if (!a.awake && s.world.cinema && World.tileAt(s.world,p.x,p.y)?.building) {
+      if (s.world.cinema === "projector" && p.y < 19) {
+        a.awake = true;
+        const projector = s.world.objects.find(o => o.name === "Projector");
+        noise(s,projector.x,projector.y,21);
+        hear(s,"tin",projector);
+        notify(s,"The projector catches. Something shifts in the seats.",true);
+      } else if (s.world.cinema === "guest" && p.x >= 17.5 && p.y >= 17.5) {
+        a.awake = true;
+        s.cinemaGuestUntil = s.elapsed + 7;
+        notify(s,"A figure ducks behind the concessions counter. ‘Keep the trophy,’ they whisper.");
+      }
+    }
     if (!a.awake && World.tileAt(s.world,p.x,p.y)?.tendril) wakeNest(s);
     const crib = s.world.nursery;
     if (crib && !a.nursery && !p.vehicle && distance(p,crib) < 3.2 &&
@@ -1763,9 +1802,10 @@ const Sim = (() => {
 
   function defeat(s, enemy) {
     s.kills++;
-    const item = Data.outfits[enemy.outfit]?.item;
+    const winner = enemy.origin === "cinema-winner";
+    const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item;
     s.world.objects.push({id: "built" + s.serial++, x: enemy.x, y: enemy.y, kind: "drop",
-      name: "Fallen infected", active: true, solid: false, action: "loot", searched: !item, corpse: true, died: s.minutes,
+      name: winner ? "The El Gordo Winner" : "Fallen infected", active: true, solid: false, action: "loot", searched: !item, corpse: !winner, died: s.minutes,
       loot: item ? [{id: item, qty: 1, condition: Data.items[item].damage ? 60 : 100}] : []});
   }
 
@@ -2034,7 +2074,7 @@ const Sim = (() => {
       if (z.dormant) {
         const close = distance(z,p) < 2.6 && lineOfSight(s,z,p);
         const companionClose = canTargetEva(npc) && distance(z,npc) < 2.3 && lineOfSight(s,z,npc);
-        if (!close && !companionClose && z.alert < 8) continue;
+        if (z.alert < 8 && (z.origin === "cinema-sleeper" || !close && !companionClose)) continue;
         z.dormant = false;
         z.cooldown = Math.max(z.cooldown,1.2);
         z.replan = 0;
@@ -2107,11 +2147,12 @@ const Sim = (() => {
         z.wander -= dt;
         if (z.wander <= 0) {
           z.wander = 3 + s.world.rng() * 8;
-          const x = z.homeX + (s.world.rng() - .5) * 5, y = z.homeY + (s.world.rng() - .5) * 5;
+          const width = z.origin === "cinema-winner" ? 9 : 5;
+          const x = z.homeX + (s.world.rng() - .5) * width, y = z.homeY + (s.world.rng() - .5) * 5;
           if (World.clear(s.world, x, y)) z.path = World.route(s.world, z.x, z.y, x, y);
         }
       }
-      z.moving = follow(s, z, z.stats.speed * dt * (z.alert > 0 ? 1 : .45), true);
+      z.moving = follow(s, z, z.stats.speed * dt * (z.alert > 0 ? 1 : .45) * (z.origin === "cinema-winner" ? .85 : 1), true);
     }
   }
 
@@ -2229,7 +2270,14 @@ const Sim = (() => {
       notify(s, x > 30 ? "A siren to the east is drawing the horde." : "A crash in the centre of town is drawing the infected.");
       }
     }
-    if (s.player.hp <= 0) { s.deathCause ??= s.harm || "unknown causes"; s.mode = "dead"; s.target = null; s.player.path = []; notify(s, "Your story ended in " + Regions.definitions[s.world.region].name + ".", true); }
+    if (s.player.hp <= 0) {
+      s.deathCause ??= s.harm || "unknown causes";
+      s.afterlifePending = s.player.exposure > 0 && Afterlife.eligible(s,Math.random());
+      s.mode = "dead";
+      s.target = null;
+      s.player.path = [];
+      notify(s, "Your story ended in " + Regions.definitions[s.world.region].name + ".", true);
+    }
     if (s.sleepPending && s.mode === "play") { s.sleepPending = false; fastSleep(s); }
   }
 
@@ -2404,7 +2452,7 @@ const Sim = (() => {
       schema: Data.saveVersion, generator: s.world.generator, seed: s.seed, difficulty: s.difficulty, role: s.role, rules:{...s.rules},
       region:s.world.region, regionStates:s.regionStates,
       elapsed: s.elapsed, minutes: s.minutes, mode: s.mode, quiet: s.quiet, kills: s.kills, serial: s.serial, controlStart: s.controlStart,
-      nextEvent: s.nextEvent, deathCause: s.deathCause, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
+      nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
       ledger:{found:{...s.ledger.found},dispatch:s.ledger.dispatch ? {...s.ledger.dispatch} : null},
       zoom: s.zoom, lookahead: s.lookahead, roofsHidden: s.roofsHidden, player:snapshotPlayer(s)
     };
@@ -2418,7 +2466,7 @@ const Sim = (() => {
     const supportedMap = data?.mapRevision === Regions.mapRevision ||
       region !== Regions.cavern && (data?.mapRevision === undefined || data.mapRevision === 2);
     return data && Object.hasOwn(Regions.definitions, region) && supportedMap &&
-      (data.ledgerRevision === undefined || [1,2,3,Chronicle.revision].includes(data.ledgerRevision)) &&
+      (data.ledgerRevision === undefined || [1,2,3,4,Chronicle.revision].includes(data.ledgerRevision)) &&
       Array.isArray(data.objects) && data.objects.length <= 1000 &&
       Array.isArray(data.enemies) && data.enemies.length <= 200 && Array.isArray(data.explored) && data.explored.length === mapSize &&
       data.npc && ["injured", "follow", "wait", "refuge", "dead", "away"].includes(data.npc.mode);
@@ -2436,9 +2484,9 @@ const Sim = (() => {
   function restore(data, crossing = null) {
     data = migrate(data);
     const region = data?.region ?? Regions.home, regionStates = data?.regionStates ?? {};
-    if (!data || data.schema !== Data.saveVersion || ![1, 2, 3, 4, 5].includes(data.generator) || !Number.isInteger(data.seed) ||
+    if (!data || data.schema !== Data.saveVersion || ![1, 2, 3, 4, 5, 6].includes(data.generator) || !Number.isInteger(data.seed) ||
         !(data.difficulty === "custom" || Object.hasOwn(Data.modes, data.difficulty)) || !Object.hasOwn(Data.roles, data.role) ||
-        typeof region !== "string" || !zoneShape(data, region) || typeof regionStates !== "object" || Array.isArray(regionStates) ||
+        typeof region !== "string" || data.generator < (Regions.definitions[region]?.generator ?? 1) || !zoneShape(data, region) || typeof regionStates !== "object" || Array.isArray(regionStates) ||
         Object.entries(regionStates).some(([id, zone]) => id === region || !zoneShape(zone, id) ||
           zone.leftAt !== undefined && (!Number.isFinite(zone.leftAt) || zone.leftAt < 0 || zone.leftAt > data.minutes))) throw new Error("Incompatible save.");
     const areas = [data,...Object.values(regionStates)];
@@ -2447,7 +2495,7 @@ const Sim = (() => {
     const legacy = data.rules === undefined;
     const oldMap = data.mapRevision === undefined;
     const rules = Data.worldRules(data.difficulty, legacy ? Data.legacyRules : data.rules);
-    if (!legacy && Object.keys(rules).some(key => rules[key] !== data.rules?.[key] && !(oldMap && key === "hordes" && data.rules.hordes === undefined))) throw new Error("Invalid world rules.");
+    if (!legacy && Object.keys(rules).some(key => rules[key] !== data.rules?.[key] && !(key === "afterlifeChance" && data.rules[key] === undefined) && !(oldMap && key === "hordes" && data.rules.hordes === undefined))) throw new Error("Invalid world rules.");
     const s = crossing?.template ?? create(data.seed, data.difficulty, data.role, data.generator, rules, region), p = data.player;
     s.regionStates = {...regionStates};
     s.ledger = Chronicle.restore(data.ledger,data.minutes);
@@ -2590,7 +2638,7 @@ const Sim = (() => {
       ...(o.kind === "car" ? {homeRegion:o.homeRegion ?? region} : {}),
       ...(oldMap && o.kind === "exit" ? {x:originalObjects.get(o.id).x,y:originalObjects.get(o.id).y} : {}),
       name: originalObjects.get(o.id)?.name ?? (o.kind === "car" ? Regions.vehicleNames[o.id] ?? "Car boot" : undefined) ?? builtNames.get(o.kind) ?? legacyDropNames.get(o.name) ??
-        (dropNames.has(o.name) ? o.name : "On the ground"),
+        (dropNames.has(o.name) || o.name === "The El Gordo Winner" ? o.name : "On the ground"),
       ...(o.kind === "barrel" ? {water: o.water ?? 0} : {})
     }));
     for (const original of originalObjects.values()) if (!savedIds.has(original.id) && missingLegacyFixture(original)) {
@@ -2642,6 +2690,9 @@ const Sim = (() => {
       s.clues = [...new Set(data.clues.filter(id => typeof id === "string" && Data.story[id]?.field))];
     }
     s.mode = s.player.hp > 0 ? "play" : "dead";
+    if (data.afterlifePending !== undefined && (typeof data.afterlifePending !== "boolean" ||
+        data.afterlifePending && (s.mode !== "dead" || s.player.exposure <= 0))) throw new Error("Invalid afterlife state.");
+    s.afterlifePending = data.afterlifePending ?? false;
     s.quiet = Boolean(data.quiet);
     s.zoom = Number.isFinite(data.zoom) ? clamp(data.zoom, .75, 1.75) : 1;
     if (typeof data.waypoint === "string") s.waypoint = data.waypoint;

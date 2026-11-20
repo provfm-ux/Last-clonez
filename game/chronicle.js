@@ -2,7 +2,7 @@
 
 const Chronicle = (() => {
   const title = "The Second All-Clear";
-  const revision = 4, dispatchDelay = 24, tideCycle = 156, lowTide = 52;
+  const revision = 5, dispatchDelay = 24, tideCycle = 156, lowTide = 52;
   const deskId = "ledger-desk";
   const leads = {
     coldvale:"The grocery store kept printing collection slips after it shut.",
@@ -13,6 +13,7 @@ const Chronicle = (() => {
     quarry:"The foreman kept a second shift record beside the weighbridge.",
     reservoir:"Follow the spillway to the valve tower. Someone scratched a warning inside.",
     lighthouse:"The boat shed at Gull Point kept a second copy of the keeper’s watch.",
+    cinema:"The ticket booth and projection booth kept separate records of the last screening.",
     cavern:"Follow the winch and survey rooms to the final shutdown console."
   };
   const entries = {
@@ -181,6 +182,54 @@ const Chronicle = (() => {
       reward:{food:2,battery:1},cache:"Eddie’s packed lunch"}
   };
 
+  // These field finds are map-seeded and independent of supplies, population and the case.
+  const filmFinds = {
+    pubstand:{region:"fields",at:["Malt house",4,4],title:"Last round",source:"Malt house · Beer mat",
+      text:"The beer mats say to stay put and wait for the trouble to blow over. The front door is barricaded with the jukebox. The back door is propped open so the regulars can smoke."},
+    centreboard:{region:"coldvale",at:["market",2,5],title:"Shopping arcade closing rota",source:"Grocery store · Arcade notice",
+      text:"The committee barricaded the shopping arcade and voted to keep the escalator running. It has been carrying an empty shopping trolley upstairs for three days."},
+    emptyroad:{region:"coldvale",at:[29,24],style:"milk-bottles",title:"Nothing on the road",source:"Main road · Unopened delivery",
+      text:"An entire row of milk bottles is untouched. The van’s indicator still blinks, faithfully asking permission to turn into an empty street."},
+    farmboards:{region:"fields",at:["Orchard farmhouse",7,3],title:"Count the nails",source:"Orchard farmhouse · Boarded window",
+      text:"The house stayed dark all night. At dawn, someone had pulled the nails out of the boards and knocked them back in from the outside."},
+    coldsample:{region:"ironworks",at:["Power substation",4,4],style:"sample-case",title:"Hold at minus twenty",source:"Power substation · Refrigerated specimen case",
+      text:"The sample was hard enough to rattle in its jar. At nineteen below it moved to the side furthest from the thermometer. Someone has crossed out ‘defrost before opening’."},
+    tornreel:{region:"ridge",at:["Firewatch cabin",6,4],style:"broken-recorder",title:"Recorder with a torn tape",source:"Firewatch cabin · Notebook and recorder",
+      text:"The notebook says the last recording was of the wind. The recorder has been smashed, very carefully, in the middle of a sentence."},
+    sealcar:{region:"ironworks",at:["Freight depot",8,4],style:"carriage-door",title:"Carriage end door",source:"Freight depot · Abandoned carriage",
+      text:"The carriage door was tied shut with neckties from the platform side. Someone inside slid a folded ticket under it after the last train had gone."},
+    rulespad:{region:"coast",at:["Weather hut",5,5],title:"The rules, revised",source:"Weather hut · Pocket notebook",
+      text:"Always check the back seat. If there is somebody in it, ask them what rule they were following. If they answer, ask how long they’ve been there."},
+    wheelbarrow:{region:"quarry",at:["Crusher shed",4,3],title:"Unlicensed transport",source:"Crusher shed · Incident report",
+      text:"The foreman tried moving a dead worker in a wheelbarrow. At lunch, three dead workers were pushing the foreman around in it. The wheelbarrow has been written off."},
+    sporetag:{region:"ridge",at:["Creek shelter",3,3],title:"Don’t tread on the threads",source:"Creek shelter · Trail notice",
+      text:"The white filaments run all the way under the door. I put my boot down and heard chairs scrape in the next room. If you wake one, expect company."}
+  };
+  for (const [id,entry] of Object.entries(filmFinds)) entries[id] = {...entry,added:5,generator:6,extra:true,rare:true};
+
+  const cinemaNotes = {
+    poster:{at:["Oxford Night Reel",8,17],title:"Shocktober event poster",source:"Entrance lobby",
+      text:"THE NIGHT REEL SOCIETY PRESENTS\nSHOCKTOBER — ONE HELL OF A NIGHT\n\nCult classics. Cold beers. Ridiculous prizes. And the world-famous El Gordo raffle. One lucky Night Reeler will walk off with the Golden Raffle Trophy. Everyone else can cry into their popcorn. Doors at 7:30. Film at 8:30. Chaos afterwards."},
+    ticketpost:{at:["Oxford Night Reel",3,15],title:"Printed social announcement",source:"Ticket booth · Fictional social post",
+      text:"OXFORD, YOU BEAUTIFUL WEIRDOS!\nTonight’s screening is sold out. Come for the cold beer and the film, stay for an indecent quantity of raffle prizes. One of you is taking El Gordo home. What could possibly go wrong?\n#NightReel #ElGordo #Shocktober"},
+    livepost:{at:["Oxford Night Reel",15,13],title:"Winner announcement and draft",source:"Projection booth · Fictional social post",
+      text:"WE HAVE A WINNER! Our El Gordo champion looks like he’s been partying since 1987. Absolute legend. Somebody get him a beer.\n\nUnsent draft\n‘Right, apparently he doesn’t want a beer. He wants…’"},
+    backnote:{at:["Oxford Night Reel",13,2],title:"Note to whoever sold 00666",source:"Backstage table",
+      text:"Whoever sold ticket 00666 needs to explain. The winner looked like absolute death. We gave him the trophy. He tried to eat Martin Fenwick. Everyone thought it was performance art.\nIT WAS NOT PERFORMANCE ART.\nIf you’ve got the keys to the back exit, OPEN THE BLOODY DOOR."},
+    finalpost:{at:["Oxford Night Reel",14,11],title:"Final screening update",source:"Projection booth · Fictional social post",
+      text:"Well, you magnificent bastards. El Gordo has eaten half the front row. The projector is still running. Nobody can find the keys and somebody’s nicked all the popcorn.\n10/10 atmosphere. Would probably not recommend.\n#NightReel #BestNightEver #SendHelp"},
+    halloffame:{at:["Oxford Night Reel",10,16],title:"El Gordo Hall of Fame",source:"Lobby wall",
+      text:"Tess Plover — 00432 — left on the last bus with twelve saucepans.\nGareth Fen — 00280 — donated his inflatable coffin back.\n\nEL GORDO CHAMPION\nTICKET #00666\nWinner: Unknown\nStatus: Unavailable for comment\n\nThe blurry photo shows a figure clutching the golden trophy. First winner to bite the presenter."}
+  };
+  for (const [id,entry] of Object.entries(cinemaNotes)) entries[id] = {...entry,region:"cinema",added:5,generator:6};
+
+  function available(entry,world) {
+    if ((entry.generator ?? 1) > world.generator) return false;
+    if (!entry.rare) return true;
+    const salt = [...entry.title].reduce((sum,c) => Math.imul(sum,31)+c.charCodeAt(0),0);
+    return Level.seeded(world.seed ^ salt)() < .48;
+  }
+
   const core = ["receipt","watch","tally","tidebook","cellar","relay","reply"];
   const routes = {
     freight:{title:"Freight diversion", verified:"horn", region:"ironworks", decoy:[81,29], from:"Machine shop", danger:"Eastern sidings",
@@ -222,7 +271,7 @@ const Chronicle = (() => {
         tint:.72,solid:false,active:false,storage:true,searched:true,loot:[],...properties});
     }
     for (const [id, entry] of Object.entries(entries)) {
-      if (entry.region !== world.region || (entry.generator ?? 1) > world.generator ||
+      if (entry.region !== world.region || !available(entry,world) ||
           Boolean(entry.added || entry.generator) !== expansion) continue;
       const o = fixture(entry.at,{id:idFor(id),record:id,name:entry.title,kind:entry.style ?? (entry.action ? "relay" : "record"),action:entry.action ? "ledger-event" : "ledger-record"});
       if (entry.reward) cache(cacheFor(id),entry.cache,o,{record:id});
@@ -278,5 +327,5 @@ const Chronicle = (() => {
       reportRead:dispatch.reportRead} : null};
   }
 
-  return {title,revision,dispatchDelay,deskId,leads,entries,core,routes,empty,has,isFixture,idFor,cacheFor,deliveryFor,isScene,isUnseen,place,incidentProblem,tideForecast,ready,restore};
+  return {title,revision,dispatchDelay,deskId,leads,entries,core,routes,empty,has,isFixture,idFor,cacheFor,deliveryFor,isScene,isUnseen,available,place,incidentProblem,tideForecast,ready,restore};
 })();

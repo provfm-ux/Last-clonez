@@ -672,3 +672,19 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 @media (any-pointer:coarse) and (orientation:landscape) and (max-height:500px) and (max-width:1024px) {
   .viewport { --touch-action-height:52px; }
 }
+
+.lesson,.afterlife-tools {
+  position:absolute; z-index:8; top:12px; left:50%; transform:translateX(-50%);
+  display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:.6rem;
+  width:max-content; max-width:calc(100% - 24px); padding:.5rem .7rem;
+  color:#e0dfcd; background:#171b17ed; border:1px solid #59614f; font-size:.83rem;
+}
+.lesson[hidden],.afterlife-tools[hidden] { display:none; }
+.in-afterlife .stage-top,.in-afterlife .stage-bottom,.in-afterlife .rail,
+.in-afterlife .mast,.in-afterlife .footer,.in-afterlife .destination-tag,
+.in-afterlife .world-tools,.in-afterlife .status-chips,.in-afterlife .live-tag,
+.in-afterlife #event-status,.in-afterlife .lens,.in-afterlife .scope { visibility:hidden; }
+.in-afterlife .afterlife-tools { background:#111411c9; border-color:#363d33; }
+.in-afterlife .lesson { display:none; }
+
+.ledger-text { white-space:pre-line; }

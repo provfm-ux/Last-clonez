@@ -2,6 +2,8 @@
 
 const Data = (() => {
   const items = {
+    raffletrophy:{name:"Golden Raffle Trophy",group:"Equipment",weight:.35,icon:"badge",
+      detail:"Congratulations. You survived the raffle. The winner didn't."},
     bat: {name:"Wooden bat", group:"Weapons", weight:1.4, damage:25, range:1.4, delay:.55, effort:6, noise:3, wear:.6, icon:"bat"},
     pipe: {name:"Steel pipe", group:"Weapons", weight:1.8, damage:31, range:1.4, delay:.68, effort:8, noise:4, wear:.35, icon:"bat"},
     spear: {name:"Improvised spear", group:"Weapons", weight:1.2, damage:34, range:1.9, delay:.64, effort:6, noise:2.5, wear:1.6, icon:"bat"},
@@ -79,7 +81,7 @@ const Data = (() => {
     {id:"repair",name:"Repair equipped weapon",repair:true,inputs:{scrap:1,tape:1},desc:"Restores 35 points of weapon condition."}
   ];
   const baseline = {count:65, mix:"mixed", hordes:"normal", damage:100, loot:100, needs:100, clock:2, startHour:8,
-    weather:"cycle", infection:"bites", care:"gradual", exposure:"on", powerDays:3, waterDays:2};
+    weather:"cycle", infection:"bites", care:"gradual", exposure:"on", powerDays:3, waterDays:2, afterlifeChance:60};
   const modes = {
     survival:{...baseline, name:"Survival", desc:"The standard Cold Vale outbreak."},
     relaxed:{name:"Relaxed", desc:"Fewer infected, more supplies and slower needs.", count:35, mix:"walkers", damage:60, needs:65, loot:140, powerDays:6, waterDays:5},
@@ -105,6 +107,7 @@ const Data = (() => {
     care:{label:"Wound treatment", choices:{gradual:"Gradual recovery", quick:"Quick recovery"}},
     exposure:{label:"Cold and wetness", choices:{on:"On", off:"Off"}},
     powerDays:{label:"Days before power cuts", min:-1, max:14, step:1},
+    afterlifeChance:{label:"Continue after infected death (%)", min:0, max:100, step:1},
     waterDays:{label:"Days before water cuts", min:-1, max:14, step:1}
   };
   function worldRules(mode, values) {
@@ -127,7 +130,7 @@ const Data = (() => {
   };
   const maxMapPins = 64;
   const control = {
-    version:"0.31",
+    version:"0.32",
     seed:17,
     starts:{
       shelter:{name:"Shelter", detail:"Start indoors by the supplies crate. Test the garden, campfire and rain collector."},

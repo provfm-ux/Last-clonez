@@ -3,6 +3,7 @@
 const Atmosphere = (() => {
   const warningSeconds = 7;
   const arrivals = {
+    cinema:[],
     coldvale:[
       {name:"the west road",entry:[2,29],goal:[23,29]}, {name:"the north road",entry:[29,2],goal:[29,23]},
       {name:"the eastern outskirts",entry:[71,29],goal:[48,29]}, {name:"the south road",entry:[29,71],goal:[29,48]}
@@ -48,7 +49,7 @@ const Atmosphere = (() => {
   const marker = (x,y) => ({x:x+.5,y:y+.5});
 
   function place(world) {
-    if (world.underground) return;
+    if (world.underground || world.region === "cinema") return;
     const occupied = new Set(world.objects.map(o => Math.floor(o.y)*world.width + Math.floor(o.x)));
     function clearCell(x,y) {
       const tile = World.tileAt(world,x,y);

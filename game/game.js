@@ -12,6 +12,8 @@
   // Movement follows the physical WASD position (event.code) so AZERTY, Dvorak and similar layouts work.
   const codeKeys = {KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright"};
   let state = Sim.createControl("survival", "carer", "shelter"), lastFrame = performance.now(), nextHud = 0, nextMap = 0, nextSave = 10, lastRender = 0, noiseRings = false, look = (() => { try { const v = localStorage.getItem("clonez-gfx"); return v === "classic" || v === "fast" ? v : "dark"; } catch { return "dark"; } })();
+  const introKey = "clonez-introduction-complete";
+  let lesson = null, afterlife = null;
   let dialogView = null, lastTap = null, deathShown = false, savedText = read(storageKey);
   let bagFilter = "", bagTab = "all", bagPane = "nearby", bagSource = "", storeSource = "";
   let expandedView = false, changingView = false, pinDraft = null, craftIngredient = null;
@@ -53,7 +55,7 @@
   }
 
   function save(showNotice = false) {
-    if (state.mode === "menu") return false;
+    if (state.mode === "menu" || lesson) return false;
     try {
       const text = JSON.stringify(Sim.snapshot(state));
       const previous = read(storageKey);
@@ -148,6 +150,74 @@
     nextHud = nextMap = 0;
     nextSave = state.elapsed + 10;
     updateHud();
+  }
+
+  function startLesson() {
+    const previous = state;
+    const setup = ["difficulty","role","start-point","survivor-name","appearance","world-seed"].map(id => [id,$(id).value]);
+    activate(Sim.createControl("training","carer","shelter"));
+    const {x,y} = state.player;
+    const crate = state.world.objects.find(o => o.storage && o.building === state.world.base.id);
+    crate.loot.push({id:"bandage",qty:1,condition:100});
+    lesson = {previous,setup,origin:{x,y}, stage:0, crate, bandages:Sim.quantity(state.player.bag,"bandage")};
+    wakeSound();
+    updateHud();
+  }
+
+  function endLesson() {
+    if (!lesson) return;
+    write(introKey,"1");
+    const {previous,setup} = lesson;
+    state = previous;
+    lesson = null;
+    titleScreen();
+    for (const [id,value] of setup) $(id).value = value;
+    showStartDetail();
+    View.prepare(state.world);
+  }
+
+  function updateLesson() {
+    if (!lesson) return;
+    const p = state.player;
+    if (lesson.stage === 0 && Sim.distance(p,lesson.origin) >= .8) {
+      lesson.stage = 1;
+      Sim.markDestination(state,"base");
+    }
+    if (lesson.stage >= 1 && lesson.stage <= 2 && Sim.quantity(p.bag,"bandage") > lesson.bandages) lesson.stage = 3;
+    if (lesson.stage === 4 && !dialog.open) {
+      const door = state.world.base.door;
+      const offset = [[0,2],[-1,2],[1,2]].find(([dx,dy]) => World.clear(state.world,door.x+dx,door.y+dy));
+      if (offset) {
+        const [dx,dy] = offset;
+        const dummy = World.infected(state.world,"lesson-walker",door.x+dx,door.y+dy,"walkers",Level.seeded(7));
+        dummy.hp = 1;
+        dummy.cooldown = 120;
+        state.world.enemies.push(dummy);
+      }
+      lesson.stage = 5;
+      Sim.markDestination(state,"base");
+    }
+    if (lesson.stage === 5 && state.kills) lesson.stage = 6;
+  }
+
+  function startAfterlife() {
+    if (!state.afterlifePending || state.mode !== "dead") return;
+    state.afterlifePending = false;
+    save();
+    close(false);
+    deathShown = false;
+    afterlife = Afterlife.start(state);
+    updateHud();
+  }
+
+  function endAfterlife() {
+    afterlife = null;
+    resetInput();
+    updateHud();
+  }
+
+  function afterlifeAction(kind) {
+    if (afterlife) Afterlife.action(afterlife,kind);
   }
 
   function start() {
@@ -253,6 +323,7 @@
   }
 
   function menu() {
+    if (lesson) return endLesson();
     if (!save()) {
       show("Keep a copy of your game", "<p>The browser rejected the local save. Export your game to keep this session.</p>" +
         button("Export save", "export", false, "primary") + " " + button("Resume", "resume"), "save");
@@ -262,9 +333,11 @@
   }
 
   function titleScreen() {
+    if (lesson) return endLesson();
     close(false);
     state.mode = "menu";
     $("hero").hidden = false;
+    $("intro-btn").textContent = read(introKey) ? "Replay introduction" : "Beginner introduction";
     $("continue-btn").hidden = !savedText && !read(backupKey);
     if (state.controlStart) $("start-point").value = state.controlStart;
     $("difficulty").value = state.difficulty;
@@ -385,6 +458,35 @@
   }
 
   function updateHud() {
+    document.body.classList.toggle("in-afterlife",Boolean(afterlife));
+    $("afterlife-tools").hidden = !afterlife;
+    $("lesson").hidden = !lesson;
+    if (afterlife) {
+      $("move-stick").hidden = false;
+      $("touch-controls").hidden = false;
+      $("touch-attack").hidden = false;
+      $("touch-run").hidden = true;
+      $("touch-attack-label").textContent = "Bite";
+      $("touch-use-label").textContent = "Grab";
+      $("touch-shove-label").textContent = "Groan";
+      const hint = afterlife.clock <= afterlife.messageUntil ? afterlife.message : "";
+      if ($("afterlife-text").textContent !== hint) $("afterlife-text").textContent = hint;
+      return;
+    }
+    $("touch-attack-label").textContent = "Attack";
+    if (lesson) {
+      const prompts = [
+        "Move with WASD or the arrows, or drag the movement stick.",
+        "Open the shelter crate. Tap it, press F nearby, or use the Use button.",
+        "Take a bandage from Nearby. Close inventory when you have it.",
+        "Open Pack or press I, then select Backpack to see what you carry.",
+        "Close inventory. Something is moving outside the shelter.",
+        "Get within reach and use Attack or Space. Shove with X or the Shove button.",
+        "You’re ready. Start your own run from the title screen."
+      ];
+      if ($("lesson-text").textContent !== prompts[lesson.stage]) $("lesson-text").textContent = prompts[lesson.stage];
+      $("lesson-exit").textContent = lesson.stage === 6 ? "Finish introduction" : "Skip introduction";
+    }
     const p = state.player, stats = [["hp", p.hp], ["st", p.stamina], ["food", p.hunger], ["water", p.hydration], ["rest", 100 - p.fatigue]];
     for (const [id, value] of stats) {
       $(id + "-num").textContent = Math.ceil(value);
@@ -482,7 +584,7 @@
     const routes = state.world.objects.filter(o => o.action === "travel").map(exit => {
       const id = exit.id.slice(5), returning = id === Regions.home, deepBack = Boolean(area.deep) && id === area.host, annex = returning ? area : Regions.definitions[id];
       const descending = id === Regions.cavern, ascending = state.world.underground;
-      const direction = descending ? "Down" : ascending ? "Up" : deepBack ? "Back" :
+      const direction = id === "cinema" ? "Oxford" : descending ? "Down" : ascending ? "Up" : deepBack ? "Back" :
         returning ? {North:"South",East:"West",South:"North",West:"East"}[annex.direction] : annex.direction;
       const detail = ascending ? "Rope back to the firewatch trail." : deepBack ? "Foot trail back to " + annex.name + "." : returning ? "Route back to town." : annex.detail;
       const crossingType = descending || ascending ? "Rope descent" : annex.vehicles && !deepBack ? "Road crossing" : "Foot trail";
@@ -651,6 +753,7 @@
     if (state.player.vehicle) Sim.brake(state);
     bagPane = pane === "carried" || pane !== "nearby" && !Sim.containers(state).length ? "carried" : "nearby";
     bagSource = source?.id ?? "";
+    if (lesson?.stage === 1 && (source === lesson.crate || !source && Sim.reachableObject(state,lesson.crate))) lesson.stage = 2;
     bagFilter = "";
     bagTab = "all";
     const categories = [["all","All"], ["Food","Food & drink"], ["Medical","Medical"], ["Weapons","Weapons"],
@@ -854,7 +957,7 @@
     const visibleRegions = Object.keys(Chronicle.leads).filter(region =>
       (region !== Regions.cavern && !Regions.definitions[region].deep) || world.region === region || state.regionStates[region]);
     const recordList = visibleRegions.map(region => {
-      const local = Object.entries(Chronicle.entries).filter(([,entry]) => entry.region === region && (entry.generator ?? 1) <= world.generator);
+      const local = Object.entries(Chronicle.entries).filter(([,entry]) => entry.region === region && Chronicle.available(entry,world));
       const read = local.filter(([id]) => Chronicle.has(ledger,id));
       const unseen = local.find(([id,entry]) => (!entry.action || entry.afterDispatch) &&
         (!entry.extra || region === Regions.cavern || Regions.definitions[region].deep) && !Chronicle.has(ledger,id));
@@ -866,7 +969,7 @@
         read.map(([id,entry]) => button(esc(entry.title),"ledgerread-" + id)).join("") + '</div></article>';
     }).join("");
     const town = world.region === Regions.home;
-    const back = world.underground ? "ridge" : Regions.home;
+    const back = world.underground ? "ridge" : (Regions.definitions[world.region].host ?? Regions.home);
     const chapter = Chronicle.has(ledger,"shutdown") ? "The recorded all-clear has stopped. Your signed check-in and the survey room record are filed below." :
       ledger.dispatch?.reportRead ? "The crew made it through. Follow the survey trail below Pine Ridge to find the source of the broadcast." :
       "The same all-clear has aired twice. Trace it across the five surface regions and give the survivors one live signal.";
@@ -878,7 +981,7 @@
       '<div class="ledger-regions">' + recordList + '</div>', "field-ledger");
   }
 
-  const ledgerEntryText = entry => '<div class="ledger-source">' + esc(entry.source) + (entry.time ? ' · ' + esc(entry.time) : '') + '</div><p>' +
+  const ledgerEntryText = entry => '<div class="ledger-source">' + esc(entry.source) + (entry.time ? ' · ' + esc(entry.time) : '') + '</div><p class="ledger-text">' +
     esc(entry.text) + '</p>' + (entry.lead ? '<p class="ledger-lead">' + esc(entry.lead) + '</p>' : '');
 
   function ledgerEntry(id) {
@@ -1473,12 +1576,15 @@
     }
     const action = event.target.closest("[data-action]")?.dataset.action;
     if (!action) return;
+    if (action === "bag-carried" && lesson?.stage === 3) lesson.stage = 4;
     if (action === "resume") close();
     else if (action === "noise-toggle") { noiseRings = !noiseRings; close(); }
     else if (action === "gfx-toggle") { look = look === "dark" ? "fast" : look === "fast" ? "classic" : "dark"; try { localStorage.setItem("clonez-gfx", look); } catch {} close(); }
     else if (action === "unstick") { close(); Sim.unstick(state); updateHud(); }
     else if (action === "menu") menu();
-    else if (action === "new") titleScreen();
+    else if (action === "new") { if (lesson) endLesson(); else titleScreen(); }
+    else if (action === "afterlife") startAfterlife();
+    else if (action === "afterlife-skip") { state.afterlifePending = false; deathShown = false; close(false); save(); }
     else if (action === "save") { save(true); updateHud(); }
     else if (action === "export") exportSave();
     else if (action === "import") $("import-input").click();
@@ -1683,7 +1789,7 @@
 
   function bindTap(element, action) {
     const control = element !== canvas;
-    const available = () => active() && !dialog.open && !element.disabled && !element.hidden;
+    const available = () => (active() || afterlife && control) && !dialog.open && !element.disabled && !element.hidden;
     const press = event => {
       const start = presses.get(event.pointerId);
       return start?.element === element ? start : null;
@@ -1765,7 +1871,7 @@
     $("stick-knob").style.transform = "translate(" + stick.x * radius + "px," + stick.y * radius + "px)";
   }
   stickElement.addEventListener("pointerdown", event => {
-    if (!actionPointer(event) || !active() || dialog.open || stick.pointer !== null) return;
+    if (!actionPointer(event) || !(active() || afterlife) || dialog.open || stick.pointer !== null) return;
     event.preventDefault();
     stick.pointer = event.pointerId;
     stick.originX = event.clientX; stick.originY = event.clientY;
@@ -1787,9 +1893,9 @@
     else Sim.shove(state);
   }
 
-  bindTap($("touch-use"), () => nearbyAction(true));
-  bindTap($("touch-attack"), () => strike());
-  bindTap($("touch-shove"), shoveOrBrake);
+  bindTap($("touch-use"), () => afterlife ? afterlifeAction("grab") : nearbyAction(true));
+  bindTap($("touch-attack"), () => afterlife ? afterlifeAction("bite") : strike());
+  bindTap($("touch-shove"), () => afterlife ? afterlifeAction("groan") : shoveOrBrake());
   bindTap($("touch-run"), () => {
     touchRun = !touchRun;
     if (touchRun) state.quiet = false;
@@ -1798,6 +1904,7 @@
   });
 
   const handlers = {
+    "intro-btn":startLesson, "lesson-exit":endLesson, "afterlife-exit":endAfterlife,
     "start-btn": start, "continue-btn": resumeSaved, "rules-btn": () => worldRulesEditor(), "map-btn": () => map(), "journal-btn": diary, "diary-btn": diary,
     "help-btn": help, "pause-btn": pause, "search-btn": nearbyAction, "attack-btn": () => strike(),
     "shove-btn": shoveOrBrake, "pack-btn": bag, "gear-btn": gear, "craft-btn": crafting,
@@ -1811,7 +1918,11 @@
   for (const [id, handler] of Object.entries(handlers)) $(id).addEventListener("click", handler);
   document.querySelectorAll("[data-panel]").forEach(button => button.addEventListener("click", health));
   $("sound-btn").addEventListener("click", () => { muted = !muted; write(soundKey, muted ? "1" : "0"); syncSound(); wakeSound(); });
-  dialog.addEventListener("cancel", event => { event.preventDefault(); close(); });
+  dialog.addEventListener("cancel", event => {
+    event.preventDefault();
+    if (dialogView === "afterlife-offer") body.querySelector('[data-action="afterlife-skip"]').click();
+    else close();
+  });
   const displayChanged = () => { resetInput(); updateDisplayMode(); };
   document.addEventListener("fullscreenchange", displayChanged);
   document.addEventListener("webkitfullscreenchange", displayChanged);
@@ -1823,9 +1934,19 @@
   window.addEventListener("keydown", event => {
     const move = codeKeys[event.code] ?? (event.key === "Shift" ? "shift" : null), key = event.key.toLowerCase();
     if (dialog.open || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (!event.repeat && (key === "enter" && event.shiftKey && !["INPUT", "SELECT", "TEXTAREA"].includes(event.target?.tagName) || key === "escape" && expandedView)) {
+    if (!event.repeat && (key === "enter" && event.shiftKey && !["INPUT", "SELECT", "TEXTAREA"].includes(event.target?.tagName) || key === "escape" && expandedView && !afterlife)) {
       event.preventDefault();
       return toggleFullscreen();
+    }
+    if (afterlife) {
+      if (move) keys.add(move);
+      else if (!event.repeat && key === "escape") endAfterlife();
+      else if (!event.repeat && key === " ") afterlifeAction("bite");
+      else if (!event.repeat && (key === "f" || key === "e")) afterlifeAction("grab");
+      else if (!event.repeat && (key === "x" || key === "q")) afterlifeAction("groan");
+      else return;
+      event.preventDefault();
+      return;
     }
     if (!active()) return;
     if (move) {
@@ -1891,36 +2012,51 @@
       } else objectPanel(exit, state.notice?.text);
     }
     if (crossing) crossing.displayed = true;
-    if (active() && !dialog.open) {
+    if ((active() || afterlife) && !dialog.open && !document.hidden) {
       const input = {
         x: stick.x || Number(keys.has("d") || keys.has("arrowright")) - Number(keys.has("a") || keys.has("arrowleft")),
         y: stick.y || Number(keys.has("s") || keys.has("arrowdown")) - Number(keys.has("w") || keys.has("arrowup")),
         run: keys.has("shift") || (touchRun && stick.pointer !== null)
       };
       const steps = Math.max(1, Math.ceil(delta / .03));
-      for (let i = 0; i < steps && active(); i++) Sim.tick(state, delta / steps, input);
-      if (state.interaction) {
-        const o = state.interaction === "eva" ? state.world.npc : state.world.objects.find(o => o.id === state.interaction);
-        if (o && o.active !== false && Sim.distance(state.player, o) <= 1.85 && Sim.lineOfSight(state, state.player, o)) {
-          state.player.path = []; state.interaction = null;
-          if (o === state.world.npc) npcPanel();
-          else objectPanel(o);
-        } else if (!state.player.path.length) state.interaction = null;
-      }
-      if (!state.flags.supplies && state.world.base) {
-        const supplies = [state.player.bag, ...state.world.objects.filter(o => o.storage && o.building === state.world.base.id).map(o => o.loot)];
-        let food = 0, water = 0;
-        for (const bag of supplies) for (const item of bag) {
-          if (item.id === "water") water += item.qty;
-          else if (Data.items[item.id].use === "food" && !Sim.isSpoiled(state, item)) food += item.qty;
+      if (afterlife) {
+        for (let i = 0; i < steps && afterlife; i++) {
+          if (Afterlife.tick(afterlife,delta/steps,input)) endAfterlife();
+          else if (afterlife.cue) {
+            if (!muted) Soundscape.play(audio,afterlife.cue,afterlife.player);
+            afterlife.cue = null;
+          }
         }
-        if (food >= 4 && water >= 3) state.flags.supplies = true;
+      } else {
+        for (let i = 0; i < steps && active(); i++) Sim.tick(state, delta / steps, input);
+        updateLesson();
+        if (state.interaction) {
+          const o = state.interaction === "eva" ? state.world.npc : state.world.objects.find(o => o.id === state.interaction);
+          if (o && o.active !== false && Sim.distance(state.player, o) <= 1.85 && Sim.lineOfSight(state, state.player, o)) {
+            state.player.path = []; state.interaction = null;
+            if (o === state.world.npc) npcPanel();
+            else objectPanel(o);
+          } else if (!state.player.path.length) state.interaction = null;
+        }
+        if (!state.flags.supplies && state.world.base) {
+          const supplies = [state.player.bag, ...state.world.objects.filter(o => o.storage && o.building === state.world.base.id).map(o => o.loot)];
+          let food = 0, water = 0;
+          for (const bag of supplies) for (const item of bag) {
+            if (item.id === "water") water += item.qty;
+            else if (Data.items[item.id].use === "food" && !Sim.isSpoiled(state, item)) food += item.qty;
+          }
+          if (food >= 4 && water >= 3) state.flags.supplies = true;
+        }
+        if (!lesson && state.elapsed >= nextSave) save();
       }
-      if (state.elapsed >= nextSave) save();
     }
-    if (state.mode === "dead" && !deathShown) {
+    if (state.mode === "dead" && !deathShown && !afterlife) {
       deathShown = true; save();
-      show("Your story ends here", "<p>" + esc(state.player.name) + " survived until day " + day() + " at " + time(state.minutes) +
+      if (state.afterlifePending) {
+        show("Something moves", "<p>A sound reaches you.</p>" + button("Follow the sound","afterlife",false,"primary") +
+          " " + button("End the run","afterlife-skip"),"afterlife-offer");
+        $("close-dialog").hidden = true;
+      } else show("Your story ends here", "<p>" + esc(state.player.name) + " survived until day " + day() + " at " + time(state.minutes) +
         " and killed " + state.kills + " infected.</p>" +
         "<p>Cause of death: " + esc(state.deathCause || "unknown causes") + ".</p>" +
         button("Choose a new start", "new", false, "primary") + " " + button("Playtest report", "playtest") + " " + button("Export save", "export"), "dead");
@@ -1928,20 +2064,22 @@
     if (state.sounds.length) for (const sound of state.sounds.splice(0)) if (!muted) Soundscape.play(audio,sound,state.player);
     if (now >= nextHud) { updateHud(); nextHud = now + 150; }
     if (now >= nextMap) {
-      if (minimap.clientWidth) View.minimap(minimap, state);
+      if (!afterlife && minimap.clientWidth) View.minimap(minimap, state);
       nextMap = now + 500;
     }
     // Menu, paused and dead screens barely change, so draw them at ~15 fps to save battery and CPU.
-    if (active() && !dialog.open || now - lastRender >= 66) {
+    if ((active() || afterlife) && !dialog.open || now - lastRender >= 66) {
       state.showNoise = noiseRings;
       state.fastGround = look !== "classic";
       state.look = look;
-      View.render(state, now / 1000, Math.min(.2, (now - lastRender) / 1000));
+      if (afterlife) View.renderAfterlife(afterlife);
+      else View.render(state, now / 1000, Math.min(.2, (now - lastRender) / 1000));
       lastRender = now;
     }
     requestAnimationFrame(frame);
   }
 
+  $("intro-btn").textContent = read(introKey) ? "Replay introduction" : "Beginner introduction";
   const canResume = Boolean(savedText || read(backupKey));
   $("continue-btn").hidden = !canResume;
   const startPoint = $("start-point");

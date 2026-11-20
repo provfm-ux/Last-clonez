@@ -127,6 +127,25 @@ check("skills novas: cooking, foraging, fishing", ["cooking", "foraging", "fishi
 
 // ---- v0.23: ficar preso, carro, agarrar ----
 const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height - 3; y++) for (let x = 3; x < w.width - 3; x++) { const t = World.tileAt(w, x + .5, y + .5); if (t && test(t)) return {x: x + .5, y: y + .5}; } return null; };
+{
+  const stepCount = strength => {
+    const s = fresh("training");
+    const start = findTile(s,t => [0,1,2,3,4,5].every(offset =>
+      World.clear(s.world,t.x+.5+.5*offset,t.y+.5-.5*offset)));
+    Object.assign(s.player,start);
+    s.world.enemies = [];
+    let count = 0;
+    for (let i = 0; i < 48; i++) {
+      Sim.tick(s,.033,{x:strength,y:0,run:false});
+      count += s.sounds.splice(0).filter(cue => cue.kind === "stepSoft" || cue.kind === "stepHard").length;
+    }
+    return count;
+  };
+  const slow = stepCount(.35), normal = stepCount(1);
+  check("áudio: passos espaçam com movimento lento e param em repouso",
+    stepCount(0) === 0 && slow > 0 && slow < normal, slow + "/" + normal);
+}
+
 { const s = fresh("training"), p = s.player, wall = findTile(s, t => t.solid === true);
   Object.assign(p, {x: wall.x, y: wall.y}); Sim.tick(s, .033, idle);
   check("preso: dentro de uma parede é empurrado para chão livre", World.clear(s.world, p.x, p.y), p.x.toFixed(1) + "," + p.y.toFixed(1)); }
@@ -263,6 +282,13 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   p.bag.push(keyOf(other)); check("chaves: a chave de outra casa não serve", Sim.contextual(s, door) === false && door.locked === true);
   p.bag.push(keyOf(door)); const ok = Sim.contextual(s, door);
   check("chaves: a chave certa destranca e abre", ok !== false && door.locked === false && door.open === true);
+  check("áudio: só uma abertura bem-sucedida produz o som de porta", s.sounds.splice(0).map(cue => cue.kind).join() === "doorOpen");
+  check("áudio: fechar a porta tem um som próprio", Sim.door(s,door) && s.sounds.splice(0).map(cue => cue.kind).join() === "doorClose");
+  const window = s.world.objects.find(o => o.kind === "window" && o.active && !o.open && !o.boards);
+  Object.assign(p,{x:window.x,y:window.y});
+  check("áudio: partir o vidro produz um som uma única vez",
+    Sim.breach(s,window,"smash") && !Sim.breach(s,window,"smash") &&
+    s.sounds.splice(0).filter(cue => cue.kind === "glassSmash").length === 1);
   const back = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s)))), kept = back.player.bag.find(i => i.id === "housekey" && i.lock === door.lockId);
   check("chaves: a etiqueta e a casa sobrevivem à gravação", kept && kept.label === homes.find(b => b.id === door.lockId).name); }
 { const lured = open => { const s = fresh("survival"), w = s.world, p = s.player; for (const z of w.enemies) z.hp = 0;
@@ -757,6 +783,23 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     Sim.shove(run) && run.player.grabbed === 0 && brute.windup === .4 && brute.x-spot.x < 1.05);
   check("combate: todas as armas têm um estilo",
     Object.values(Data.items).filter(item => item.damage).every(item => Data.combatStyles[item.combat]));
+  run.sounds.length = 0;
+  const zombieCues = () => run.sounds.splice(0).filter(cue => cue.kind.startsWith("zombie.common.")).map(cue => cue.kind.slice(14));
+  strike("bat","walker");
+  check("áudio: golpe não letal dispara hit", zombieCues().join() === "hit");
+  const wounded = run.world.enemies[0];
+  wounded.hp = 1;
+  run.player.cooldown = 0;
+  Sim.attack(run,wounded);
+  Sim.attack(run,wounded);
+  check("áudio: golpe letal dispara death uma vez", zombieCues().join() === "death");
+  const zombie = World.infected(run.world,"voice-test",spot.x+.8,spot.y,"walkers",context.Level.seeded(17));
+  Object.assign(zombie,{dormant:false,windup:.01,windupTarget:"player"});
+  run.world.enemies = [zombie];
+  Sim.tick(run,.033,idle);
+  check("áudio: deteção e início do ataque disparam notice e attack", zombieCues().join() === "notice,attack");
+  Sim.tick(run,.033,idle);
+  check("áudio: deteção não se repete no frame seguinte", !zombieCues().includes("notice"));
 }
 
 {

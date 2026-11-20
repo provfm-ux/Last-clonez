@@ -500,7 +500,10 @@
     const Context = window.AudioContext || window.webkitAudioContext;
     if (!Context) return;
     try {
-      if (!audio) audio = new Context();
+      if (!audio) {
+        audio = new Context();
+        Soundscape.preload(audio);
+      }
       if (audio.state === "suspended") audio.resume().catch(() => {});
     } catch { /* Audio is optional. */ }
   }

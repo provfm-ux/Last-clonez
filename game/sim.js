@@ -897,6 +897,7 @@ const Sim = (() => {
         const damage = Math.round(crashSpeed * 5);
         car.hp = Math.max(0, car.hp - damage); p.driveSpeed = 0;
         noise(s, p.x, p.y, 14);
+        hear(s,"crash",p);
         if (damage >= 25 && !(p.fracture > 0) && s.world.rng() < .25) breakLeg(s, "The crash broke your leg.");
         s.effects.push({x: p.x, y: p.y, text: "CRASH −" + damage, color: "#e3a289", life: 1});
         if (car.hp > 0 && car.hp < 45 && !car.warnedSmoke) { car.warnedSmoke = true; notify(s, "The engine is smoking. Repair the vehicle soon.", true); }
@@ -927,6 +928,7 @@ const Sim = (() => {
       car.hp = Math.max(0, car.hp - Math.round(10 + p.driveSpeed * 1.5));
       s.effects.push({x: zombie.x, y: zombie.y, text: "−" + damage, color: "#edc28b", life: .8});
       if (!zombie.hp) defeat(s, zombie);
+      else hearZombie(s,"hit",zombie);
     }
     if (car.hp <= 0) { exitVehicle(s, true); notify(s, "The vehicle was wrecked.", true); }
   }
@@ -1084,9 +1086,27 @@ const Sim = (() => {
     }
   }
 
-  function hear(s, kind, point) {
-    s.sounds.push({kind,x:point.x,y:point.y,muffled:!lineOfSight(s,s.player,point)});
+  function hear(s, kind, point, intensity = 1) {
+    const zombieVoice = kind === "near" || kind === "distant" || kind === "horde";
+    s.sounds.push({kind,x:point.x,y:point.y,muffled:!lineOfSight(s,s.player,point),zombieVoice,intensity});
     if (s.sounds.length > 5) s.sounds.shift();
+  }
+
+  const zombieVoices = new WeakMap();
+
+  function hearZombie(s, role, zombie) {
+    if (distance(s.player,zombie) > 20) return;
+    const kind = "zombie.common." + role;
+    const cue = {kind,x:zombie.x,y:zombie.y,muffled:!lineOfSight(s,s.player,zombie),
+      entity:s.world.region+":"+zombie.id};
+    // Preserve the existing five-slot atmospheric queue for warnings and other cues.
+    // Events share this queue, but idle and chase cannot evict an existing warning.
+    if (s.sounds.length >= 5) {
+      const background = s.sounds.findIndex(sound => sound.kind === "zombie.common.idle" || sound.kind === "zombie.common.chase");
+      if (background < 0 || role === "idle" || role === "chase") return;
+      s.sounds.splice(background,1);
+    }
+    s.sounds.push(cue);
   }
 
   function encounterSlots(s, reserve = 0) {
@@ -1442,6 +1462,7 @@ const Sim = (() => {
     if (method === "smash") { o.broken = true; o.hp = 0; }
     World.sync(s.world);
     noise(s, o.x, o.y, method === "pry" ? 6.5 : 13);
+    hear(s,method === "pry" ? "pry" : "glassSmash",o);
     const cut = method === "smash" && !tool;
     if (cut) {
       p.hp = Math.max(0, p.hp - 5);
@@ -1453,6 +1474,7 @@ const Sim = (() => {
     if (station?.door.alarmArmed && gridPower(s)) {
       station.door.alarmArmed = false;
       noise(s, o.x, o.y, 25);
+      hear(s,"alarm",o);
       notify(s, "Police alarm. The infected are coming.", true);
     }
     return true;
@@ -1481,6 +1503,7 @@ const Sim = (() => {
     o.open = !o.open;
     World.sync(s.world);
     noise(s, o.x, o.y, auto ? 1.2 : 2);
+    hear(s,o.kind === "window" ? "windowSlide" : o.open ? "doorOpen" : "doorClose",o,auto ? .75 : 1);
     return true;
   }
 
@@ -1495,6 +1518,7 @@ const Sim = (() => {
     addXp(s, "crafting", 5);
     World.sync(s.world);
     noise(s, o.x, o.y, 5);
+    hear(s,"hammer",o);
     notify(s, "Barricade reinforced. The noise may attract the infected.");
     return true;
   }
@@ -2006,6 +2030,7 @@ const Sim = (() => {
 
   function defeat(s, enemy) {
     s.kills++;
+    hearZombie(s,"death",enemy);
     const winner = enemy.origin === "cinema-winner";
     const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item;
     s.world.objects.push({id: "built" + s.serial++, x: enemy.x, y: enemy.y, kind: "drop",
@@ -2034,10 +2059,12 @@ const Sim = (() => {
     else if (conditionBefore >= 20 && item.condition < 20) notify(s, "Your " + Data.items[item.id].name + " is nearly worn out. Repair it or switch weapons.", true);
     noise(s, p.x, p.y, w.noise);
     const hit = !w.firearm || s.world.rng() < aimChance(s, z);
+    hear(s,w.firearm ? "shot" : "strike",w.firearm ? p : z);
     const matchup = Data.combatStyles[w.combat].damage[z.kind] ?? 1;
     const amount = hit ? Math.round(w.damage * matchup * damageFactor(s) * (w.firearm ? 1 : 1 + level(s, "strength") * .03) * (item.condition < 20 ? .8 : 1)) : 0;
     z.hp = Math.max(0, z.hp - amount);
     if (hit) {
+      if (z.hp > 0) hearZombie(s,"hit",z);
       z.flash = .2;
       if (z.kind !== "brute" || matchup >= 1) {
         z.stagger = Math.max(z.stagger, z.kind === "runner" && w.combat === "reach" ? .48 : .28);
@@ -2226,6 +2253,8 @@ const Sim = (() => {
     return false;
   }
 
+  const audibleStride = new WeakMap();
+
   function updatePlayer(s, dt, input) {
     const p = s.player;
     if (p.grabbed > 0 && p.grabbed - dt <= 0) p.grabCool = 4;
@@ -2255,11 +2284,13 @@ const Sim = (() => {
     const surface = World.tileAt(s.world, p.x, p.y)?.surface;
     const footing = surface === "sand" ? .78 : surface === "field" ? .88 : 1;
     const speed = (s.running ? 4 : s.quiet ? 1.6 : 2.55) * (injury ? .8 : 1) * (load > .9 ? .9 : 1) * (p.fatigue > 85 || cold ? .8 : 1) * (p.grabbed > 0 ? .4 : 1) * (p.fracture > 0 ? (p.splinted ? Data.fracture.splintSpeed : Data.fracture.brokenSpeed) : 1) * footing;
+    const startX = p.x, startY = p.y;
     if (manual) {
       const dx = input.x * .5 + input.y, dy = input.y - input.x * .5, mag = Math.hypot(dx, dy);
       const strength = Math.min(1, Math.hypot(input.x, input.y));
       p.moving = move(s, p, dx / mag * speed * dt * strength, dy / mag * speed * dt * strength);
     } else p.moving = follow(s, p, speed * dt);
+    const travelled = Math.hypot(p.x-startX,p.y-startY);
     if (!p.path.length) s.dash = false;
     if (p.grabbed > 0 && p.moving) { p.grabbed = Math.max(0, p.grabbed - dt * 1.2); if (!p.grabbed) p.grabCool = 4; }
     if (!World.clear(s.world, p.x, p.y)) unstick(s, true);
@@ -2280,6 +2311,16 @@ const Sim = (() => {
         const rain = s.weather === "Rain" && surface !== "tile" ? .8 : 1;
         noise(s, p.x, p.y, (s.running ? 6.5 : s.quiet ? 1 : 2.4) * quiet * terrain * rain);
       }
+      // Audible strides follow distance; the separate noise timer drives infected AI.
+      let remaining = (audibleStride.get(p) ?? 0) - travelled;
+      if (remaining <= 0) {
+        remaining += s.running ? .92 : 1.05;
+        if (!s.sounds.length) {
+          const soft = surface === "grass" || surface === "sand" || surface === "field";
+          hear(s,soft ? "stepSoft" : "stepHard",p,s.quiet ? .38 : s.running ? 1.22 : .78);
+        }
+      }
+      audibleStride.set(p,remaining);
     }
     const fit = 1 + level(s, "fitness") * .05;
     if (s.running && p.moving) {
@@ -2299,6 +2340,8 @@ const Sim = (() => {
     const dark = isNight(s) || s.world.underground;
     const light = activeLight(s) && dark;
     const vision = light ? 1.2 : lit ? 1 : s.world.underground ? .43 : dark ? .6 : s.weather === "Rain" ? .85 : 1;
+    let ambient = null, bestDistance = 16;
+    const chooseVoice = s.elapsed >= (s.nextZombieAmbience ?? 0);
     for (const z of s.world.enemies) {
       if (z.hp <= 0 || distance(p, z) > 23 && z.alert <= 0) continue;
       if (z.dormant) {
@@ -2322,6 +2365,15 @@ const Sim = (() => {
       const seen = d < sight && lineOfSight(s, z, p);
       const npcSeen = canTargetEva(npc) && distance(z, npc) < 3.8 && lineOfSight(s, z, npc);
       const victim = npcSeen && (!seen || distance(z, npc) < d) ? npc : p;
+      let voice = zombieVoices.get(z);
+      if (!voice) {
+        voice = {noticed:false,next:s.elapsed+1+(z.phase ?? 0)%6};
+        zombieVoices.set(z,voice);
+      }
+      if (seen && !voice.noticed) {
+        voice.noticed = true;
+        hearZombie(s,"notice",z);
+      }
       if (seen || npcSeen) {
         z.alert = 8; z.chaseX = victim.x; z.chaseY = victim.y;
       }
@@ -2333,6 +2385,7 @@ const Sim = (() => {
           const pending = z.windupTarget === "eva" ? npc : p;
           endWindup(z);
           z.swing = .18;
+          hearZombie(s,"attack",z);
           if ((pending === p || canTargetEva(npc)) && distance(z, pending) < 1.15 && lineOfSight(s, z, pending)) {
             if (pending === p) hurt(s, z);
             else {
@@ -2363,6 +2416,7 @@ const Sim = (() => {
             if (o.hp <= 0) {
               Object.assign(o, {boards:0, open:true, hp:0, locked:false, latched:false, broken:true});
               World.sync(s.world);
+              hear(s,o.kind === "window" ? "glassSmash" : "crash",o);
               z.bash = null;
               notify(s, o.name + " gave way.", true);
             }
@@ -2383,6 +2437,16 @@ const Sim = (() => {
         }
       }
       z.moving = follow(s, z, z.stats.speed * dt * (z.alert > 0 ? 1 : .45) * (z.origin === "cinema-winner" ? .85 : 1), true);
+      if (chooseVoice && d < bestDistance && s.elapsed >= voice.next && (z.alert <= 0 || z.moving)) {
+        bestDistance = d;
+        ambient = z;
+      }
+    }
+    if (ambient) {
+      const chase = ambient.alert > 0, phase = ambient.phase ?? 0;
+      zombieVoices.get(ambient).next = s.elapsed + (chase ? 3 : 8) + ((phase+s.elapsed)%4);
+      s.nextZombieAmbience = s.elapsed + 1.2;
+      hearZombie(s,chase ? "chase" : "idle",ambient);
     }
   }
 

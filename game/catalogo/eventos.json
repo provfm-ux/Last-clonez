@@ -1,0 +1,138 @@
+{
+  "schema": "lastclonez.audio.events/1",
+  "asset_root": "assets/audio/zombies/",
+  "events": {
+    "zombie.common.idle": {
+      "role": "idle",
+      "sound_ids": [
+        "LCZ-ZMB-001",
+        "LCZ-ZMB-009",
+        "LCZ-ZMB-019",
+        "LCZ-ZMB-020",
+        "LCZ-ZMB-023"
+      ],
+      "files_ogg": [
+        "assets/audio/zombies/lcz_zombie_01.ogg",
+        "assets/audio/zombies/lcz_zombie_09.ogg",
+        "assets/audio/zombies/lcz_zombie_19.ogg",
+        "assets/audio/zombies/lcz_zombie_20.ogg",
+        "assets/audio/zombies/lcz_zombie_23.ogg"
+      ],
+      "files_mp3": [
+        "assets/audio/zombies/lcz_zombie_01.mp3",
+        "assets/audio/zombies/lcz_zombie_09.mp3",
+        "assets/audio/zombies/lcz_zombie_19.mp3",
+        "assets/audio/zombies/lcz_zombie_20.mp3",
+        "assets/audio/zombies/lcz_zombie_23.mp3"
+      ],
+      "status": "provisional"
+    },
+    "zombie.common.notice": {
+      "role": "notice",
+      "sound_ids": [
+        "LCZ-ZMB-002",
+        "LCZ-ZMB-010",
+        "LCZ-ZMB-012"
+      ],
+      "files_ogg": [
+        "assets/audio/zombies/lcz_zombie_02.ogg",
+        "assets/audio/zombies/lcz_zombie_10.ogg",
+        "assets/audio/zombies/lcz_zombie_12.ogg"
+      ],
+      "files_mp3": [
+        "assets/audio/zombies/lcz_zombie_02.mp3",
+        "assets/audio/zombies/lcz_zombie_10.mp3",
+        "assets/audio/zombies/lcz_zombie_12.mp3"
+      ],
+      "status": "provisional"
+    },
+    "zombie.common.chase": {
+      "role": "chase",
+      "sound_ids": [
+        "LCZ-ZMB-008",
+        "LCZ-ZMB-014",
+        "LCZ-ZMB-015",
+        "LCZ-ZMB-021"
+      ],
+      "files_ogg": [
+        "assets/audio/zombies/lcz_zombie_08.ogg",
+        "assets/audio/zombies/lcz_zombie_14.ogg",
+        "assets/audio/zombies/lcz_zombie_15.ogg",
+        "assets/audio/zombies/lcz_zombie_21.ogg"
+      ],
+      "files_mp3": [
+        "assets/audio/zombies/lcz_zombie_08.mp3",
+        "assets/audio/zombies/lcz_zombie_14.mp3",
+        "assets/audio/zombies/lcz_zombie_15.mp3",
+        "assets/audio/zombies/lcz_zombie_21.mp3"
+      ],
+      "status": "provisional"
+    },
+    "zombie.common.attack": {
+      "role": "attack",
+      "sound_ids": [
+        "LCZ-ZMB-003",
+        "LCZ-ZMB-004",
+        "LCZ-ZMB-006",
+        "LCZ-ZMB-007",
+        "LCZ-ZMB-013"
+      ],
+      "files_ogg": [
+        "assets/audio/zombies/lcz_zombie_03.ogg",
+        "assets/audio/zombies/lcz_zombie_04.ogg",
+        "assets/audio/zombies/lcz_zombie_06.ogg",
+        "assets/audio/zombies/lcz_zombie_07.ogg",
+        "assets/audio/zombies/lcz_zombie_13.ogg"
+      ],
+      "files_mp3": [
+        "assets/audio/zombies/lcz_zombie_03.mp3",
+        "assets/audio/zombies/lcz_zombie_04.mp3",
+        "assets/audio/zombies/lcz_zombie_06.mp3",
+        "assets/audio/zombies/lcz_zombie_07.mp3",
+        "assets/audio/zombies/lcz_zombie_13.mp3"
+      ],
+      "status": "provisional"
+    },
+    "zombie.common.hit": {
+      "role": "hit",
+      "sound_ids": [
+        "LCZ-ZMB-005",
+        "LCZ-ZMB-011",
+        "LCZ-ZMB-022",
+        "LCZ-ZMB-024"
+      ],
+      "files_ogg": [
+        "assets/audio/zombies/lcz_zombie_05.ogg",
+        "assets/audio/zombies/lcz_zombie_11.ogg",
+        "assets/audio/zombies/lcz_zombie_22.ogg",
+        "assets/audio/zombies/lcz_zombie_24.ogg"
+      ],
+      "files_mp3": [
+        "assets/audio/zombies/lcz_zombie_05.mp3",
+        "assets/audio/zombies/lcz_zombie_11.mp3",
+        "assets/audio/zombies/lcz_zombie_22.mp3",
+        "assets/audio/zombies/lcz_zombie_24.mp3"
+      ],
+      "status": "provisional"
+    },
+    "zombie.common.death": {
+      "role": "death",
+      "sound_ids": [
+        "LCZ-ZMB-016",
+        "LCZ-ZMB-017",
+        "LCZ-ZMB-018"
+      ],
+      "files_ogg": [
+        "assets/audio/zombies/lcz_zombie_16.ogg",
+        "assets/audio/zombies/lcz_zombie_17.ogg",
+        "assets/audio/zombies/lcz_zombie_18.ogg"
+      ],
+      "files_mp3": [
+        "assets/audio/zombies/lcz_zombie_16.mp3",
+        "assets/audio/zombies/lcz_zombie_17.mp3",
+        "assets/audio/zombies/lcz_zombie_18.mp3"
+      ],
+      "status": "provisional"
+    }
+  }
+}

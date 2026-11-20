@@ -1,0 +1,811 @@
+{
+  "schema": "lastclonez.audio.catalog/1",
+  "pack_id": "last-clonez-zombie-vocals-oga-24",
+  "version": "1.0.0",
+  "locale": "pt-PT",
+  "source_archive": "zombies.zip (provided by user)",
+  "source_identification": "Candidate match to artisticdude OpenGameArt pack; source archive binary identity with downloaded official archive not verified",
+  "source_url": "https://opengameart.org/content/zombies-sound-pack",
+  "license_status": "CC0 confirmed at candidate source page; identity of supplied archive not independently confirmed",
+  "category_labels_pt": {
+    "idle": "Repouso / gemido de fundo",
+    "notice": "Deteção do jogador",
+    "chase": "Perseguição",
+    "attack": "Investida / ataque",
+    "hit": "Reação a golpe",
+    "death": "Morte do zombie"
+  },
+  "events": {
+    "zombie.common.idle": {
+      "role": "idle",
+      "selection": [
+        "lcz_zombie_01",
+        "lcz_zombie_09",
+        "lcz_zombie_19",
+        "lcz_zombie_20",
+        "lcz_zombie_23"
+      ],
+      "label_pt": "Repouso / gemido de fundo",
+      "status": "provisional"
+    },
+    "zombie.common.notice": {
+      "role": "notice",
+      "selection": [
+        "lcz_zombie_02",
+        "lcz_zombie_10",
+        "lcz_zombie_12"
+      ],
+      "label_pt": "Deteção do jogador",
+      "status": "provisional"
+    },
+    "zombie.common.chase": {
+      "role": "chase",
+      "selection": [
+        "lcz_zombie_08",
+        "lcz_zombie_14",
+        "lcz_zombie_15",
+        "lcz_zombie_21"
+      ],
+      "label_pt": "Perseguição",
+      "status": "provisional"
+    },
+    "zombie.common.attack": {
+      "role": "attack",
+      "selection": [
+        "lcz_zombie_03",
+        "lcz_zombie_04",
+        "lcz_zombie_06",
+        "lcz_zombie_07",
+        "lcz_zombie_13"
+      ],
+      "label_pt": "Investida / ataque",
+      "status": "provisional"
+    },
+    "zombie.common.hit": {
+      "role": "hit",
+      "selection": [
+        "lcz_zombie_05",
+        "lcz_zombie_11",
+        "lcz_zombie_22",
+        "lcz_zombie_24"
+      ],
+      "label_pt": "Reação a golpe",
+      "status": "provisional"
+    },
+    "zombie.common.death": {
+      "role": "death",
+      "selection": [
+        "lcz_zombie_16",
+        "lcz_zombie_17",
+        "lcz_zombie_18"
+      ],
+      "label_pt": "Morte do zombie",
+      "status": "provisional"
+    }
+  },
+  "sounds": [
+    {
+      "id": "LCZ-ZMB-001",
+      "original_name": "zombie-1.wav",
+      "original_sha256": "dad8280256985cadc5745f407c53ebdcf428d55e6369a70847e5b83d60e98c17",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_01.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_01.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.854,
+        "duration_processed_s": 0.805,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.1,
+        "rms_original_dbfs": -17.1,
+        "spectral_centroid_hz": 456,
+        "acoustic_tendency": "grave/escuro"
+      },
+      "suggested_role": "idle",
+      "role_description_pt": "Repouso / gemido de fundo",
+      "event_id": "zombie.common.idle",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-002",
+      "original_name": "zombie-2.wav",
+      "original_sha256": "b8833b90e2f929cb28ce067e10dacc6e807f47f92393b8f2e6fd17d34f207efe",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_02.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_02.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.708,
+        "duration_processed_s": 0.682,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -15.4,
+        "spectral_centroid_hz": 524,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "notice",
+      "role_description_pt": "Deteção do jogador",
+      "event_id": "zombie.common.notice",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-003",
+      "original_name": "zombie-3.wav",
+      "original_sha256": "8097e5c1da76b30ae5a1dca0b85d70fab0e1386170a03acc77f9492047ac4e84",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_03.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_03.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.583,
+        "duration_processed_s": 0.573,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -14.8,
+        "spectral_centroid_hz": 377,
+        "acoustic_tendency": "grave/escuro"
+      },
+      "suggested_role": "attack",
+      "role_description_pt": "Investida / ataque",
+      "event_id": "zombie.common.attack",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-004",
+      "original_name": "zombie-4.wav",
+      "original_sha256": "36b6376649969e11112361afb00e6d161a2433f9db045273d9ed40d6e9b06ab0",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_04.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_04.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.729,
+        "duration_processed_s": 0.721,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.5,
+        "rms_original_dbfs": -12.6,
+        "spectral_centroid_hz": 383,
+        "acoustic_tendency": "grave/escuro"
+      },
+      "suggested_role": "attack",
+      "role_description_pt": "Investida / ataque",
+      "event_id": "zombie.common.attack",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-005",
+      "original_name": "zombie-5.wav",
+      "original_sha256": "6920b559f953d19737f65a9da5b31f7bb3e1421c48552f52d7a57399d507574b",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_05.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_05.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.5,
+        "duration_processed_s": 0.477,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.3,
+        "rms_original_dbfs": -14.0,
+        "spectral_centroid_hz": 289,
+        "acoustic_tendency": "grave/escuro"
+      },
+      "suggested_role": "hit",
+      "role_description_pt": "Reação a golpe",
+      "event_id": "zombie.common.hit",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-006",
+      "original_name": "zombie-6.wav",
+      "original_sha256": "2ad9acaccc9bc29f77f89581767699c3ed8d9630c19a11a8bbf6332ce89686a2",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_06.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_06.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.542,
+        "duration_processed_s": 0.505,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -13.5,
+        "spectral_centroid_hz": 457,
+        "acoustic_tendency": "grave/escuro"
+      },
+      "suggested_role": "attack",
+      "role_description_pt": "Investida / ataque",
+      "event_id": "zombie.common.attack",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-007",
+      "original_name": "zombie-7.wav",
+      "original_sha256": "8e63e327c960bfe76d0402f7a54f7629272e6346e5c6b84ac35ad52b9597dec8",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_07.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_07.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.583,
+        "duration_processed_s": 0.578,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -13.2,
+        "spectral_centroid_hz": 348,
+        "acoustic_tendency": "grave/escuro"
+      },
+      "suggested_role": "attack",
+      "role_description_pt": "Investida / ataque",
+      "event_id": "zombie.common.attack",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-008",
+      "original_name": "zombie-8.wav",
+      "original_sha256": "98dadef79f3cdbf120277e24e95919dfc2e853a45a7d72273a1d3c2cbc1ea823",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_08.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_08.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.833,
+        "duration_processed_s": 0.802,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.5,
+        "rms_original_dbfs": -14.9,
+        "spectral_centroid_hz": 477,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "chase",
+      "role_description_pt": "Perseguição",
+      "event_id": "zombie.common.chase",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-009",
+      "original_name": "zombie-9.wav",
+      "original_sha256": "938c9a75828cda0ec78482e7a969cebc8f989968dcde15326e8c5a2f437fd468",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_09.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_09.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.875,
+        "duration_processed_s": 0.835,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -1.2,
+        "rms_original_dbfs": -19.3,
+        "spectral_centroid_hz": 860,
+        "acoustic_tendency": "mais agudo/áspero"
+      },
+      "suggested_role": "idle",
+      "role_description_pt": "Repouso / gemido de fundo",
+      "event_id": "zombie.common.idle",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-010",
+      "original_name": "zombie-10.wav",
+      "original_sha256": "be9223a5c65ad1c1444e6e2153918d8c2a2a1dee59efeb36fa5bbb060c2bfed8",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_10.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_10.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.688,
+        "duration_processed_s": 0.66,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.5,
+        "rms_original_dbfs": -13.3,
+        "spectral_centroid_hz": 616,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "notice",
+      "role_description_pt": "Deteção do jogador",
+      "event_id": "zombie.common.notice",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-011",
+      "original_name": "zombie-11.wav",
+      "original_sha256": "edbe930f09f61f034c90b80a6f5b06757fbea2a8f2b9ccdc263ed9246b33a400",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_11.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_11.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.5,
+        "duration_processed_s": 0.499,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.5,
+        "rms_original_dbfs": -16.1,
+        "spectral_centroid_hz": 906,
+        "acoustic_tendency": "mais agudo/áspero"
+      },
+      "suggested_role": "hit",
+      "role_description_pt": "Reação a golpe",
+      "event_id": "zombie.common.hit",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-012",
+      "original_name": "zombie-12.wav",
+      "original_sha256": "2b1984e3485715642a1195393fd35227eadc27b8f7eeb968956e18f4e8cb9400",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_12.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_12.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.792,
+        "duration_processed_s": 0.773,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -15.3,
+        "spectral_centroid_hz": 649,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "notice",
+      "role_description_pt": "Deteção do jogador",
+      "event_id": "zombie.common.notice",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-013",
+      "original_name": "zombie-13.wav",
+      "original_sha256": "b8a64c3a557d7ce0b69492717bc1a88706b69c499a2714f02527d822a8462545",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_13.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_13.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.563,
+        "duration_processed_s": 0.535,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.1,
+        "rms_original_dbfs": -16.7,
+        "spectral_centroid_hz": 759,
+        "acoustic_tendency": "mais agudo/áspero"
+      },
+      "suggested_role": "attack",
+      "role_description_pt": "Investida / ataque",
+      "event_id": "zombie.common.attack",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-014",
+      "original_name": "zombie-14.wav",
+      "original_sha256": "b1fffbf93fd9cf353a9dd0d519b6cd6e739bd3fb28853a580e018ac73efdda4b",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_14.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_14.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.667,
+        "duration_processed_s": 0.65,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -14.6,
+        "spectral_centroid_hz": 528,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "chase",
+      "role_description_pt": "Perseguição",
+      "event_id": "zombie.common.chase",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-015",
+      "original_name": "zombie-15.wav",
+      "original_sha256": "19d0955dfcca86939dbce76388dad5d3ad4dd8ed70bf7ce457d9a46b555e220b",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_15.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_15.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.875,
+        "duration_processed_s": 0.848,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -14.5,
+        "spectral_centroid_hz": 370,
+        "acoustic_tendency": "grave/escuro"
+      },
+      "suggested_role": "chase",
+      "role_description_pt": "Perseguição",
+      "event_id": "zombie.common.chase",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-016",
+      "original_name": "zombie-16.wav",
+      "original_sha256": "637f8d26b186005246a279fb19def56c81eebcf144c2346460ac1e4fc0075fc7",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_16.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_16.mp3"
+      },
+      "media": {
+        "duration_original_s": 1.438,
+        "duration_processed_s": 1.417,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -16.9,
+        "spectral_centroid_hz": 547,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "death",
+      "role_description_pt": "Morte do zombie",
+      "event_id": "zombie.common.death",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-017",
+      "original_name": "zombie-17.wav",
+      "original_sha256": "c954b6173399ed574c1c1350b8da4a5b465e0454cc810d6e49779fe121fafa34",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_17.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_17.mp3"
+      },
+      "media": {
+        "duration_original_s": 1.583,
+        "duration_processed_s": 1.552,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -15.6,
+        "spectral_centroid_hz": 397,
+        "acoustic_tendency": "grave/escuro"
+      },
+      "suggested_role": "death",
+      "role_description_pt": "Morte do zombie",
+      "event_id": "zombie.common.death",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-018",
+      "original_name": "zombie-18.wav",
+      "original_sha256": "91c33adaf9efa32d87c364eb2a679833a24ac5586c52f675f3e9cf8cedfde199",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_18.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_18.mp3"
+      },
+      "media": {
+        "duration_original_s": 1.104,
+        "duration_processed_s": 1.097,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -14.8,
+        "spectral_centroid_hz": 373,
+        "acoustic_tendency": "grave/escuro"
+      },
+      "suggested_role": "death",
+      "role_description_pt": "Morte do zombie",
+      "event_id": "zombie.common.death",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-019",
+      "original_name": "zombie-19.wav",
+      "original_sha256": "79fa7bb077c0b5c46837a63299a1df3269a2310f25b6a3055dd27a4700c74789",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_19.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_19.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.979,
+        "duration_processed_s": 0.95,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.4,
+        "rms_original_dbfs": -17.7,
+        "spectral_centroid_hz": 698,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "idle",
+      "role_description_pt": "Repouso / gemido de fundo",
+      "event_id": "zombie.common.idle",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-020",
+      "original_name": "zombie-20.wav",
+      "original_sha256": "3a962ea1d8517ad4c2fea8221e6a0e622dcad3ba34bae5a436d4f0971774b56d",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_20.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_20.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.958,
+        "duration_processed_s": 0.934,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -16.4,
+        "spectral_centroid_hz": 428,
+        "acoustic_tendency": "grave/escuro"
+      },
+      "suggested_role": "idle",
+      "role_description_pt": "Repouso / gemido de fundo",
+      "event_id": "zombie.common.idle",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-021",
+      "original_name": "zombie-21.wav",
+      "original_sha256": "d58c26ae8df808238becc3434cf46778fca4582e9fcda138bdc01f720ecbbefc",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_21.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_21.mp3"
+      },
+      "media": {
+        "duration_original_s": 1.083,
+        "duration_processed_s": 1.074,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -14.5,
+        "spectral_centroid_hz": 466,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "chase",
+      "role_description_pt": "Perseguição",
+      "event_id": "zombie.common.chase",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-022",
+      "original_name": "zombie-22.wav",
+      "original_sha256": "3224f8e3e9e446e5e424a9f6ce11ee78784ebd7bdc2db535306b337c973e6e02",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_22.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_22.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.667,
+        "duration_processed_s": 0.646,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.1,
+        "rms_original_dbfs": -16.1,
+        "spectral_centroid_hz": 513,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "hit",
+      "role_description_pt": "Reação a golpe",
+      "event_id": "zombie.common.hit",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-023",
+      "original_name": "zombie-23.wav",
+      "original_sha256": "d467553c380b0c2fb04cd5e5583ec53d0d3620902cf3b90e6aa64438f3e5e84c",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_23.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_23.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.812,
+        "duration_processed_s": 0.758,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.2,
+        "rms_original_dbfs": -16.6,
+        "spectral_centroid_hz": 499,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "idle",
+      "role_description_pt": "Repouso / gemido de fundo",
+      "event_id": "zombie.common.idle",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    },
+    {
+      "id": "LCZ-ZMB-024",
+      "original_name": "zombie-24.wav",
+      "original_sha256": "3776a39a471c215f26115290837012084fc07f37e20b4808ce76f5dafe98f2fb",
+      "assets": {
+        "ogg": "assets/audio/zombies/lcz_zombie_24.ogg",
+        "mp3": "assets/audio/zombies/lcz_zombie_24.mp3"
+      },
+      "media": {
+        "duration_original_s": 0.333,
+        "duration_processed_s": 0.325,
+        "sample_rate_hz": 44100,
+        "channels_processed": 1,
+        "peak_original_dbfs": -0.1,
+        "rms_original_dbfs": -14.8,
+        "spectral_centroid_hz": 568,
+        "acoustic_tendency": "intermédio"
+      },
+      "suggested_role": "hit",
+      "role_description_pt": "Reação a golpe",
+      "event_id": "zombie.common.hit",
+      "status": "provisional_manual_listening_required",
+      "license": {
+        "candidate_source": "https://opengameart.org/content/zombies-sound-pack",
+        "candidate_author": "artisticdude",
+        "candidate_license": "CC0",
+        "exact_source_match_verified": false
+      }
+    }
+  ],
+  "missing_sounds": [
+    {
+      "event_id": "zombie.common.feeding",
+      "state": "not_in_pack"
+    },
+    {
+      "event_id": "zombie.howler.alert",
+      "state": "not_in_pack"
+    },
+    {
+      "event_id": "zombie.fungal.disturbed",
+      "state": "not_in_pack"
+    },
+    {
+      "event_id": "zombie.anomalous.voice",
+      "state": "not_in_pack"
+    },
+    {
+      "event_id": "horde.distant.loop",
+      "state": "not_in_pack"
+    },
+    {
+      "event_id": "minigame.victim.captured.special",
+      "state": "not_in_pack",
+      "note": "Original homage to Wilhelm scream; no file included; only when zombie player catches human, rare, roughly 10% when supplied and licensed"
+    }
+  ]
+}

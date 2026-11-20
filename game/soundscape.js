@@ -2,6 +2,9 @@
 
 const Soundscape = (() => {
   const buffers = new WeakMap(), playing = new WeakMap(), sampleRate = 16000, tau = 2 * Math.PI;
+  const recordings = new WeakMap(), zombieBanks = new WeakMap();
+  const maxVoices = 10;
+  const zombieGains = {idle:.19,notice:.29,chase:.22,attack:.37,hit:.33,death:.40};
   const configs = {
     distant:{seconds:2.4,gain:.27,cut:560}, near:{seconds:1.28,gain:.34,cut:1800},
     horde:{seconds:3.2,gain:.43,cut:990}, twig:{seconds:.57,gain:.37,cut:2500},
@@ -9,7 +12,13 @@ const Soundscape = (() => {
     crib:{seconds:1.45,gain:.24,cut:1700}, alarm:{seconds:1.9,gain:.32,cut:2200},
     wings:{seconds:.65,gain:.3,cut:2600}, heartbeat:{seconds:.8,gain:.36,cut:340},
     footsteps:{seconds:.85,gain:.29,cut:1250}, glass:{seconds:.65,gain:.24,cut:3000},
-    stone:{seconds:1.65,gain:.25,cut:1400}
+    stone:{seconds:1.65,gain:.25,cut:1400},
+    doorOpen:{seconds:.38,gain:.16,cut:3100}, doorClose:{seconds:.23,gain:.18,cut:2200},
+    windowSlide:{seconds:.28,gain:.14,cut:3600}, glassSmash:{seconds:.53,gain:.21,cut:5900},
+    pry:{seconds:.29,gain:.17,cut:3300}, hammer:{seconds:.45,gain:.17,cut:2800},
+    stepSoft:{seconds:.14,gain:.026,cut:1350}, stepHard:{seconds:.15,gain:.030,cut:2300},
+    strike:{seconds:.15,gain:.18,cut:2400}, shot:{seconds:.42,gain:.26,cut:4700},
+    crash:{seconds:.49,gain:.23,cut:2700}
   };
 
   const tone = (hz,t) => Math.sin(tau*hz*t);
@@ -20,10 +29,13 @@ const Soundscape = (() => {
     const config = configs[kind], buffer = ctx.createBuffer(1,Math.ceil(config.seconds*sampleRate),sampleRate);
     const output = buffer.getChannelData(0);
     const rng = Level.seeded(kind.length * 137 + config.cut);
-    let grain = 0;
+    let grain = 0, body = 0, previousNoise = 0;
     for (let i = 0; i < output.length; i++) {
       const t = i/sampleRate, fuzz = 2*rng()-1;
       grain += (fuzz-grain)*.18;
+      body += (grain-body)*.055;
+      const edge = (fuzz-previousNoise)*.5, texture = grain-body;
+      previousNoise = fuzz;
       const voice = .55*tone(63+9*Math.sin(t*4),t) + .16*tone(130+11*Math.cos(t*4),t) + .13*tone(197,t);
       let sample = 0;
       switch (kind) {
@@ -48,6 +60,47 @@ const Soundscape = (() => {
           sample = (.55*grain+.2*tone(94,t))*(tap(t,.04,17)+.75*tap(t,.41,19)); break;
         case "glass":
           sample = (.38*tone(1294,t)+.23*tone(2325,t))*(tap(t,.02,15)+.48*tap(t,.17,21)); break;
+        case "doorOpen": {
+          const latch = (.48*edge+.24*tone(1047,t))*tap(t,.011,140) +
+            (.39*texture+.13*tone(721,t))*tap(t,.042,85);
+          const hinge = (.51*texture+.065*tone(166,t))*breath(t,config.seconds,16);
+          sample = latch + hinge; break;
+        }
+        case "doorClose":
+          sample = (.38*tone(124,t)+.19*tone(218,t)+.45*body)*tap(t,.048,41) +
+            (.48*texture+.16*edge)*tap(t,.054,89) + .18*edge*tap(t,.081,110); break;
+        case "windowSlide":
+          sample = (.63*texture+.13*edge)*breath(t,config.seconds,37) +
+            (.40*texture+.16*tone(391,t))*tap(t,.215,57) + .19*edge*tap(t,.231,112); break;
+        case "glassSmash": {
+          const crack = (.67*edge+.61*texture)*tap(t,.008,110);
+          const shards = .71*tap(t,.017,55)+.45*tap(t,.038,81)+.41*tap(t,.077,58)+
+            .29*tap(t,.091,64)+.25*tap(t,.135,66)+.19*tap(t,.189,56)+.12*tap(t,.274,37);
+          const shimmer = .14*tone(2311,t)+.095*tone(3289,t)+.07*tone(4471,t);
+          sample = crack + (.76*edge+.34*texture+shimmer)*shards; break;
+        }
+        case "pry":
+          sample = (.73*texture+.14*edge)*breath(t,config.seconds,49) +
+            (.50*texture+.27*tone(256,t))*tap(t,.191,59) + .24*edge*tap(t,.208,110); break;
+        case "hammer":
+          sample = (.55*texture+.31*tone(216,t)+.16*tone(323,t)+.21*edge)*
+            (tap(t,.012,67)+.68*tap(t,.145,73)+.48*tap(t,.331,58)); break;
+        case "stepSoft":
+          sample = (.54*texture+.16*edge)*(.69*tap(t,.013,55)+.5*tap(t,.032,41)+.29*tap(t,.067,55)) +
+            (.82*body+.11*tone(88,t))*tap(t,.022,39); break;
+        case "stepHard":
+          sample = (.37*tone(101,t)+.17*tone(179,t)+.51*texture)*tap(t,.016,57) +
+            (.65*texture+.11*edge)*tap(t,.055,45); break;
+        case "strike":
+          sample = (.47*texture+.33*tone(139,t)+.24*body)*tap(t,.027,54) +
+            .23*edge*tap(t,.026,104); break;
+        case "shot":
+          sample = (.61*edge+.54*texture+.24*tone(167,t))*tap(t,.008,52) +
+            (.52*body+.34*texture)*(.56*tap(t,.026,28)+.4*tap(t,.067,44)+.21*tap(t,.109,33)); break;
+        case "crash":
+          sample = (.61*texture+.39*body+.30*tone(97,t))*tap(t,.02,22) +
+            (.52*texture+.21*edge+.13*tone(437,t))*
+            (tap(t,.041,39)+.59*tap(t,.112,46)+.31*tap(t,.201,23)); break;
         case "stone": {
           const impact = tap(t,.03,23)+.55*tap(t,.19,18)+.37*tap(t,.37,16)+.2*tap(t,.63,13)+.12*tap(t,.87,13);
           sample = (.56*grain+.36*tone(224,t)+.14*tone(317,t))*impact; break;
@@ -65,35 +118,128 @@ const Soundscape = (() => {
     return buffer;
   }
 
+  async function decodeRecording(ctx, path) {
+    if (path.startsWith("data:audio/")) {
+      const bytes = Uint8Array.from(atob(path.split(",",2)[1]), c => c.charCodeAt(0));
+      return ctx.decodeAudioData(bytes.buffer);
+    }
+    const response = await fetch(path);
+    if (!response.ok) throw new Error("Recording unavailable");
+    return ctx.decodeAudioData(await response.arrayBuffer());
+  }
+
+  async function preload(ctx) {
+    if (!ctx) return;
+    bankFor(ctx);
+    if (!recordings.has(ctx)) {
+      const clips = new Map();
+      const ready = Promise.all(Object.entries(Recordings).filter(([id]) => Object.hasOwn(configs,id)).map(async ([id,path]) => {
+        try { clips.set(id,await decodeRecording(ctx,path)); } catch { /* Keep the current synth for this cue. */ }
+      }));
+      recordings.set(ctx,{clips,ready});
+    }
+    await recordings.get(ctx).ready;
+  }
+
+  function bankFor(ctx) {
+    if (!zombieBanks.has(ctx)) {
+      const embedded = typeof ZombieEventFiles === "undefined" ? null : ZombieEventFiles;
+      const events = embedded ? Promise.resolve(embedded) : Promise.resolve().then(async () => {
+        const response = await fetch("catalogo/eventos.json");
+        if (!response.ok) return {};
+        return (await response.json()).events ?? {};
+      }).catch(() => ({}));
+      zombieBanks.set(ctx,{events,clips:new Map(),picks:new Map(),pending:0,generation:0});
+    }
+    return zombieBanks.get(ctx);
+  }
+
+  function zombieClip(ctx,bank,paths) {
+    const key = paths[0];
+    if (!bank.clips.has(key)) bank.clips.set(key,(async () => {
+      for (const path of paths) {
+        try { return await decodeRecording(ctx,path); } catch { /* Try the next codec. */ }
+      }
+      return null;
+    })());
+    return bank.clips.get(key);
+  }
+
+  async function playZombie(ctx,cue,listener,role) {
+    const range = Math.hypot(cue.x-listener.x,cue.y-listener.y);
+    const limit = role === "idle" || role === "chase" ? maxVoices-3 : maxVoices;
+    if (range > 20 || (playing.get(ctx)?.size ?? 0) >= limit) return;
+    const bank = bankFor(ctx), generation = bank.generation;
+    if (bank.pending >= (limit === maxVoices ? 3 : 2)) return;
+    bank.pending++;
+    const started = performance.now();
+    try {
+      const entry = (await bank.events)[cue.kind];
+      if (!entry?.files_ogg?.length || generation !== bank.generation) return;
+      const previous = bank.picks.get(cue.entity);
+      const candidates = entry.files_ogg.map((path,index) => ({path,index})).filter(option => option.path !== previous);
+      const pool = candidates.length ? candidates : [{path:entry.files_ogg[0],index:0}];
+      const {path,index} = pool[Math.floor(Math.random()*pool.length)];
+      bank.picks.delete(cue.entity);
+      if (bank.picks.size >= 256) bank.picks.delete(bank.picks.keys().next().value);
+      bank.picks.set(cue.entity,path);
+      const sample = await zombieClip(ctx,bank,[path,entry.files_mp3?.[index]].filter(Boolean));
+      if (sample && generation === bank.generation && performance.now()-started < 900 &&
+          ctx.state === "running" && (playing.get(ctx)?.size ?? 0) < limit) {
+        output(ctx,cue,listener,sample,{cut:6800,gain:zombieGains[role]},.96+Math.random()*.08,true);
+      }
+    } catch { /* Audio is optional. */ }
+    finally { bank.pending--; }
+  }
+
   function play(ctx, cue, listener) {
-    const config = configs[cue.kind];
-    if (!config || !ctx || ctx.state !== "running") return;
+    if (!ctx || ctx.state !== "running") return;
+    if (cue.kind.startsWith("zombie.common.")) {
+      const role = cue.kind.slice(14);
+      if (Object.hasOwn(zombieGains,role)) return playZombie(ctx,cue,listener,role);
+      return;
+    }
+    const config = Object.hasOwn(configs,cue.kind) ? configs[cue.kind] : null;
+    if (!config || (playing.get(ctx)?.size ?? 0) >= maxVoices) return;
     try {
       let library = buffers.get(ctx);
       if (!library) { library = new Map(); buffers.set(ctx,library); }
-      if (!library.has(cue.kind)) library.set(cue.kind,makeBuffer(ctx,cue.kind));
-      const source = ctx.createBufferSource(), volume = ctx.createGain(), filter = ctx.createBiquadFilter();
-      const dx = cue.x-listener.x, dy = cue.y-listener.y, distance = Math.hypot(dx,dy);
-      source.buffer = library.get(cue.kind);
-      filter.type = "lowpass";
-      filter.frequency.value = config.cut * (cue.muffled ? .52 : 1);
-      const attenuation = cue.kind === "horde" ? .8 : 1 / (1 + distance*.06);
-      volume.gain.value = config.gain * attenuation;
-      source.connect(filter).connect(volume);
-      if (ctx.createStereoPanner) {
-        const pan = ctx.createStereoPanner();
-        pan.pan.value = Math.min(.88,Math.max(-.88,(dx-dy)/Math.max(5,distance*1.3)));
-        volume.connect(pan).connect(ctx.destination);
-      } else volume.connect(ctx.destination);
-      let sources = playing.get(ctx);
-      if (!sources) { sources = new Set(); playing.set(ctx,sources); }
-      sources.add(source);
-      source.onended = () => sources.delete(source);
-      source.start();
+      const recording = recordings.get(ctx)?.clips.get(cue.kind);
+      if (!recording && !library.has(cue.kind)) library.set(cue.kind,makeBuffer(ctx,cue.kind));
+      const step = cue.kind === "stepSoft" || cue.kind === "stepHard";
+      output(ctx,cue,listener,recording ?? library.get(cue.kind),config,step ? .90+Math.random()*.20 : 1);
     } catch { /* The on-screen cue remains available without audio. */ }
   }
 
+  function output(ctx,cue,listener,buffer,config,pitch = 1,zombie = false) {
+    const source = ctx.createBufferSource(), volume = ctx.createGain(), filter = ctx.createBiquadFilter();
+    const dx = cue.x-listener.x, dy = cue.y-listener.y, distance = Math.hypot(dx,dy);
+    source.buffer = buffer;
+    if (source.playbackRate) source.playbackRate.value = pitch;
+    filter.type = "lowpass";
+    filter.frequency.value = cue.muffled ? zombie ? 850 : config.cut*.52 : config.cut;
+    const zombieVoice = zombie || cue.zombieVoice;
+    const proximity = Math.max(0,1-distance/4);
+    const attenuation = zombieVoice
+      ? (.09/(1+Math.max(0,distance-4)*.24) + .49*proximity**1.35) * (cue.muffled ? .62 : 1)
+      : cue.kind === "horde" ? .8 : 1/(1+distance*.06);
+    volume.gain.value = config.gain * attenuation * (cue.intensity ?? 1);
+    source.connect(filter).connect(volume);
+    if (ctx.createStereoPanner) {
+      const pan = ctx.createStereoPanner();
+      pan.pan.value = Math.min(.88,Math.max(-.88,(dx-dy)/Math.max(5,distance*1.3)));
+      volume.connect(pan).connect(ctx.destination);
+    } else volume.connect(ctx.destination);
+    let sources = playing.get(ctx);
+    if (!sources) { sources = new Set(); playing.set(ctx,sources); }
+    sources.add(source);
+    source.onended = () => sources.delete(source);
+    source.start();
+  }
+
   function stop(ctx) {
+    const bank = zombieBanks.get(ctx);
+    if (bank) bank.generation++;
     const sources = playing.get(ctx);
     if (!sources) return;
     for (const source of sources) {
@@ -102,5 +248,5 @@ const Soundscape = (() => {
     sources.clear();
   }
 
-  return {play,stop};
+  return {preload,play,stop};
 })();

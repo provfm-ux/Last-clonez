@@ -623,7 +623,7 @@
       const descending = id === Regions.cavern, ascending = state.world.underground;
       const direction = id === "cinema" ? "Oxford" : descending ? "Down" : ascending ? "Up" : deepBack ? "Back" :
         returning ? {North:"South",East:"West",South:"North",West:"East"}[annex.direction] : annex.direction;
-      const detail = ascending ? "Rope back to the firewatch trail." : deepBack ? "Foot trail back to " + annex.name + "." : returning ? "Route back to town." : annex.detail;
+      const detail = ascending ? "Rope back to the firewatch trail." : deepBack ? "Foot trail back to " + Regions.definitions[id].name + "." : returning ? "Route back to town." : annex.detail;
       const crossingType = descending || ascending ? "Rope descent" : annex.vehicles && !deepBack ? "Road crossing" : "Foot trail";
       const visited = returning || ascending || deepBack || Boolean(state.regionStates[id]);
       return '<article class="region-route"><div><b>' + direction + ' · ' + exit.name + '</b><p>' + detail +
@@ -1012,11 +1012,17 @@
     }).join("");
     const town = world.region === Regions.home;
     const back = world.underground ? "ridge" : (Regions.definitions[world.region].host ?? Regions.home);
-    const chapter = Chronicle.has(ledger,"shutdown") ? "The recorded all-clear has stopped. Your signed check-in and the survey room record are filed below." :
+    const district = Object.values(Expedition.districts).find(area => area.host === world.region);
+    const districtHint = world.generator >= Expedition.generator && district ? '<p>' + esc(district.lead) + '</p>' : "";
+    const districtProgress = world.generator >= Expedition.generator && Chronicle.has(ledger,"shutdown") ?
+      '<p>' + Expedition.packets.filter(id => Chronicle.has(ledger,id)).length + ' / ' + Expedition.packets.length +
+      ' district witness packets. Bring them to the Southbank Switchroom.</p>' : "";
+    const chapter = Chronicle.has(ledger,"lastreturn") ? "The automatic register is closed. The district witness copies are filed below." :
+      Chronicle.has(ledger,"shutdown") ? "The recorded all-clear has stopped. The district clerks are still checking who made it home." :
       ledger.dispatch?.reportRead ? "The crew made it through. Follow the survey trail below Pine Ridge to find the source of the broadcast." :
       "The same all-clear has aired twice. Trace it across the five surface regions and give the survivors one live signal.";
     show("Field ledger", '<section class="ledger-case"><h3>' + Chronicle.title + '</h3><p>' + esc(chapter) + '</p>' +
-      '<p class="item-meta">' + gathered + ' / ' + Chronicle.core.length + ' core records and checks</p>' +
+      '<p class="item-meta">' + gathered + ' / ' + Chronicle.core.length + ' core records and checks</p>' + districtHint + districtProgress +
       (world.region === "coast" && Chronicle.has(ledger,"tidebook") ? '<p>' + esc(Chronicle.tideForecast(state.minutes)) + '</p>' : '') + dispatchStatus() +
       '<div class="item-actions">' + button(town ? "Mark civil defence desk" : "Mark crossing to " + Regions.definitions[back].name,
         town ? "mark-" + Chronicle.deskId : "mark-exit-" + back, !active(), "primary") + button("Back to journal", "diary") + '</div></section>' +

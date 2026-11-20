@@ -267,7 +267,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("portas: com a porta aberta o infetado entra e chega ao jogador", withOpen === true);
   check("portas: com a porta fechada o infetado (sem alerta) não vem", withClosed === false); }
 // ---- v0.26: mundo maior (geração 4) ----
-{ check("mundo: jogos novos usam a geração 6", fresh("survival").world.generator === 6);
+{ check("mundo: jogos novos usam a geração 7", fresh("survival").world.generator === 7);
   for (const region of ["ridge", "ironworks", "coast", "fields"]) {
     const w4 = World.build(Data.control.seed, "survival", 4, Data.worldRules("survival"), region), w3 = World.build(Data.control.seed, "survival", 3, Data.worldRules("survival"), region);
     const wild = w4.objects.filter(o => o.id.startsWith("wild-"));
@@ -333,7 +333,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("viagem: Cold Vale → Ironworks → Slag Quarry → Ironworks", trail.join(" > ") === "ironworks > quarry > ironworks", trail.join(" > "));
   let q = s; try { for (const id of ["fields", "reservoir"]) q = go(q, id); } catch (e) { trail.push(e.message); }
   let back = null, why = ""; try { back = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(q)))); } catch (e) { why = e.message; }
-  check("viagem: gravar e restaurar dentro do Greywater Reservoir", back?.world.region === "reservoir" && back.world.generator === 6, why || q.world.region);
+  check("viagem: gravar e restaurar dentro do Greywater Reservoir", back?.world.region === "reservoir" && back.world.generator === 7, why || q.world.region);
   let boom = ""; try { for (let i = 0; i < 400; i++) Sim.tick(q, .1, {x: 1, y: 0, run: false}); } catch (e) { boom = e.message; }
   check("viagem: 400 ticks no reservatório sem erros", boom === "", boom); }
 // ---- v0.31: case finale, regional challenges, and hidden records ----
@@ -556,6 +556,46 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
         Sim.collect(run,prize,0) === 1 && Sim.quantity(run.player.bag,"raffletrophy") === 1 &&
         Sim.quantity(Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(run)))).player.bag,"raffletrophy") === 1);
     }
+  }
+}
+{
+  const {Expedition,Chronicle,Regions} = context;
+  const districts = Object.entries(Expedition.districts);
+  const oldTiles = Object.entries(Regions.definitions).filter(([id]) => !Expedition.districts[id])
+    .reduce((sum,[,area]) => sum+area.width*area.height,0);
+  const newTiles = districts.reduce((sum,[,area]) => sum+area.width*area.height,0);
+  check("outer districts at least double the mapped area",newTiles >= oldTiles);
+  check("story count grows tenfold",Object.keys(Chronicle.entries).length >=
+    10*(Object.keys(Chronicle.entries).length-Object.keys(Expedition.records).length));
+  check("300 optional Easter eggs across the districts",Object.values(Expedition.records).filter(entry => entry.easter).length === 300);
+  for (const [id,district] of districts) {
+    const old = Sim.create(17,"training","carer",6,undefined,district.host);
+    const host = Sim.create(17,"training","carer",7,undefined,district.host);
+    const gate = host.world.objects.find(o => o.id === "exit-"+id);
+    check("district gate reachable and absent in old saves: "+id, gate && !old.world.objects.some(o => o.id === gate.id) &&
+      World.route(host.world,host.player.x,host.player.y,gate.x,gate.y,0,true).length > 0);
+    Object.assign(host.player,{x:gate.x,y:gate.y});
+    const run = Sim.travel(host,gate);
+    check("district crossing works: "+id,run?.world.region === id);
+    if (!run) continue;
+    const notes = run.world.objects.filter(Chronicle.isScene);
+    check("all district clues have reachable floor: "+id,notes.length >= 121 && notes.every(o =>
+      World.clear(run.world,o.x,o.y) && World.route(run.world,run.player.x,run.player.y,o.x,o.y,0,true).length));
+    for (const index of [0,4,9]) {
+      for (const suffix of ["a","b","c","f"]) {
+        const o = notes.find(o => o.record === "out-"+id+"-"+index+suffix);
+        Object.assign(run.player,{x:o.x,y:o.y});
+        check("field witness entry resolves: "+o.record,Sim.resolveScene(run,o));
+      }
+    }
+    const packet = notes.find(o => o.record === "packet-"+id);
+    Object.assign(run.player,{x:packet.x,y:packet.y});
+    check("district packet can be assembled: "+id,Sim.resolveScene(run,packet));
+    const saved = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(run))));
+    const back = saved.world.objects.find(o => o.id === "exit-"+district.host);
+    Object.assign(saved.player,{x:back.x,y:back.y});
+    const returned = Sim.travel(saved,back);
+    check("district progress persists after returning: "+id,returned?.world.region === district.host && Chronicle.has(returned.ledger,packet.record));
   }
 }
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>

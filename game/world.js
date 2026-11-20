@@ -71,7 +71,7 @@ const World = (() => {
       sync(world);
     }
     const occupied = new Set();
-    const count = region === "cinema" ? 0 : town || !rules.count ? rules.count : Math.max(1, Math.round(rules.count * areaDensity[region]));
+    const count = region === "cinema" ? 0 : town || !rules.count ? rules.count : Math.max(1, Math.round(rules.count * (areaDensity[region] ?? .24)));
     for (const {x,y,dormant} of world.homes ? Homes.residents(world,count) : []) {
       const z = infected(world,"z"+world.enemies.length,x,y,rules.mix,world.rng,"resident");
       z.dormant = dormant;

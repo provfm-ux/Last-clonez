@@ -243,7 +243,7 @@ const Sim = (() => {
   function createControl(difficulty, role, startId, options, profile) {
     if (!Object.hasOwn(Data.control.starts, startId)) throw new Error("Choose a starting point on the control map.");
     const seed = Number.isInteger(profile?.seed) && profile.seed >= 0 && profile.seed <= 999999999 ? profile.seed : Data.control.seed;
-    const s = create(seed, difficulty, role, 6, options, Regions.home, profile);
+    const s = create(seed, difficulty, role, Expedition.generator, options, Regions.home, profile);
     s.controlStart = startId;
     if (startId === "shelter") {
       placeStartingBat(s);
@@ -2511,7 +2511,7 @@ const Sim = (() => {
   function restore(data, crossing = null) {
     data = migrate(data);
     const region = data?.region ?? Regions.home, regionStates = data?.regionStates ?? {};
-    if (!data || data.schema !== Data.saveVersion || ![1, 2, 3, 4, 5, 6].includes(data.generator) || !Number.isInteger(data.seed) ||
+    if (!data || data.schema !== Data.saveVersion || ![1, 2, 3, 4, 5, 6, Expedition.generator].includes(data.generator) || !Number.isInteger(data.seed) ||
         !(data.difficulty === "custom" || Object.hasOwn(Data.modes, data.difficulty)) || !Object.hasOwn(Data.roles, data.role) ||
         typeof region !== "string" || data.generator < (Regions.definitions[region]?.generator ?? 1) || !zoneShape(data, region) || typeof regionStates !== "object" || Array.isArray(regionStates) ||
         Object.entries(regionStates).some(([id, zone]) => id === region || !zoneShape(zone, id) ||

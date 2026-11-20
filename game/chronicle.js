@@ -223,6 +223,9 @@ const Chronicle = (() => {
   };
   for (const [id,entry] of Object.entries(cinemaNotes)) entries[id] = {...entry,region:"cinema",added:5,generator:6};
 
+  Object.assign(entries, Expedition.records);
+  for (const [id,district] of Object.entries(Expedition.districts)) leads[id] = district.brief;
+
   function available(entry,world) {
     if ((entry.generator ?? 1) > world.generator) return false;
     if (!entry.rare) return true;

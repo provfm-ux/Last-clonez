@@ -30,3 +30,5 @@ O jogo está em `game/`. Guia do jogador: `docs/GAME_GUIDE.md`.
 
 ## Comandos
 `npm test` | `npm run test:full` | `npm run index` | `npm run build` | `npm run test:compat` (precisa de `../old-version`)
+
+Last CloneZ — Cloudflare deployment.

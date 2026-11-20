@@ -221,12 +221,19 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("roupa: peso do arranque cabe na mochila", Sim.weight(p.bag) < Sim.capacity(s), Sim.weight(p.bag).toFixed(1) + " / " + Sim.capacity(s)); }
 { const temps = [];
   for (const coat of [false, true]) { const s = fresh("survival"), p = s.player; for (const z of s.world.enemies) z.hp = 0;
-    const spot = findTile(s, t => !t.building && t.solid === false); Object.assign(p, {x: spot.x, y: spot.y}); if (coat) { p.gear.body = "wintercoat"; p.gear.head = "beanie"; }
+    const spot = findTile(s, t => !t.building && t.solid === false); Object.assign(p, {x: spot.x, y: spot.y}); if (coat) for (const id of ["wintercoat","beanie"]) {
+      p.bag.push({id,qty:1,condition:100});
+      Sim.use(s,p.bag.length-1);
+    }
     for (let i = 0; i < 800; i++) { s.minutes = 21 * 1440 + 12 * 60; Sim.tick(s, .25, idle); } temps.push(p.temperature); }
   check("roupa: casaco e gorro aquecem no inverno", temps[1] > temps[0] + .8, temps.map(t => t.toFixed(2)).join(" → ")); }
 { const absorbed = {}; 
   for (const kit of ["bare", "heavy"]) { const s = fresh("survival"), p = s.player; s.rules.damage = 10; p.fracture = 0;
-    p.gear = kit === "bare" ? {head: null, hands: null, wrist: null, arms: null, body: null, legs: null, feet: null} : {head: null, hands: "gloves", wrist: null, arms: "armguards", body: "wintercoat", legs: "jeans", feet: "boots"};
+    if (kit === "bare") for (const slot of Object.keys(p.gear)) p.gear[slot] = null;
+    else for (const id of ["gloves","armguards","wintercoat"]) {
+      p.bag.push({id,qty:1,condition:100});
+      Sim.use(s,p.bag.length-1);
+    }
     s.world.enemies.filter(e => e.hp > 0).slice(0, 4).forEach((z, i) => Object.assign(z, {x: p.x + .6 + i * .1, y: p.y + .4, alert: 30, chaseX: p.x, chaseY: p.y}));
     const seen = new Set(); let n = 0;
     for (let i = 0; i < 4000 && s.mode === "play"; i++) { p.hp = 100; Sim.tick(s, .033, idle); for (const m of s.messages) if (!seen.has(m)) { seen.add(m); if (/absorbs/.test(m.text)) n++; } }
@@ -598,6 +605,248 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     check("district progress persists after returning: "+id,returned?.world.region === district.host && Chronicle.has(returned.ledger,packet.record));
   }
 }
+{
+  const seed = 17, s = Sim.createRecommended(seed, true, 2.3), p = s.player;
+  const standard = Sim.createControl("survival", "carer", "shelter", undefined, {seed});
+  const homeIds = new Set(s.world.buildings.filter(b => b.type === "home").map(b => b.id));
+  const stash = s.world.objects.find(o => homeIds.has(o.building) && Sim.quantity(o.loot ?? [], "bandage") >
+    Sim.quantity(standard.world.objects.find(other => other.id === o.id)?.loot ?? [], "bandage"));
+  const bat = s.world.objects.find(o => o.kind === "drop" && o.loot?.some(item => item.id === "bat"));
+  const originalPosition = {x:p.x,y:p.y};
+  const steps = [s.guideStep];
+  for (const input of [{x:1,y:0}, {x:-1,y:0}, {x:0,y:1}, {x:0,y:-1}]) {
+    Sim.tick(s, .033, input);
+    if (s.playtest.move !== undefined) break;
+  }
+  Object.assign(p, originalPosition);
+  Sim.collect(s, bat, bat.loot.findIndex(item => item.id === "bat"));
+  steps.push(s.guideStep);
+  Sim.use(s, p.bag.findIndex(item => item.id === "bat"));
+  steps.push(s.guideStep);
+  const houseSpot = findTile(s, t => t.building === stash?.building && !t.solid &&
+    Sim.distance({x:t.x+.5,y:t.y+.5},stash) <= 1.85 &&
+    World.sees(s.world,t.x+.5,t.y+.5,stash.x,stash.y));
+  if (houseSpot) {
+    Object.assign(p, houseSpot);
+    const house = s.world.buildings.find(b => b.id === stash.building);
+    const cupboard = s.world.objects.find(o => o.building === house.id && Sim.reachableObject(s,o) &&
+      o.loot?.some(item => item.id !== "bandage"));
+    if (cupboard) {
+      Sim.collect(s, cupboard, cupboard.loot.findIndex(item => item.id !== "bandage"));
+      steps.push(s.guideStep);
+    }
+    Sim.collect(s, stash, stash.loot.findIndex(item => item.id === "bandage"));
+  }
+  steps.push(s.guideStep);
+  p.wounds.push({part:"arm", type:"scratch", bleed:.07, bandaged:false, clean:false, infection:0, age:0});
+  Sim.use(s, p.bag.findIndex(item => item.id === "bandage"));
+  steps.push(s.guideStep);
+  const shelter = findTile(s, t => t.building === s.world.base.id && !t.solid &&
+    World.clear(s.world,t.x+.5,t.y+.5));
+  Object.assign(p, shelter);
+  s.minutes = 1200;
+  s.atmosphere.nextWave = 0;
+  s.nextEvent = 0;
+  Sim.tick(s, .033);
+  steps.push(s.guideStep);
+  check("início recomendado: recolher, equipar, explorar, tratar e regressar sem repetir passos",
+    steps.join(",") === "0,1,2,3,4,5,6", steps.join(","));
+  check("início recomendado: mesmas regras Survival, primeira noite sem horda itinerante",
+    JSON.stringify(s.rules) === JSON.stringify(standard.rules) && !s.atmosphere.pending && s.atmosphere.nextWave === 0 &&
+    !s.messages.some(message => /siren|crash in the centre/.test(message.text)));
+  s.minutes = 1440 + 390;
+  Sim.tick(s, .033);
+  check("início recomendado: hordas itinerantes regressam após o amanhecer", s.atmosphere.pending || s.atmosphere.nextWave > 0);
+  check("objetivo: clínica marcada e modo sem mapa usa sinais",
+    Sim.pinnedGoal(s) === "Find Eva" && Sim.destination(s)?.id === s.world.buildings.find(b => b.type === "clinic").id);
+  s.hideNavigation = true;
+  check("sem mapa: pista física sem destino", /signs north/.test(Sim.pinnedGoal(s)) && Sim.destination(s) === null);
+  s.flags.rescued = true;
+  check("objetivo: avança para o rádio", /radio/.test(Sim.pinnedGoal(s)));
+  const z = s.world.enemies.find(e => e.hp > 0 && !e.dormant);
+  Object.assign(z, {x:p.x,y:p.y,hp:1});
+  Sim.attack(s, z);
+  p.hp = 0;
+  Sim.tick(s, .033);
+  const saved = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  check("marcos locais: guardam os primeiros tempos e só existem com adesão",
+    saved.guideStep === 6 && saved.playtest.tutorialSkip === 2.3 &&
+    ["move","pickup","equip","fight","heal","death"].every(id => Number.isFinite(saved.playtest[id])) &&
+    !Sim.createRecommended(seed).playtest && !standard.playtest, JSON.stringify(saved.playtest));
+}
+
+{
+  const make = () => Sim.createControl("survival", "carer", "shelter", undefined, {seed:1014});
+  const a = make(), b = make(), old = make();
+  for (const s of [a,b]) {
+    s.difficultyOptions = Sim.difficultyOptions(s);
+    s.player.hp = 25;
+    s.atmosphere.nextWave = 0;
+    for (const z of s.world.enemies) z.hp = 0;
+    Sim.tick(s, .2);
+  }
+  check("hordas adaptativas: mesma seed e ações dão a mesma pausa",
+    a.recoveryUsed && b.recoveryUsed && a.atmosphere.nextWave === 45.2 &&
+    JSON.stringify(a.atmosphere) === JSON.stringify(b.atmosphere));
+  const original = JSON.stringify(a.rules);
+  const decreased = Sim.setDifficulty(a, {pressure:"low", bleed:true, aim:"light"});
+  const rejected = !Sim.setDifficulty(a, {pressure:"high"}) && a.difficultyOptions.pressure === "low";
+  const restored = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(a))));
+  check("dificuldade: baixar guarda o historial, subir exige confirmação, regras de geração intactas",
+    decreased && rejected && restored.difficultyOptions.assists.bleed && restored.difficultyOptions.aim === "light" &&
+    restored.difficultyChanges.length === 1 && JSON.stringify(restored.rules) === original &&
+    Sim.setDifficulty(restored, {pressure:"high"}, true));
+  check("dificuldade: gravação anterior conserva as regras sem assistências nem diretor",
+    Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(old)))).difficultyOptions === undefined);
+  check("dificuldade: só Relaxed e Survival ativam o diretor por defeito",
+    Object.keys(Data.modes).every(id => Sim.difficultyOptions({difficulty:id}).director === ["relaxed","survival"].includes(id)));
+  check("travessias: distritos exteriores perigosos e Training calmo",
+    Object.keys(context.Expedition.districts).every(region => Sim.dangerRating(a,region) === "Dangerous" &&
+      Sim.dangerRating(fresh("training"),region) === "Calm"));
+  check("mira assistida desligada mantém o alvo original",
+    Sim.touchAttackTarget(old) === Sim.attackTarget(old));
+  const open = findTile(old, t => [-1,0,1].every(dx => World.clear(old.world,t.x+.5+dx,t.y+.5)));
+  const [front,back] = old.world.enemies.filter(z => z.hp > 0 && !z.dormant);
+  Object.assign(old.player, open, {headingX:1,headingY:0});
+  Object.assign(front, {x:open.x+.7,y:open.y});
+  Object.assign(back, {x:open.x-.3,y:open.y});
+  old.world.enemies = [front,back];
+  old.difficultyOptions = Sim.difficultyOptions(old, {aim:"light"});
+  check("mira assistida: favorece um alvo visível à frente, mas nunca fora de alcance",
+    Sim.attackTarget(old) === back && Sim.touchAttackTarget(old) === front &&
+    (front.x += 4, Sim.touchAttackTarget(old) === null));
+  const withBleed = make(), withoutBleed = make();
+  withBleed.difficultyOptions = Sim.difficultyOptions(withBleed, {bleed:true});
+  for (const s of [withBleed,withoutBleed]) {
+    s.player.wounds.push({part:"arm",type:"cut",bleed:.18,bandaged:false,clean:false,infection:0,age:0});
+    Sim.tick(s,.2);
+  }
+  check("assistência: reduz a perda de vida por hemorragia", withBleed.player.hp > withoutBleed.player.hp);
+}
+
+{
+  const run = Sim.createControl("training","carer","shelter",undefined,{seed:17});
+  const spot = findTile(run, t => World.clear(run.world,t.x+.5,t.y+.5) &&
+    World.clear(run.world,t.x+1.5,t.y+.5) && World.sees(run.world,t.x+.5,t.y+.5,t.x+1.5,t.y+.5));
+  Object.assign(run.player,spot);
+  const enemy = (kind, distance = .8) => ({id:"matchup",kind,stats:Data.infected[kind],hp:Data.infected[kind].hp,
+    x:spot.x+distance,y:spot.y,stagger:0,windup:.4,windupTarget:"player"});
+  const strike = (id, kind, distance) => {
+    run.player.cooldown = 0;
+    run.player.stamina = 100;
+    const z = enemy(kind,distance);
+    run.world.enemies = [z];
+    run.player.bag.push({id,qty:1,condition:100,uid:"test-"+id});
+    Sim.use(run,run.player.bag.length-1);
+    return {z, hit:Sim.attack(run,z)};
+  };
+  const batWalker = strike("bat","walker"), batBrute = strike("bat","brute"), axeBrute = strike("axe","brute");
+  check("combate: taco forte contra walker, mas o brute resiste e mantém o ataque",
+    batWalker.hit && batWalker.z.hp === 17 && batBrute.hit && batBrute.z.hp === 68 && batBrute.z.windup === .4);
+  check("combate: machado forte contra brute e interrompe o ataque",
+    axeBrute.hit && axeBrute.z.hp === 39 && axeBrute.z.windup === 0);
+  const spear = strike("spear","runner",1.65), knife = strike("knife","runner",1.65);
+  const closeKnife = strike("knife","runner");
+  check("combate: lança alcança e desequilibra runner, faca é melhor de perto",
+    spear.hit && spear.z.stagger === .48 && !knife.hit && closeKnife.hit && closeKnife.z.hp === 12);
+  const brute = enemy("brute");
+  run.world.enemies = [brute];
+  run.player.cooldown = 0;
+  run.player.grabbed = 1;
+  check("combate: empurrar brute liberta o jogador mas não cancela a investida",
+    Sim.shove(run) && run.player.grabbed === 0 && brute.windup === .4 && brute.x-spot.x < 1.05);
+  check("combate: todas as armas têm um estilo",
+    Object.values(Data.items).filter(item => item.damage).every(item => Data.combatStyles[item.combat]));
+}
+
+{
+  const run = Sim.createControl("training","carer","shelter",undefined,{seed:17});
+  const player = run.player;
+  const bat = {id:"bat",qty:1,condition:.2,born:0,uid:"repair-test-bat"};
+  const axe = {id:"axe",qty:1,condition:92,born:0,uid:"repair-test-axe"};
+  player.bag.push(bat, axe);
+  Sim.use(run,player.bag.indexOf(bat));
+  const z = {...World.infected(run.world,"repair-test",player.x,player.y,"walkers",context.Level.seeded(17))};
+  run.world.enemies.push(z);
+  check("desgaste: golpe parte arma no limite e bloqueia novo ataque",
+    Sim.attack(run,z) && bat.condition === 0 && Sim.weaponProblem(run) === "Weapon broken" &&
+    run.messages.some(message => message.text.includes("Wooden bat broke")));
+  const snap = Sim.snapshot(run);
+  const restored = Sim.restore(JSON.parse(JSON.stringify(snap)));
+  check("desgaste: a condição zero mantém-se na gravação", Sim.weapon(restored).condition === 0);
+  const supply = id => Sim.available(run,id);
+  player.bag.push({id:"scrap",qty:2,condition:100,born:0},{id:"tape",qty:2,condition:100,born:0});
+  const scrap = supply("scrap"), tape = supply("tape");
+  const failed = !Sim.craft(run,"repair",{...axe}) && supply("scrap") === scrap && supply("tape") === tape;
+  check("reparação: escolhe arma no inventário, sem mudar arma equipada, e respeita o limite",
+    failed && Sim.craft(run,"repair",axe) && axe.condition === 100 && Sim.weapon(run) === bat &&
+    supply("scrap") === scrap-1 && supply("tape") === tape-1);
+  check("reparação: receita antiga recupera uma arma partida e não gasta material numa arma nova",
+    !Sim.craft(run,"repair",axe) && Sim.craft(run,"repair") && bat.condition === 35 &&
+    supply("scrap") === scrap-2 && supply("tape") === tape-2);
+}
+
+{
+  const run = Sim.createControl("training","carer","shelter",undefined,{seed:17});
+  const p = run.player;
+  const bat = {id:"bat",qty:1,condition:100,born:0,uid:"carried-bat"};
+  const axe = {id:"axe",qty:1,condition:100,born:0,uid:"carried-axe"};
+  p.bag.push(bat,axe);
+  Sim.use(run,p.bag.indexOf(axe));
+  Sim.drop(run,p.bag.indexOf(axe));
+  check("equipamento: largar o machado deixa mãos vazias com taco na mochila", Sim.weapon(run).id === "fists");
+  Sim.use(run,p.bag.indexOf(bat));
+  Sim.unequipWeapon(run);
+  const snapshot = () => JSON.parse(JSON.stringify(Sim.snapshot(run)));
+  check("equipamento: desequipar mantém taco na mochila e punhos após carregar",
+    Sim.weapon(Sim.restore(snapshot())).id === "fists" && p.bag.includes(bat));
+  const stale = snapshot();
+  stale.player.weapon = "bat";
+  stale.player.weaponUid = "removed-bat";
+  check("equipamento: identificador obsoleto não equipa outro taco",
+    Sim.weapon(Sim.restore(stale)).id === "fists");
+  const legacy = snapshot();
+  legacy.player.weapon = "bat";
+  delete legacy.player.weaponUid;
+  check("equipamento: uma gravação antiga só com o tipo de arma ainda a equipa",
+    Sim.weapon(Sim.restore(legacy)).id === "bat");
+}
+
+{
+  const run = Sim.createControl("training","carer","shelter",undefined,{seed:17});
+  const p = run.player;
+  const diy = run.world.objects.find(o => o.loot?.some(item => item.id === "diyguide"));
+  check("livros: existem manuais para todas as competências na cidade",
+    Boolean(diy) && Object.keys(Data.skillBooks).every(id => run.world.objects.some(o => o.loot?.some(item => item.id === id))));
+  p.bag.push({id:"diyguide",qty:1,condition:100});
+  const i = p.bag.length-1;
+  const read = Sim.use(run,i) && !Sim.use(run,i);
+  const reloaded = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(run))));
+  check("livros: dá XP uma vez e conserva leitura após carregar",
+    read && reloaded.player.skills.crafting === 24 && !Sim.use(reloaded,i) && Sim.repairAmount(run) === 38);
+  const old = JSON.parse(JSON.stringify(Sim.snapshot(run)));
+  delete old.booksStocked;
+  delete old.player.readBooks;
+  for (const o of old.objects) if (o.loot) o.loot = o.loot.filter(item => !Object.hasOwn(Data.skillBooks,item.id));
+  const upgraded = Sim.restore(old);
+  check("livros: aparecem em mapas antigos sem duplicar ao gravar de novo",
+    upgraded.world.booksStocked && upgraded.world.objects.filter(o => o.loot?.some(item => item.id === "diyguide")).length === 1 &&
+    upgraded.player.readBooks.length === 0);
+
+  p.bag.push({id:"wintercoat",qty:1,condition:100},{id:"tape",qty:1,condition:100});
+  Sim.use(run,p.bag.length-2);
+  const z = World.infected(run.world,"wear-test",p.x,p.y,"walkers",context.Level.seeded(17));
+  Object.assign(z,{windup:.01,windupTarget:"player"});
+  run.world.enemies.push(z);
+  Sim.tick(run,.033);
+  const worn = ["body","legs","feet"].map(slot => Sim.wornItem(run,slot)).filter(item => item?.condition < 100);
+  check("roupa: um golpe danifica a roupa na zona atingida", worn.length > 0);
+  const damaged = worn[0];
+  if (damaged) damaged.condition = 20;
+  check("reparação DIY: tecido e fita melhoram a condição da roupa", Boolean(damaged) &&
+    Sim.craft(run,"mend",damaged) && damaged.condition === 58 && p.skills.crafting === 28);
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

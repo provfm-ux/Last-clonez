@@ -41,6 +41,8 @@ const World = (() => {
   }
 
   const areaDensity = {ridge:.12, ironworks:.24, coast:.12, fields:.14, cavern:.05, quarry:.10, reservoir:.12, lighthouse:.08};
+  const infectedCount = (region, count) => region === "cinema" ? 0 : region === Regions.home || !count ?
+    count : Math.max(1, Math.round(count * (areaDensity[region] ?? .24)));
 
   function infected(world, id, x, y, mix, rng, origin) {
     const kind = mix === "runners" && rng() < .20 ? "runner" : mix !== "walkers" && rng() < .18 ? "brute" : "walker";
@@ -71,7 +73,7 @@ const World = (() => {
       sync(world);
     }
     const occupied = new Set();
-    const count = region === "cinema" ? 0 : town || !rules.count ? rules.count : Math.max(1, Math.round(rules.count * (areaDensity[region] ?? .24)));
+    const count = infectedCount(region, rules.count);
     for (const {x,y,dormant} of world.homes ? Homes.residents(world,count) : []) {
       const z = infected(world,"z"+world.enemies.length,x,y,rules.mix,world.rng,"resident");
       z.dormant = dormant;
@@ -181,5 +183,5 @@ const World = (() => {
   }
 
   const zoneAt = (world, x, y) => world.zones[tileAt(world, x, y)?.zone] || world.zones.wild;
-  return {width, height, start, weapons: Data.items, build, tileAt, clear, drivable, sees, route, sync, zoneAt, infectedOutfit, infected};
+  return {width, height, start, weapons: Data.items, build, tileAt, clear, drivable, sees, route, sync, zoneAt, infectedOutfit, infected, infectedCount};
 })();

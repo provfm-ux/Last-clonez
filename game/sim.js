@@ -612,7 +612,9 @@ const Sim = (() => {
     const p = s.player, point = positions[0] || {x: car.x, y: car.y};
     p.vehicle = null; p.x = point.x; p.y = point.y; p.path = [];
     p.driveSpeed = 0; p.velocityX = 0; p.velocityY = 0;
-    car.solid = Boolean(positions.length);
+    const carTile = World.tileAt(s.world, car.x, car.y);
+    const overlapsCar = Math.abs(point.x - carTile.x - .5) <= .68 && Math.abs(point.y - carTile.y - .5) <= .68;
+    car.solid = Boolean(positions.length) && !overlapsCar;
     const npc = s.world.npc;
     if (npc.ridingVehicle === car.id) {
       const next = positions[1] || point;

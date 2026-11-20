@@ -141,6 +141,20 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("carro: preso num sítio sem estrada liberta-se ou o jogador sai", !p.vehicle || World.drivable(World.tileAt(s.world, p.x, p.y)), p.vehicle ? "ainda no carro" : "saiu do carro");
   if (p.vehicle) Sim.exitVehicle(s, true);
   check("carro: nunca deixa o jogador dentro de uma parede ao sair", World.clear(s.world, p.x, p.y)); }
+{ const s = fresh("training"), p = s.player, car = s.world.objects.find(o => o.kind === "car");
+  Object.assign(p, {x: car.x, y: car.y});
+  const entered = Sim.enterVehicle(s, car);
+  car.heading = 0;
+  p.driveSpeed = 3;
+  Sim.tick(s, .03, {x: 0, y: 1, run: false});
+  const velocity = Math.hypot(p.velocityX, p.velocityY);
+  const sideways = Math.abs(p.velocityX * Math.sin(car.heading) - p.velocityY * Math.cos(car.heading));
+  check("carro: curva progressiva e deslocação no eixo das rodas",
+    entered && car.heading > 0 && car.heading <= .121 && velocity > 0 && sideways < 1e-6,
+    "ângulo " + car.heading.toFixed(3) + ", desvio " + sideways.toFixed(6));
+  const restored = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  check("carro: orientação preservada na gravação", Sim.vehicle(restored)?.heading === car.heading);
+}
 { let worst = 140, any = 0;
   for (const dir of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
     const s = fresh("survival"), p = s.player, car = s.world.objects.find(o => o.kind === "car");

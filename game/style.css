@@ -69,8 +69,7 @@ canvas { display: block; }
 
 .viewport { grid-row:3; position: relative; min-height: 0; overflow: hidden; background: #101711; isolation: isolate; }
 .event-status {
-  grid-row:2; display:flex; align-items:center; height:34px; padding:0 10px; overflow:hidden; pointer-events:none;
-  background:#1b211b; border-bottom:1px solid var(--border); color:var(--text);
+  min-width:0; display:flex; align-items:center; padding:0 8px; overflow:hidden; pointer-events:none; color:var(--text);
   font:12px/14px var(--sans);
 }
 .event-status[hidden] { display:none; }
@@ -303,7 +302,7 @@ select { width:100%; display:block; margin-top:5px; padding:7px 24px 7px 8px; ba
 .actions { margin-top:8px; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); }
 .actions button { min-height:37px; }
 .actions button .icon { color:#c9c59b; }
-.status-chips { position:absolute; z-index:3; top:18px; right:17px; max-width:62%; padding:6px 8px; background:#172117e8; border:1px solid #80614b; border-radius:4px; color:#e7b78a; font:600 10px var(--mono); line-height:1.45; text-align:right; }
+
 .live-tag { top:auto; bottom:16px; left:20px; font-size:9px; }
 .legend span:first-child i { background:#fff0c8; }
 .legend span:nth-child(2) i { background:#e3b873; }
@@ -435,7 +434,7 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
   .stage-top { padding:0 9px; }
   .camera { font-size:8px; }
   .weather { display:none; }
-  .status-chips { font-size:8px; top:16px; right:15px; max-width:80%; }
+
   .live-tag { font-size:8px; left:17px; bottom:14px; }
 }
 @media(max-width:540px) and (orientation:portrait) {
@@ -484,7 +483,7 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 #roof-toggle[aria-pressed="true"] { background:#423d28; color:#f8e6ba; }
 #roof-toggle .icon { width:14px; height:14px; }
 #roof-toggle span { min-width:0; font:700 8px var(--mono); }
-.status-chips { top:58px; }
+
 .move-stick {
   position:absolute; z-index:5; left:var(--touch-inset); bottom:var(--touch-inset); width:var(--touch-stick); height:var(--touch-stick); display:none;
   border:1px solid #c7cc9570; border-radius:50%; background:#15201575; touch-action:none;
@@ -604,7 +603,7 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
   .pin-form input, .pin-form select { min-height:44px; font-size:16px; }
   .world-tools button { width:44px; height:44px; }
   .destination-tag { min-height:44px; max-width:calc(100% - 214px); }
-  .status-chips { top:68px; }
+
   .live-tag { left:var(--touch-inset); right:auto; bottom:calc(var(--touch-inset) + var(--touch-stick) + 19px); }
   .gear-list .small-button, .item-actions .small-button, .bag-toolbar .small-button, .nearby-clues .small-button, .dialog-close { min-height:44px; }
   .dialog-close { min-width:44px; }
@@ -651,14 +650,14 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
   .hero-foot { display:none; }
   .destination-tag { top:8px; left:9px; }
   .world-tools { top:8px; right:9px; }
-  .status-chips { top:58px; right:9px; max-width:52%; }
+
 }
 @media (any-pointer:coarse) and (orientation:landscape) and (max-height:500px) and (max-width:1024px) {
   .viewport { --touch-inset:9px; --touch-stick:86px; --touch-action-height:48px; }
   .stage-bottom { grid-template-columns:minmax(0,2.8fr) minmax(0,1.4fr) repeat(3,minmax(0,1fr)); }
   .vitals { grid-column:1; }
   .actions { grid-column:4 / 6; grid-row:auto; }
-  .status-chips { top:58px; }
+
 }
 
 /* 0.23 mobile ergonomics: compact search bar, bigger everyday buttons */
@@ -682,7 +681,7 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 .lesson[hidden],.afterlife-tools[hidden] { display:none; }
 .in-afterlife .stage-top,.in-afterlife .stage-bottom,.in-afterlife .rail,
 .in-afterlife .mast,.in-afterlife .footer,.in-afterlife .destination-tag,
-.in-afterlife .world-tools,.in-afterlife .status-chips,.in-afterlife .live-tag,
+.in-afterlife .world-tools,.in-afterlife .hud-strip,.in-afterlife .live-tag,
 .in-afterlife #event-status,.in-afterlife .lens,.in-afterlife .scope { visibility:hidden; }
 .in-afterlife .afterlife-tools { background:#111411c9; border-color:#363d33; }
 .in-afterlife .lesson { display:none; }
@@ -703,3 +702,23 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 #map-btn[hidden],#map-card[hidden],#destination-btn[hidden] { display:none; }
 
 .weapon-item-icon { width:34px; height:20px; object-fit:contain; image-rendering:pixelated; }
+
+
+.hud-strip { grid-row:2; display:grid; grid-template-columns:minmax(0,auto) minmax(0,1fr); min-width:0;
+  height:34px; overflow:hidden; background:#1b211b; border-bottom:1px solid var(--border); }
+.hud-strip[hidden] { display:none; }
+.condition-bar { display:flex; align-items:center; min-width:0; max-width:clamp(8.3rem,37vw,13rem); gap:6px;
+  border:0; border-right:1px solid var(--border); border-radius:0; padding:0 8px; background:#242e23; color:#e5e8d8;
+  font:650 11px/1 var(--sans); text-align:left; cursor:pointer; }
+.condition-bar:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
+.condition-meter { --fill:20%; --tone:#a9bf9c; width:20px; height:5px; flex:none; border-radius:2px;
+  background:linear-gradient(to right,var(--tone) var(--fill),#111811 var(--fill)); }
+.condition-bar[data-level="1"] .condition-meter { --fill:25%; --tone:#cfbc81; }
+.condition-bar[data-level="2"] .condition-meter { --fill:50%; --tone:#dfa975; }
+.condition-bar[data-level="3"] .condition-meter { --fill:75%; --tone:#ef916c; }
+.condition-bar[data-level="4"] .condition-meter { --fill:100%; --tone:#fa876f; }
+#condition-summary { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#condition-count { flex:none; color:#e8c28f; }
+#condition-count:empty { display:none; }
+.health-conditions ul { margin:.35rem 0 .7rem; padding-left:1.3rem; }
+.death-actions .small-button { min-height:44px; }

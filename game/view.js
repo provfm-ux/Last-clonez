@@ -269,8 +269,8 @@ const View = (() => {
     const {x, y, wallOutline: outline} = t;
     const fullHeight = t.outside ? 34 : 26;
     const dx = x + .5 - player.x, dy = y + .5 - player.y;
-    const cutaway = menu ? 0 : clamp(dx + dy, 0, 1) * clamp((4 - Math.hypot(dx, dy)) / 1.5, 0, 1);
-    const height = fullHeight + (10 - fullHeight) * cutaway;
+    const cutaway = !menu && dx + dy > 0 && sq(dx, dy, 3.3);
+    const height = cutaway ? 10 : fullHeight;
     const [cap, south, east] = t.outside ? ["#667369", "#454e44", "#343f35"] : ["#727b6c", "#475248", "#39463e"];
     const top = outline.map(([u, v]) => p(x + u, y + v, height));
     for (let i = 0; i < outline.length; i++) {

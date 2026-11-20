@@ -398,8 +398,157 @@ const View = (() => {
     ctx.drawImage(sprite, Math.round(sx) - 27, Math.round(sy) - 60);
   }
 
+  const furnitureSprites = new Map();
+  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug"]);
+
+  function paintFurniture(kind, variant, powered) {
+    const oak = ["#947859", "#735943", "#514035"];
+    const cloth = variant === 0 ? ["#879174", "#656e59", "#475143"] :
+      variant === 1 ? ["#8f6e62", "#6c514b", "#533e3a"] : ["#668182", "#50686b", "#374c52"];
+    const enamel = ["#c7c9b4", "#a3a796", "#777e76"];
+    const metal = ["#b1b7aa", "#818c86", "#576965"];
+    const edge = (a, b, color) => line(p(...a), p(...b), color);
+    if (kind !== "rug") shadow(0, 0, kind === "bed" || kind === "sofa" ? 28 : 23, 9, "#0d120f70");
+
+    switch (kind) {
+      case "bed": {
+        for (const side of [-.32, .26]) for (const end of [-.43, .38]) box(side, end, 0, .07, .07, 9, oak);
+        box(-.37, -.51, 7, .74, 1.02, 3, oak);
+        box(-.34, -.46, 10, .68, .93, 5, enamel);
+        box(-.29, -.42, 15, .55, .24, 3, enamel);
+        edge([-.23, -.33, 18], [.18, -.33, 18], "#e9dfc080");
+        box(-.35, -.13, 15, .70, .60, 2, cloth);
+        box(-.35, -.16, 17, .70, .10, 1, cloth);
+        for (const seam of [0, .16, .33]) edge([-.31, seam, 17], [.31, seam, 17], "#ddd0ad48");
+        for (const seam of [-.16, .13]) edge([seam, -.04, 17], [seam, .43, 17], "#222d2f62");
+        box(-.38, -.53, 7, .76, .064, 18, oak);
+        for (const upright of [-.27, .26]) edge([upright, -.46, 13], [upright, -.46, 24], "#b5956766");
+        break;
+      }
+      case "fridge": {
+        box(-.32, -.29, 0, .64, .58, 3, rubber);
+        box(-.37, -.32, 3, .74, .64, 30, enamel);
+        box(-.35, .30, 5, .70, .054, 18, enamel);
+        box(-.35, .30, 24, .70, .054, 8, enamel);
+        edge([-.34, .36, 23], [.34, .36, 23], "#4f5d55");
+        box(-.26, .36, 18, .20, .035, 2, metal);
+        box(-.26, .36, 26, .16, .035, 2, metal);
+        const [px, py] = p(.24, .36, 28);
+        dot(px, py, 2, 1, powered ? "#ceda91" : "#666f61");
+        dot(px - 10, py + 7, 3, 2, "#a480697d");
+        break;
+      }
+      case "sink":
+      case "washstand": {
+        box(-.34, -.28, 2, .68, .56, 15, oak);
+        edge([0, .287, 3], [0, .287, 16], "#3e342b");
+        for (const pull of [-.19, .10]) box(pull, .28, 12, .09, .035, 1, metal);
+        box(-.39, -.31, 17, .78, .62, 3, enamel);
+        box(-.30, -.20, 20, .37, .36, 1, ["#596d69", "#455552", "#343f40"]);
+        edge([-.29, .15, 21], [.07, .15, 21], "#d4d8ba");
+        for (const rib of [.17, .25, .33]) edge([rib, -.22, 20], [rib, .16, 20], "#65746f");
+        box(-.12, -.26, 20, .055, .06, 6, metal);
+        box(-.12, -.22, 25, .055, .19, 1, metal);
+        break;
+      }
+      case "cupboard":
+      case "wardrobe":
+      case "sideboard": {
+        const tall = kind !== "sideboard", height = tall ? 34 : 18;
+        for (const foot of [-.32, .26]) box(foot, .19, 0, .06, .07, 4, oak);
+        box(-.39, -.29, 4, .78, .58, height - 4, oak);
+        box(-.41, -.31, height, .82, .62, 2, oak);
+        for (const door of [-.34, .025]) {
+          box(door, .286, 6, .31, .036, height - 9, oak);
+          edge([door + .035, .33, 8], [door + .035, .33, height - 5], "#a9895c");
+          edge([door + .035, .33, height - 5], [door + .275, .33, height - 5], "#a9895c");
+        }
+        box(-.09, .33, height * .60, .045, .027, 3, metal);
+        box(.05, .33, height * .60, .045, .027, 3, metal);
+        if (!tall) box(.14, -.13, height + 2, .13, .16, 1, cloth);
+        break;
+      }
+      case "shelf": {
+        box(-.36, -.29, 1, .72, .06, 23, oak);
+        for (const side of [-.38, .30]) box(side, -.29, 0, .07, .56, 25, oak);
+        for (const level of [4, 13, 23]) {
+          box(-.32, -.27, level, .64, .54, 2, oak);
+          if (level < 23) {
+            box(-.24, -.12, level + 2, .12, .12, 5, cloth);
+            box(-.05, -.14, level + 2, .12, .14, 4, enamel);
+          }
+        }
+        break;
+      }
+      case "table": {
+        for (const side of [-.34, .28]) for (const end of [-.31, .25]) box(side, end, 0, .065, .065, 17, oak);
+        box(-.43, -.40, 17, .86, .80, 3, oak);
+        for (const joint of [-.24, 0, .21]) edge([-.40, joint, 20], [.40, joint, 20], "#48362f60");
+        edge([-.39, .36, 20], [.38, .36, 20], "#ad8b62");
+        box(-.23, -.10, 20, .21, .17, 1, enamel);
+        edge([-.20, -.05, 21], [-.06, -.05, 21], "#707164");
+        box(.13, -.18, 20, .10, .10, 4, cloth);
+        break;
+      }
+      case "sofa":
+      case "armchair": {
+        const half = kind === "sofa" ? .49 : .37;
+        for (const side of [-half + .06, half - .12]) for (const end of [-.24, .22]) box(side, end, 0, .06, .06, 5, oak);
+        box(-half, -.32, 4, 2 * half, .65, 9, cloth);
+        box(-half + .04, -.34, 12, 2 * half - .08, .17, 13, cloth);
+        const seats = kind === "sofa" ? 2 : 1, width = (2 * half - .24) / seats;
+        for (let seat = 0; seat < seats; seat++) {
+          const side = -half + .12 + width * seat;
+          box(side, -.14, 13, width - .015, .44, 3, cloth);
+          edge([side + .02, .285, 16], [side + width - .03, .285, 16], "#d5c3ad60");
+        }
+        for (const side of [-half, half - .11]) box(side, -.21, 13, .11, .52, 7, cloth);
+        box(half - .28, -.14, 16, .14, .18, 4, enamel);
+        break;
+      }
+      case "rug": {
+        const corners = [p(-.46, -.42), p(.46, -.42), p(.46, .42), p(-.46, .42)];
+        poly(corners, "#5b4844", "#372e30");
+        poly([p(-.40, -.36), p(.40, -.36), p(.40, .36), p(-.40, .36)], "#876d59", "#b29a78");
+        for (const row of [-.27, -.13, .01, .15, .29]) edge([-.37, row, 0], [.37, row, 0], row > 0 ? "#b89b704f" : "#4338385e");
+        for (const side of [-.3, -.15, 0, .15, .3]) {
+          edge([side, -.48, 0], [side, -.42, 0], "#c0aa89");
+          edge([side, .42, 0], [side, .48, 0], "#c0aa89");
+        }
+        break;
+      }
+    }
+  }
+
+  function drawFurniture(kind, x, y, variant, powered) {
+    const key = kind + ":" + variant + ":" + Number(powered);
+    let sprite = furnitureSprites.get(key);
+    if (!sprite) {
+      sprite = document.createElement("canvas");
+      sprite.width = 72;
+      sprite.height = 64;
+      const previous = ctx;
+      try {
+        ctx = sprite.getContext("2d");
+        ctx.translate(36, 49);
+        paintFurniture(kind, variant, powered);
+      } finally { ctx = previous; }
+      furnitureSprites.set(key, sprite);
+    }
+    const [sx, sy] = p(x, y);
+    ctx.drawImage(sprite, Math.round(sx) - 36, Math.round(sy) - 49);
+  }
+
   function prop(o, state, clock) {
     const {x, y, kind, tint: tone} = o;
+    if (darkLook) {
+      const furniture = kind === "locker" && !o.opened && World.tileAt(state.world, x, y)?.room === "Bedroom" ? "cupboard" : kind;
+      if (furnitureKinds.has(furniture)) {
+        const variant = Number.isFinite(tone) ? clamp(Math.floor(tone * 3), 0, 2) : 0;
+        drawFurniture(furniture, x, y, variant, kind === "fridge" && Sim.hasPower(state, o));
+        return;
+      }
+    }
     const f = (dx, dy, z, w, d, h, c) => box(x + dx, y + dy, z, w, d, h, c);
     if (kind === "fungus") {
       const sap = state.atmosphere.awake ? olive : ["#c3c98b","#778752","#566449"];

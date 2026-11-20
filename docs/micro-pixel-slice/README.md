@@ -15,6 +15,15 @@ The other graphics modes retain their existing art.
 | Terrain chunk cache and viewport culling | Pavement and floor details draw into cached chunks. Brick wall shapes, slate roofs and deciduous trees use cached canvases. Survivor and infected poses are packed into atlas pages and blitted per actor. |
 | Audio, gameplay HUD, day/night and lighting | Existing interaction, survival, combat, flashlight, weather, and powered lights continue to run. The Dark Pixel colour grade is lighter in daylight to keep the small sprites legible. |
 
+## Furniture art pass
+
+Dark Pixel uses original cached sprites for beds, fridges, sinks, cupboards,
+shelves, tables, sofas, armchairs and rugs. Materials, seams, fittings and worn
+edges distinguish the pieces at game scale. Tint selects a small set of fabric
+variants, and the fridge indicator follows its existing power state. These
+sprites are drawn at the existing prop anchors in the depth stack, so doors,
+collision, targeting and loot continue to use the same world objects.
+
 ## Running and testing
 
 The Cloudflare Worker Preview serves the game from `game/`. For local testing,
@@ -30,6 +39,8 @@ walking into the furnished house with automatic roof visibility.
 ![Street with cottages and a parked car](street.png)
 
 ![Playable cutaway of the Alexandria Row interior](interior.png)
+
+![Closer view of the new furniture sprites inside the playable house](furniture.png)
 
 ## Remaining work
 

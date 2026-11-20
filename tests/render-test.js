@@ -13,6 +13,9 @@ const mk = () => new Proxy({}, {
     if (k === "createRadialGradient" || k === "createLinearGradient") return () => { counts[k] = (counts[k] || 0) + 1; return {addColorStop() {}}; };
     return (...args) => {
       counts[k] = (counts[k] || 0) + 1;
+      if (k === "drawImage" && args.length === 3 && args[0]?.width === 72 && args[0]?.height === 64) {
+        counts.furnitureBlit = (counts.furnitureBlit || 0) + 1;
+      }
       if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 32) counts.actorBlit = (counts.actorBlit || 0) + 1;
     }; },
   set(t, k, v) { t[k] = v; return true; }});
@@ -83,6 +86,18 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   e = null; try { View.render(d, 0, 1 / 60); } catch (x) { e = x.message; } check("dark pixel: cadáver com poça de sangue desenha sem erros", e === null, e ?? "");
   d.look = "fast"; e = null; try { View.render(d, 0, 1 / 60); View.minimap({width: 160, height: 160, getContext: () => mk(), clientWidth: 160}, d); } catch (x) { e = x.message; }
   check("dark pixel: voltar a Fast/Classic e desenhar o minimapa funciona (contexto restaurado)", e === null, e ?? ""); }
+{
+  const interior = Sim.createControl("survival", "carer", "shelter"), world = interior.world;
+  const house = world.buildings.find(b => b.compact);
+  const floor = world.tiles.find(t => t.building === house.id && !t.solid);
+  Object.assign(interior.player, {x:floor.x + .5, y:floor.y + .5});
+  interior.look = "dark";
+  world.explored.fill(1);
+  View.prepare(world);
+  View.render(interior, 0, 1 / 60);
+  const furniture = per(() => View.render(interior, 1 / 60, 1 / 60));
+  check("dark pixel: interior desenha vários móveis a partir do cache", (furniture.furnitureBlit || 0) >= 4);
+}
 if (!quiet) console.log("\nOperações por frame (jogo parado): " + Math.round(Object.values(steady).reduce((a, b) => a + b, 0)) + " (clássico: " + Math.round(Object.values(classic).reduce((a, b) => a + b, 0)) + ")");
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

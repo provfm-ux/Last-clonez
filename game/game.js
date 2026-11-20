@@ -669,9 +669,9 @@
     const description = "View conditions and injuries. " + (statuses.map(status => status.label).join(", ") || "Stable");
     if (bar.getAttribute("aria-label") !== description) bar.setAttribute("aria-label",description);
     const w = Sim.weaponData(state), item = Sim.weapon(state);
-    $("weapon").textContent = car ? "Vehicle" : w.name;
-    $("condition").textContent = car ? Math.round(car.fuel) + "% fuel · " + Math.round(car.hp/1.4) + "% condition" :
-      Math.round(item.condition) + "% condition" + (w.firearm ? " · " + itemCount("ammo") + " rounds" : "");
+    $("weapon").textContent = car ? "Vehicle" : !active() ? "Gear" : w.name;
+    $("condition").textContent = !active() ? "" : car ? Math.round(car.fuel) + "% fuel · " + Math.round(car.hp/1.4) + "% condition" :
+      item.id === "fists" ? "Unarmed" : Math.round(item.condition) + "% condition" + (w.firearm ? " · " + itemCount("ammo") + " rounds" : "");
     $("shove-label").textContent = car ? "Brake" : "Shove";
     $("destination-btn").hidden = !active() || state.hideNavigation;
     $("world-tools").hidden = !active();
@@ -814,7 +814,16 @@
     const d = Data.items[item.id], parts = [];
     parts.push(formatWeight(d.weight * item.qty) + " kg");
     if (item.id === "housekey" && item.label) parts.push("Tag: " + item.label);
-    if (d.damage) parts.push(d.damage + " damage · reach " + d.range + " · " + Math.round(item.condition ?? 100) + "% condition");
+    if (d.damage) {
+      const style = Data.combatStyles[d.combat];
+      parts.push(style.name + " · " + d.damage + " base damage · reach " + d.range +
+        " · " + d.delay + "s recovery · " + d.effort + " stamina · " + Math.round(item.condition ?? 100) + "% condition");
+      parts.push(d.noise >= 10 ? "Very loud" : d.noise >= 4 ? "Loud" : "Quieter");
+      parts.push(d.wear >= 1 ? "Wears quickly" : d.wear <= .4 ? "Durable" : "Moderate wear");
+      for (const [kind, multiplier] of Object.entries(style.damage)) {
+        parts.push((multiplier > 1 ? "Strong vs " : "Weaker vs ") + Data.infected[kind].name.toLowerCase() + "s");
+      }
+    }
     if (item.id === "flashlight") parts.push(item.charge > 0 ? Math.ceil(item.charge) + " game min of light" : "Empty battery");
     if (d.nutrition) parts.push("+" + d.nutrition + " food" + (d.hydration ? " · +" + d.hydration + " thirst relief" : ""));
     if (d.perish) {
@@ -1012,7 +1021,7 @@
       const details = itemDescription(item) + (d.firearm ? " · " + itemCount("ammo") + " rounds" : "") +
         (backpack ? " · Adds 10 kg of capacity" : "");
       const row = '<div class="item-row' + (equipped || worn ? " equipped-item" : "") + '"><div><div class="item-top">' +
-        icon(d.icon) + "<b>" + esc(d.name) + '</b></div><div class="item-meta">' + details + '</div></div>' +
+        itemIcon(item.id) + "<b>" + esc(d.name) + '</b></div><div class="item-meta">' + details + '</div></div>' +
         button(equipped ? "Equipped" : worn ? "Remove" : "Equip", "equip-" + index, equipped, worn ? "" : "primary") + "</div>";
       (d.damage ? weapons : equipment).push(row);
     });
@@ -1022,7 +1031,7 @@
       '<div class="item-actions">' + button("Edit survivor", "edit-survivor") + button("Customize quick belt", "belt-edit", false, "primary") +
       (itemCount("watch") ? button("Place watch alarm · 10 s", "arm-watch", Boolean(p.vehicle || state.atmosphere.alarm)) : "") + "</div>" +
       (lighting.length ? '<section class="inventory-section"><h3>LIGHTING</h3><div class="inventory-items">' + lighting.join("") + "</div></section>" : "") +
-      '<section class="inventory-section"><h3>WEAPONS</h3><div class="gear-list">' + (weapons.join("") || '<div class="empty">No weapons carried.</div>') +
+      '<section class="inventory-section"><h3>WEAPONS</h3><p class="item-meta">Blunt hits work well on walkers. Quick and long-reach weapons help against runners. Heavy hits can interrupt brutes.</p><div class="gear-list">' + (weapons.join("") || '<div class="empty">No weapons carried.</div>') +
       '</div></section><section class="inventory-section"><h3>WEARABLE GEAR</h3><div class="gear-list">' +
       (equipment.join("") || '<div class="empty">No wearable gear carried.</div>') + '</div></section>', "gear");
   }

@@ -18,6 +18,12 @@ Jogo de sobrevivência isométrica para teclado, rato e toque. Escolhe uma apar�
 - As travessias indicam o perigo da região. Nas novas partidas, os infetados dos Outer Districts causam 15% mais dano.
 - Para comparar presets com um bot simples, corre `node scripts/balance.js 3 game 2`. O CSV distingue mortes de partidas ainda vivas ao fim do teste.
 
+## Armas e combate
+
+- Golpes contundentes como os do taco e do tubo funcionam bem contra walkers. Contra runners, a faca dá golpes rápidos de perto e a lança permite atacar mais longe e desequilibrá-los.
+- Brutes resistem a golpes leves e a empurrões. Um machado ou uma catana pode interromper o seu ataque. Empurrar ainda permite escapar a um agarrão.
+- **Inventory** e **Gear** mostram o alcance, a recuperação entre ataques, o custo de resistência, o ruído, o desgaste e os tipos de infetado contra os quais cada arma é mais eficaz.
+
 ## Bairros e exploração
 
 - **Casas compactas.** Explora cozinhas, quartos e quintais em Cold Vale e nos quatro mapas exteriores. Procura no frigorífico, no armário do quarto e nos móveis do corredor. Nos trilhos e quintais há amoras, maçãs e isco.

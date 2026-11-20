@@ -18,7 +18,7 @@ const Sim = (() => {
   const lootReachable = (s, o) => o?.action === "loot" && (s.player.vehicle ? o === vehicle(s) && s.player.driveSpeed === 0 : reachableObject(s, o));
   const weapon = s => s.player.bag.find(item => s.player.weaponUid && item.uid === s.player.weaponUid && Data.items[item.id].damage) ||
     s.player.bag.find(item => item.id === s.player.weapon && Data.items[item.id].damage) || {id: "fists", condition: 100};
-  const fists = {name: "Fists", damage: 9, range: 1.05, delay: .48, effort: 5, noise: 2, wear: 0};
+  const fists = {combat: "unarmed", name: "Fists", damage: 9, range: 1.05, delay: .48, effort: 5, noise: 2, wear: 0};
   const weaponData = s => Data.items[weapon(s).id] || fists;
   const level = (s, skill) => Math.min(Data.skillMax, Math.floor(Math.sqrt((s.player.skills[skill] ?? 0) / 12)));
   const season = s => Data.seasons[Math.floor(s.minutes / 1440 / Data.seasonDays) % Data.seasons.length];
@@ -29,7 +29,7 @@ const Sim = (() => {
     const after = level(s, skill);
     if (after > before) notify(s, Data.skills[skill].name + " reached level " + after + ".");
   }
-  const windupTime = .5;
+  const windupTime = .5, bruteWindup = .18;
   const legacyWoundParts = new Map([["Braço", "arm"], ["Perna", "leg"]]);
   const legacyWoundTypes = new Map([["mordida", "bite"], ["corte", "cut"], ["arranhão", "scratch"]]);
   const legacyDropNames = new Map([
@@ -1979,15 +1979,18 @@ const Sim = (() => {
     if (conditionBefore >= 20 && item.condition < 20) notify(s, "Your " + Data.items[item.id].name + " is nearly worn out. Repair it or switch weapons.", true);
     noise(s, p.x, p.y, w.noise);
     const hit = !w.firearm || s.world.rng() < aimChance(s, z);
-    const amount = hit ? Math.round(w.damage * damageFactor(s) * (w.firearm ? 1 : 1 + level(s, "strength") * .03) * (item.condition < 20 ? .8 : 1)) : 0;
+    const matchup = Data.combatStyles[w.combat].damage[z.kind] ?? 1;
+    const amount = hit ? Math.round(w.damage * matchup * damageFactor(s) * (w.firearm ? 1 : 1 + level(s, "strength") * .03) * (item.condition < 20 ? .8 : 1)) : 0;
     z.hp = Math.max(0, z.hp - amount);
     if (hit) {
       z.flash = .2;
-      z.stagger = Math.max(z.stagger, .28);
-      z.swing = 0;
-      endWindup(z);
+      if (z.kind !== "brute" || matchup >= 1) {
+        z.stagger = Math.max(z.stagger, z.kind === "runner" && w.combat === "reach" ? .48 : .28);
+        z.swing = 0;
+        endWindup(z);
+      }
     }
-    s.effects.push({x: z.x, y: z.y, text: hit ? "−" + amount : "MISS", color: hit ? "#efc785" : "#d2cfb6", life: .8});
+    s.effects.push({x: z.x, y: z.y, text: hit ? (matchup < 1 ? "RESISTED " : matchup > 1 ? "STRONG " : "") + "−" + amount : "MISS", color: hit ? "#efc785" : "#d2cfb6", life: .8});
     addXp(s, "combat", hit ? 1.5 : .2);
     if (!w.firearm) addXp(s, "strength", hit ? .8 : .1);
     if (!z.hp) {
@@ -2009,11 +2012,16 @@ const Sim = (() => {
     faceTowards(p, near);
     s.swingVisual = {weapon:"fists", dx:near.x - p.x, dy:near.y - p.y};
     p.stamina -= effort; p.cooldown = .7; p.swing = .18;
-    near.stagger = 1.1; near.swing = 0;
-    endWindup(near);
+    const brute = near.kind === "brute";
+    if (!brute || near.windup <= 0) {
+      near.stagger = Math.max(near.stagger, brute ? .25 : 1.1);
+      near.swing = 0;
+      endWindup(near);
+    }
     const d = distance(p, near), dx = (near.x - p.x) / (d || 1), dy = (near.y - p.y) / (d || 1);
-    if (World.clear(s.world, near.x + dx * .6, near.y + dy * .6)) { near.x += dx * .6; near.y += dy * .6; }
-    s.effects.push({x: near.x, y: near.y, text: "SHOVED", color: "#c9d6ae", life: .65});
+    const push = brute ? .18 : .6;
+    if (World.clear(s.world, near.x + dx * push, near.y + dy * push)) { near.x += dx * push; near.y += dy * push; }
+    s.effects.push({x: near.x, y: near.y, text: brute ? "BRACED" : "SHOVED", color: "#c9d6ae", life: .65});
     if (p.grabbed > 0) { p.grabbed = 0; p.grabCool = 3; notify(s, "You shoved the infected away and broke free."); }
     noise(s, p.x, p.y, 3);
     return true;
@@ -2272,7 +2280,7 @@ const Sim = (() => {
       if (distance(z, victim) < 1 && (seen || npcSeen)) {
         z.moving = false;
         if (z.cooldown <= 0) {
-          z.windup = windupTime + (assist(s, "windup") && victim === p ? .35 : 0);
+          z.windup = windupTime + (z.kind === "brute" ? bruteWindup : 0) + (assist(s, "windup") && victim === p ? .35 : 0);
           z.windupTarget = victim === npc ? "eva" : "player";
           z.cooldown = 1.5;
           faceTowards(z, victim);
@@ -2827,7 +2835,7 @@ const Sim = (() => {
     if (s.player.vehicle && !s.world.objects.some(o => o.id === s.player.vehicle && o.kind === "car" && o.active &&
         o.hp > 0 && !o.solid && Math.hypot(o.x - p.x, o.y - p.y) < .1)) throw new Error("Invalid vehicle position.");
     s.world.enemies = data.enemies.map(z => {
-      const windup = Number.isFinite(z.windup) ? clamp(z.windup, 0, windupTime + .35) : 0;
+      const windup = Number.isFinite(z.windup) ? clamp(z.windup, 0, windupTime + bruteWindup + .35) : 0;
       // In older saves the first tick resolves the target of an unfinished attack.
       const windupTarget = windup && ["player", "eva"].includes(z.windupTarget) ? z.windupTarget : null;
       const outfit = Object.hasOwn(Data.outfits, z.outfit) ? z.outfit : World.infectedOutfit(s.world, z);

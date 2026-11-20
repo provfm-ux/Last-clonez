@@ -717,6 +717,41 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("assistência: reduz a perda de vida por hemorragia", withBleed.player.hp > withoutBleed.player.hp);
 }
 
+{
+  const run = Sim.createControl("training","carer","shelter",undefined,{seed:17});
+  const spot = findTile(run, t => World.clear(run.world,t.x+.5,t.y+.5) &&
+    World.clear(run.world,t.x+1.5,t.y+.5) && World.sees(run.world,t.x+.5,t.y+.5,t.x+1.5,t.y+.5));
+  Object.assign(run.player,spot);
+  const enemy = (kind, distance = .8) => ({id:"matchup",kind,stats:Data.infected[kind],hp:Data.infected[kind].hp,
+    x:spot.x+distance,y:spot.y,stagger:0,windup:.4,windupTarget:"player"});
+  const strike = (id, kind, distance) => {
+    run.player.cooldown = 0;
+    run.player.stamina = 100;
+    const z = enemy(kind,distance);
+    run.world.enemies = [z];
+    run.player.bag.push({id,qty:1,condition:100,uid:"test-"+id});
+    Sim.use(run,run.player.bag.length-1);
+    return {z, hit:Sim.attack(run,z)};
+  };
+  const batWalker = strike("bat","walker"), batBrute = strike("bat","brute"), axeBrute = strike("axe","brute");
+  check("combate: taco forte contra walker, mas o brute resiste e mantém o ataque",
+    batWalker.hit && batWalker.z.hp === 17 && batBrute.hit && batBrute.z.hp === 68 && batBrute.z.windup === .4);
+  check("combate: machado forte contra brute e interrompe o ataque",
+    axeBrute.hit && axeBrute.z.hp === 39 && axeBrute.z.windup === 0);
+  const spear = strike("spear","runner",1.65), knife = strike("knife","runner",1.65);
+  const closeKnife = strike("knife","runner");
+  check("combate: lança alcança e desequilibra runner, faca é melhor de perto",
+    spear.hit && spear.z.stagger === .48 && !knife.hit && closeKnife.hit && closeKnife.z.hp === 12);
+  const brute = enemy("brute");
+  run.world.enemies = [brute];
+  run.player.cooldown = 0;
+  run.player.grabbed = 1;
+  check("combate: empurrar brute liberta o jogador mas não cancela a investida",
+    Sim.shove(run) && run.player.grabbed === 0 && brute.windup === .4 && brute.x-spot.x < 1.05);
+  check("combate: todas as armas têm um estilo",
+    Object.values(Data.items).filter(item => item.damage).every(item => Data.combatStyles[item.combat]));
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

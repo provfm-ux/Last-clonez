@@ -1,6 +1,7 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Added weapon matchups, brute resistance and clearer equipment descriptions.
 - Added a Recommended start with optional in-run hints and first-night protection from wandering hordes.
 - Moved presets, seed and other setup choices under Advanced and pinned the current story objective in the HUD.
 - Added opt-in local playtest milestones to the run report.

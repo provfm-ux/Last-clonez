@@ -9,7 +9,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link id="micro-zombie-atlas" rel="preload" as="image" href="micro-zombies.png">
 <link rel="stylesheet" href="style.css?v=onboarding">
-<script src="data.js?v=difficulty" defer></script>
+<script src="data.js?v=weapon-matchups" defer></script>
 <script src="research.js?v=0.33" defer></script>
 <script src="legacy-level.js?v=0.33" defer></script>
 <script src="level.js?v=0.33" defer></script>
@@ -21,9 +21,9 @@
 <script src="atmosphere.js?v=0.33" defer></script>
 <script src="soundscape.js?v=0.33-sprites" defer></script>
 <script src="afterlife.js?v=0.33-sprites" defer></script>
-<script src="sim.js?v=difficulty" defer></script>
+<script src="sim.js?v=weapon-matchups" defer></script>
 <script src="view.js?v=atmosphere" defer></script>
-<script src="game.js?v=atmosphere" defer></script>
+<script src="game.js?v=weapon-matchups" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -152,7 +152,7 @@
         <button class="vital fatigue" data-panel="health"><div><span>REST</span><b id="rest-num">92</b></div><div class="track"><div id="rest-bar"></div></div></button>
       </div>
       <div class="equip-row">
-        <button class="equipped" id="gear-btn" type="button" title="Equipment · G" disabled><span class="equip-label">Gear</span><b id="weapon">Wooden bat</b><small id="condition">100% condition</small></button>
+        <button class="equipped" id="gear-btn" type="button" title="Equipment · G" disabled><span class="equip-label">Gear</span><b id="weapon">Gear</b><small id="condition"></small></button>
         <div class="carry"><svg class="icon" aria-hidden="true"><use href="#pack"/></svg><b id="carry">5.6 / 16 kg</b></div>
         <button class="craft-shortcut" id="craft-btn"><svg class="icon"><use href="#build"/></svg> Build <kbd>B</kbd></button>
       </div>

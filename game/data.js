@@ -4,21 +4,21 @@ const Data = (() => {
   const items = {
     raffletrophy:{name:"Golden Raffle Trophy",group:"Equipment",weight:.35,icon:"badge",
       detail:"Congratulations. You survived the raffle. The winner didn't."},
-    bat: {name:"Wooden bat", group:"Weapons", weight:1.4, damage:25, range:1.4, delay:.55, effort:6, noise:3, wear:.6, icon:"bat"},
-    pipe: {name:"Steel pipe", group:"Weapons", weight:1.8, damage:31, range:1.4, delay:.68, effort:8, noise:4, wear:.35, icon:"bat"},
-    spear: {name:"Improvised spear", group:"Weapons", weight:1.2, damage:34, range:1.9, delay:.64, effort:6, noise:2.5, wear:1.6, icon:"bat"},
-    axe: {name:"Axe", group:"Weapons", weight:2.2, damage:43, range:1.4, delay:.78, effort:10, noise:5, wear:.45, icon:"bat"},
-    pistol: {name:"Pistol", group:"Weapons", weight:.9, damage:62, range:7, delay:.68, effort:1, noise:20, wear:.25, firearm:true, icon:"aim"},
-    knife: {name:"Kitchen knife", group:"Weapons", weight:.35, damage:18, range:1.05, delay:.35, effort:3, noise:1.5, wear:.8, icon:"bat"},
-    machete: {name:"Machete", group:"Weapons", weight:1.1, damage:37, range:1.5, delay:.6, effort:7, noise:4, wear:.3, icon:"bat"},
-    shovel: {name:"Garden shovel", group:"Weapons", weight:2.4, damage:33, range:1.5, delay:.82, effort:10, noise:5, wear:.22, icon:"bat"},
-    golfclub: {name:"Golf club", group:"Weapons", weight:.9, damage:21, range:1.6, delay:.5, effort:5, noise:3, wear:.4, icon:"bat"},
-    crowbar: {name:"Crowbar", group:"Weapons", weight:1.8, damage:27, range:1.4, delay:.6, effort:6, noise:3, wear:.25, icon:"bat"},
-    hatchet: {name:"Hatchet", group:"Weapons", weight:1.1, damage:32, range:1.2, delay:.55, effort:6, noise:3.5, wear:.55, icon:"bat"},
-    wrench: {name:"Adjustable wrench", group:"Weapons", weight:1.1, damage:24, range:1.15, delay:.52, effort:5, noise:4, wear:.3, icon:"bat"},
-    fryingpan: {name:"Frying pan", group:"Weapons", weight:1.2, damage:22, range:1.2, delay:.58, effort:5, noise:6, wear:.5, icon:"bat"},
-    broom: {name:"Push broom", group:"Weapons", weight:.8, damage:13, range:1.75, delay:.47, effort:4, noise:2, wear:1.1, icon:"bat"},
-    rollingpin: {name:"Rolling pin", group:"Weapons", weight:.6, damage:17, range:1.1, delay:.38, effort:4, noise:2, wear:.5, icon:"bat"},
+    bat: {combat:"blunt", name:"Wooden bat", group:"Weapons", weight:1.4, damage:25, range:1.4, delay:.55, effort:6, noise:3, wear:.6, icon:"bat"},
+    pipe: {combat:"blunt", name:"Steel pipe", group:"Weapons", weight:1.8, damage:31, range:1.4, delay:.68, effort:8, noise:4, wear:.35, icon:"bat"},
+    spear: {combat:"reach", name:"Improvised spear", group:"Weapons", weight:1.2, damage:34, range:1.9, delay:.64, effort:6, noise:2.5, wear:1.6, icon:"bat"},
+    axe: {combat:"heavy", name:"Axe", group:"Weapons", weight:2.2, damage:43, range:1.4, delay:.78, effort:10, noise:5, wear:.45, icon:"bat"},
+    pistol: {combat:"firearm", name:"Pistol", group:"Weapons", weight:.9, damage:62, range:7, delay:.68, effort:1, noise:20, wear:.25, firearm:true, icon:"aim"},
+    knife: {combat:"quick", name:"Kitchen knife", group:"Weapons", weight:.35, damage:18, range:1.05, delay:.35, effort:3, noise:1.5, wear:.8, icon:"bat"},
+    machete: {combat:"heavy", name:"Machete", group:"Weapons", weight:1.1, damage:37, range:1.5, delay:.6, effort:7, noise:4, wear:.3, icon:"bat"},
+    shovel: {combat:"heavy", name:"Garden shovel", group:"Weapons", weight:2.4, damage:33, range:1.5, delay:.82, effort:10, noise:5, wear:.22, icon:"bat"},
+    golfclub: {combat:"blunt", name:"Golf club", group:"Weapons", weight:.9, damage:21, range:1.6, delay:.5, effort:5, noise:3, wear:.4, icon:"bat"},
+    crowbar: {combat:"blunt", name:"Crowbar", group:"Weapons", weight:1.8, damage:27, range:1.4, delay:.6, effort:6, noise:3, wear:.25, icon:"bat"},
+    hatchet: {combat:"heavy", name:"Hatchet", group:"Weapons", weight:1.1, damage:32, range:1.2, delay:.55, effort:6, noise:3.5, wear:.55, icon:"bat"},
+    wrench: {combat:"blunt", name:"Adjustable wrench", group:"Weapons", weight:1.1, damage:24, range:1.15, delay:.52, effort:5, noise:4, wear:.3, icon:"bat"},
+    fryingpan: {combat:"blunt", name:"Frying pan", group:"Weapons", weight:1.2, damage:22, range:1.2, delay:.58, effort:5, noise:6, wear:.5, icon:"bat"},
+    broom: {combat:"reach", name:"Push broom", group:"Weapons", weight:.8, damage:13, range:1.75, delay:.47, effort:4, noise:2, wear:1.1, icon:"bat"},
+    rollingpin: {combat:"quick", name:"Rolling pin", group:"Weapons", weight:.6, damage:17, range:1.1, delay:.38, effort:4, noise:2, wear:.5, icon:"bat"},
     bandage: {name:"Bandage", group:"Medical", weight:.08, use:"bandage", icon:"cross"},
     disinfectant: {name:"Disinfectant", group:"Medical", weight:.2, use:"disinfectant", icon:"cross"},
     splint: {name:"Splint", group:"Medical", weight:.3, use:"splint", icon:"cross"},
@@ -85,6 +85,15 @@ const Data = (() => {
     {id:"gate",name:"Plank gate",build:"gate",inputs:{wood:3,nails:6},desc:"Add a door to a fence line. Close it after passing through."},
     {id:"repair",name:"Repair equipped weapon",repair:true,inputs:{scrap:1,tape:1},desc:"Restores 35 points of weapon condition."}
   ];
+  const combatStyles = {
+    unarmed:{name:"Unarmed", damage:{brute:.6}},
+    quick:{name:"Quick", damage:{runner:1.2, brute:.72}},
+    blunt:{name:"Blunt", damage:{walker:1.12, brute:.78}},
+    reach:{name:"Reach", damage:{runner:1.12, brute:.87}},
+    heavy:{name:"Heavy", damage:{runner:.9, brute:1.15}},
+    firearm:{name:"Firearm", damage:{}}
+  };
+
   const baseline = {count:65, mix:"mixed", hordes:"normal", damage:100, loot:100, needs:100, clock:2, startHour:8,
     weather:"cycle", infection:"bites", care:"gradual", exposure:"on", powerDays:3, waterDays:2, afterlifeChance:60};
   const modes = {
@@ -277,6 +286,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,seasons,seasonDays,fracture,
+  return {items,recipes,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,garden,crops,supplyCache,story,saveVersion:1};
 })();

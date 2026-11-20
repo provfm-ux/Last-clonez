@@ -1,5 +1,10 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
+## 0.31 — The Second All-Clear
+- Extended the evacuation story into a playable finale in Cinder Grotto.
+- Added six field challenges and marked discovered story sites on the map.
+- Hid three new records in the outlying regions with a linked ending and cache.
+
 ## 0.30 — visual "Dark pixel"
 Testes: `smoke-test.js` **140** a passar; `render-test.js` tudo OK (inclui o novo visual). **Não visto num browser real** — por isso o menu *Graphics* permite voltar a *Fast*/*Classic*.
 

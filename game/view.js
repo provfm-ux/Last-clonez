@@ -1804,6 +1804,13 @@ const View = (() => {
     const clinic=world.buildings.find(b=>b.type==="clinic");
     if(clinic&&!state.flags.rescued)dot(clinic.x+4,clinic.y+5,"#b7d4c3",4);
     if(state.world.npc.mode==="follow")dot(state.world.npc.x,state.world.npc.y,"#a0d6ad");
+    if (!menu && w >= 350) {
+      for (const o of world.objects) {
+        if (Chronicle.isUnseen(state.ledger,o) && !Chronicle.entries[o.record].extra && Sim.exploredTile(state,o.x,o.y)) {
+          dot(o.x,o.y,Chronicle.entries[o.record].game ? "#e7af73" : "#b7d4c3",3);
+        }
+      }
+    }
     const destination = Sim.destination(state);
     if(destination)dot(destination.x,destination.y,"#e6a365",7);
     const order = state.ledger.dispatch, route = order && Chronicle.routes[order.route];

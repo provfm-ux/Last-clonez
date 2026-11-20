@@ -28,6 +28,12 @@ const reset = () => { for (const k of Object.keys(counts)) delete counts[k]; };
 const per = (fn, n = 1) => { reset(); fn(n); return Object.fromEntries(Object.entries(counts).map(([k, v]) => [k, v / n])); };
 
 const s = Sim.createControl("survival", "carer", "shelter"); View.prepare(s.world);
+const home = s.world.buildings.find(b => b.compact);
+const corner = home && context.World.tileAt(s.world, home.x, home.y);
+check("paredes: o canto liga as duas paredes sem sobressair",
+  corner?.wallOutline.some(([x]) => x === 1) &&
+  corner.wallOutline.some(([, y]) => y === 1) &&
+  corner.wallOutline.every(([x, y]) => x > 0 && y > 0));
 const first = per(() => View.render(s, 0, 1 / 60));
 const steady = per(n => { for (let i = 0; i < n; i++) View.render(s, i / 60, 1 / 60); }, 10);
 s.fastGround = false; const classic = per(n => { for (let i = 0; i < n; i++) View.render(s, i / 60, 1 / 60); }, 10); s.fastGround = true;

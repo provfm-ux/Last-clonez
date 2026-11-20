@@ -671,30 +671,30 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
   .viewport { --touch-action-height:52px; }
 }
 
-/* 0.28 Attack: right side, the biggest and most prominent control. The three small actions sit above it with a clear gap. */
+/* Keep Attack within right-thumb reach, below the other touch actions. */
 .touch-attack { display:none; }
 @media (any-pointer:coarse) {
-  .viewport { --touch-attack:98px; --touch-action-height:54px; }
+  .viewport { --touch-attack:66px; --touch-action-height:54px; }
   .touch-attack {
     display:flex; position:absolute; z-index:6; right:var(--touch-inset); left:auto; bottom:var(--touch-inset);
     width:var(--touch-attack); height:var(--touch-attack); border-radius:50%; flex-direction:column; align-items:center; justify-content:center; gap:2px;
-    background:radial-gradient(circle at 35% 30%, #c4472a, #8f2c1a 70%); border:3px solid #f0b08a; color:#fff3dd;
-    font:800 14px var(--sans); letter-spacing:.04em; text-transform:uppercase; touch-action:none; user-select:none; -webkit-user-select:none;
+    background:radial-gradient(circle at 35% 30%, #c4472a, #8f2c1a 70%); border:2px solid #f0b08a; color:#fff3dd;
+    font:800 11px var(--sans); letter-spacing:.04em; text-transform:uppercase; touch-action:none; user-select:none; -webkit-user-select:none;
     box-shadow:0 0 0 4px rgba(240,176,138,.22), 0 8px 20px rgba(0,0,0,.55);
   }
-  .touch-attack::before { content:""; position:absolute; inset:-10px; border-radius:50%; }
+  .touch-attack::before { content:""; position:absolute; inset:-4px; border-radius:50%; }
   .touch-attack[hidden] { display:none; }
-  .touch-attack .icon { width:36px; height:36px; color:#ffe2c4; }
+  .touch-attack .icon { width:23px; height:23px; color:#ffe2c4; }
   .touch-attack:active { transform:scale(.95); background:radial-gradient(circle at 35% 30%, #e0603c, #a8351f 70%); }
   .touch-attack.ready { animation:attack-ready 1.2s ease-in-out infinite; }
   @keyframes attack-ready { 50% { box-shadow:0 0 0 7px rgba(240,176,138,.42), 0 8px 20px rgba(0,0,0,.55); } }
-  .touch-controls { display:flex; flex-direction:row; gap:7px; grid-template-columns:none; right:var(--touch-inset); bottom:calc(var(--touch-inset) + var(--touch-attack) + 20px); }
+  .touch-controls { display:flex; flex-direction:row; gap:7px; grid-template-columns:none; right:var(--touch-inset); bottom:calc(var(--touch-inset) + var(--touch-attack) + 12px); }
   .touch-controls[hidden] { display:none; }
   .touch-controls button { min-width:62px; padding:0 8px; }
   #touch-shove { grid-column:auto; }
-  .toast { bottom:calc(var(--touch-inset) + var(--touch-attack) + 20px + var(--touch-action-height) + 13px); }
+  .toast { bottom:calc(var(--touch-inset) + var(--touch-attack) + 12px + var(--touch-action-height) + 13px); }
 }
 @media (any-pointer:coarse) and (orientation:landscape) and (max-height:500px) and (max-width:1024px) {
-  .viewport { --touch-attack:86px; --touch-action-height:48px; }
-  .touch-attack .icon { width:30px; height:30px; }
+  .viewport { --touch-attack:58px; --touch-action-height:48px; }
+  .touch-attack .icon { width:20px; height:20px; }
 }

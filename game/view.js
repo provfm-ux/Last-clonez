@@ -882,6 +882,16 @@ const View = (() => {
       f(.3,-.12,0,.22,.24,4,["#8d9a79","#6f7b5f","#5b664e"]);
       return;
     }
+    if (kind === "drop") {
+      const item = o.loot?.find(i => Object.hasOwn(weaponArt,i.id));
+      if (item) {
+        const [sx,sy] = p(x,y,2);
+        shadow(x,y,12,4);
+        drawHeldWeapon(item.id,sx-7,sy,1,4);
+        return;
+      }
+      if (!o.loot?.length) return;
+    }
     if(kind==="crate" || kind==="drop") {
       const small=kind==="drop";
       shadow(x,y,19,7);
@@ -1196,7 +1206,12 @@ const View = (() => {
     machete: [[1,0,3,2,darkSteel],[4,-2,7,3,steel],[5,-2,7,1,lightSteel]],
     shovel: [[1,0,9,2,lightWood],[9,-2,4,5,steel],[12,-1,2,3,lightSteel]],
     golfclub: [[1,0,3,2,darkSteel],[4,0,9,1,steel],[12,0,3,3,lightSteel]],
-    crowbar: [[1,0,11,2,"#87564a"],[11,-2,2,3,"#a56e5b"],[12,-2,2,1,lightSteel]]
+    crowbar: [[1,0,11,2,"#87564a"],[11,-2,2,3,"#a56e5b"],[12,-2,2,1,lightSteel]],
+    hatchet: [[1,0,8,2,woodGrip],[7,-1,3,3,darkSteel],[9,-3,3,6,steel],[12,-2,1,4,lightSteel]],
+    wrench: [[1,0,8,2,darkSteel],[2,0,6,1,steel],[8,-2,3,5,steel],[11,-2,2,1,lightSteel],[11,2,2,1,lightSteel]],
+    fryingpan: [[1,0,7,2,darkSteel],[7,-2,7,6,darkSteel],[8,-3,5,1,steel],[8,4,5,1,steel],[13,-1,2,4,steel],[9,-1,3,3,"#4c5553"]],
+    broom: [[1,0,11,1,lightWood],[11,-2,2,5,woodGrip],[13,-3,3,7,"#9e7643"],[14,-2,2,1,"#d1ae6a"],[14,1,2,1,"#c79b59"]],
+    rollingpin: [[1,0,13,1,lightWood],[3,-2,8,5,woodGrip],[4,-2,6,1,lightWood],[4,2,6,1,"#825132"]]
   };
   const weaponSprites = new Map();
   const weaponAngles = [-1.15, -.45, .38, .95, 0, -.25];
@@ -1228,6 +1243,23 @@ const View = (() => {
       weaponSprites.set(key, sprite);
     }
     ctx.drawImage(sprite, x - weaponExtent / 2, y - weaponExtent / 2);
+  }
+
+  const weaponIcons = new Map();
+  function weaponIcon(id) {
+    if (!Object.hasOwn(weaponArt,id)) return "";
+    if (!weaponIcons.has(id)) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 34;
+      canvas.height = 20;
+      const icon = canvas.getContext("2d");
+      for (const [x,y,w,h,color] of weaponArt[id]) {
+        icon.fillStyle = color;
+        icon.fillRect(x*2,(y+5)*2,w*2,h*2);
+      }
+      weaponIcons.set(id,canvas.toDataURL());
+    }
+    return weaponIcons.get(id);
   }
 
   const zombieAtlasLink = document.getElementById("micro-zombie-atlas");
@@ -1393,6 +1425,11 @@ const View = (() => {
     if (isPlayer) {
       ctx.fillStyle = "#b8aa78";
       ctx.fillRect(striking ? 13 : 7, top + (striking ? 5 : 11), striking ? 7 : 4, 2.5);
+    }
+    if (isPlayer && alive) {
+      const id = a.swing > 0 && state.swingVisual ? state.swingVisual.weapon : Sim.weapon(state).id;
+      const phase = a.swing > 0 ? id === "pistol" ? 5 : a.swing > .12 ? 0 : a.swing > .06 ? 1 : 2 : 4;
+      drawHeldWeapon(id,handX,handY,1,phase);
     }
     if (a.origin === "cinema-winner") {
       ctx.fillStyle = "#d5ad52";
@@ -1913,6 +1950,7 @@ const View = (() => {
           if (!index) {
             const batch = o.kind === "campfire" ? Sim.fireBatch(state, o) : null;
             let label = o.name;
+            if (o.kind === "drop" && !o.corpse && o.loot.length === 1) label = Data.items[o.loot[0].id].name;
             if (o.action === "travel") label = "Crossing · " + o.name;
             else if (o.action === "door" && o.kind !== "fence") label = o.boards ? "Barricade · " + o.boards :
               o.broken ? "Broken " + o.kind : o.locked ? "Locked door" : o.latched ? "Latched window" : o.open ? "Close" : "Open";
@@ -2110,5 +2148,5 @@ const View = (() => {
     c.font="700 10px monospace";c.fillStyle="#d6d7ba";c.textAlign="center";
     if(world.base)c.fillText("SHELTER",ox+10*unit,oy+40*unit+15);
   }
-  return {prepare,render,renderAfterlife,locate,minimap,mapPoint,visible};
+  return {prepare,render,renderAfterlife,locate,minimap,mapPoint,visible,weaponIcon};
 })();

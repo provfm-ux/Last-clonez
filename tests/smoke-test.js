@@ -283,10 +283,34 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("mundo: viajar para Pine Ridge funciona e traz os locais extra", there.world.region === "ridge" && there.world.objects.filter(o => o.id.startsWith("wild-")).length === 7, err || there.world.region);
   let back = null, why = ""; try { back = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(there)))); } catch (e) { why = e.message; }
   check("mundo: gravar e restaurar em Pine Ridge (geração 4)", back && back.world.region === "ridge" && back.world.objects.filter(o => o.id.startsWith("wild-")).length === 7, why); }
-{ const s = fresh("survival"), p = s.player, bat = p.bag.find(i => i.id === "bat"), z = s.world.enemies.find(e => e.hp > 0);
+{ const s = fresh("survival"), p = s.player, z = s.world.enemies.find(e => e.hp > 0);
+  const pile = s.world.objects.find(o => o.kind === "drop" && o.loot.some(i => i.id === "bat"));
+  Sim.collect(s,pile,0);
+  const index = p.bag.findIndex(i => i.id === "bat");
+  Sim.use(s,index);
+  const bat = p.bag[index];
   bat.condition = 20 + Data.items.bat.wear / 2; Object.assign(z, {x: p.x + .7, y: p.y, hp: 400}); s.target = z; const seen = new Set(); let warned = false;
   for (let i = 0; i < 120 && !warned; i++) { p.hp = 100; Sim.tick(s, .05, idle); for (const m of s.messages) if (!seen.has(m)) { seen.add(m); if (/nearly worn out/.test(m.text)) warned = true; } }
   check("armas: aviso quando a arma fica abaixo de 20 % de condição", warned, "condição " + bat.condition.toFixed(1)); }
+{
+  const restore = s => Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  for (const id of Object.keys(Data.control.starts)) {
+    const run = Sim.createControl("training","carer",id);
+    const bat = run.world.objects.find(o => o.kind === "drop" && o.loot.some(i => i.id === "bat"));
+    check("start empty-handed with a reachable bat: "+id, Sim.weapon(run).id === "fists" &&
+      !Sim.quantity(run.player.bag,"bat") && Sim.reachableObject(run,bat));
+    const resumed = restore(run), pile = resumed.world.objects.find(o => o.id === bat.id);
+    check("pickup stays unequipped: "+id, Sim.collect(resumed,pile,0) === 1 && Sim.weapon(resumed).id === "fists");
+    Sim.use(resumed,resumed.player.bag.findIndex(i => i.id === "bat"));
+    check("equipped bat persists on reload: "+id, Sim.weapon(restore(resumed)).id === "bat");
+  }
+  const run = fresh("training");
+  const sources = {hatchet:"workshop",wrench:"workshop",rollingpin:"market",broom:"market",fryingpan:"home",pipe:"fuel"};
+  for (const [id,type] of Object.entries(sources)) {
+    check("weapon available in "+type+": "+id,run.world.objects.some(o => o.loot?.some(i => i.id === id) &&
+      run.world.buildings.some(b => b.id === o.building && b.type === type)));
+  }
+}
 // ---- v0.28: três regiões novas (geração 5) ----
 { const rules = Data.worldRules("survival"), deep = {quarry: "ironworks", reservoir: "fields", lighthouse: "coast"};
   for (const [id, host] of Object.entries(deep)) {

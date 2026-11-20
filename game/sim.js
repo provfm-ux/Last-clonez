@@ -688,14 +688,14 @@ const Sim = (() => {
       const delta = Math.atan2(Math.sin(target - heading), Math.cos(target - heading));
       const backing = Math.abs(delta) > Math.PI * .55;
       const turn = backing ? delta - Math.sign(delta) * Math.PI : delta;
-      const steering = clamp(turn, -dt * 4, dt * 4);
-      const angle = heading + steering;
-      car.heading = Math.atan2(Math.sin(angle), Math.cos(angle));
-      // Steering rotates the car before the wheels can carry it sideways.
-      const traction = Math.max(0, Math.cos(turn - steering));
+      // Turn radius is tied to wheel travel, including while reversing.
+      const traction = Math.max(.4, Math.cos(turn));
       const step = p.driveSpeed * dt * traction * (backing ? -.65 : 1);
+      const maxTurn = Math.abs(step) / 1.35;
+      const angle = heading + clamp(turn, -maxTurn, maxTurn);
       wantsToMove = Math.abs(step) > .0001;
       p.moving = wantsToMove && move(s, p, Math.cos(angle) * step, Math.sin(angle) * step);
+      if (p.moving) car.heading = Math.atan2(Math.sin(angle), Math.cos(angle));
     } else p.moving = follow(s, p, p.driveSpeed * dt);
     p.velocityX = (p.x - beforeX) / dt;
     p.velocityY = (p.y - beforeY) / dt;

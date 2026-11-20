@@ -108,6 +108,10 @@ const View = (() => {
     for (const [index, t] of world.tiles.entries()) {
       if (t.kind === "void") continue;
       const building = buildings.get(t.building);
+      if (t.nearHome && t.surface === "path") {
+        t.kerbEdges = [[-1, 0], [0, -1], [1, 0], [0, 1]].map(([dx, dy]) =>
+          World.tileAt(world, t.x + dx, t.y + dy)?.surface === "asphalt");
+      }
       if (building) world.roofTiles.get(building.id).push(index);
       if (t.kind === "wall") {
         const joins = (dx, dy, axis) => {
@@ -143,19 +147,23 @@ const View = (() => {
   }
 
   const BLOOD = ["#4a0c0f", "#6a1216", "#8c1a1c", "#2c070a"];
-  const GROUND_BLOOD = ["#4a191d80", "#662f3466", "#75363b55", "#32191b80"];
+  const GROUND_BLOOD = "#53333765";
   const dot = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
-  function bloodPool(wx, wy, rx, ry, seed, colors = BLOOD) {
+  function bloodPool(wx, wy, rx, ry, seed) {
     const ring = (k, color) => poly(Array.from({length: 10}, (_, i) => p(wx + Math.cos(i / 10 * 6.283) * rx * k * (1 + .18 * Math.sin(seed + i * 2.3)), wy + Math.sin(i / 10 * 6.283) * ry * k)), color);
-    ring(1, colors[3]); ring(.72, colors[0]); ring(.34, colors[1]);
-    const [hx, hy] = p(wx - rx * .2, wy - ry * .1); dot(hx, hy, 3, 2, colors[2]);
+    ring(1, BLOOD[3]); ring(.72, BLOOD[0]); ring(.34, BLOOD[1]);
+    const [hx, hy] = p(wx - rx * .2, wy - ry * .1); dot(hx, hy, 3, 2, BLOOD[2]);
   }
   function microDetail(t) {
     const {x, y} = t, h = ((x * 73856093) ^ (y * 19349663)) >>> 0, at = (u, v) => p(x + u, y + v);
-    const spot = (u, v, n, r, seed) => { for (let k = 0; k < n; k++) { const q = ((seed + k * 40503) * 2654435761) >>> 0, [px, py] = at(Math.min(.95, Math.max(.05, u + ((q % 100) / 100 - .5) * r)), Math.min(.95, Math.max(.05, v + (((q >> 8) % 100) / 100 - .5) * r))); dot(px, py, 2 + (q >> 16 & 1), 2, GROUND_BLOOD[k % 3 ? (q >> 20 & 1) : 3]); } };
     if (t.surface === "grass" || t.surface === "field") {
       for (let k = 0; k < 6; k++) { const q = ((h + k * 977) * 2246822519) >>> 0, [px, py] = at(.12 + (q % 76) / 100, .12 + ((q >> 7) % 76) / 100);
         dot(px, py - 3, 2, 4, k % 3 === 0 ? "#2a3a22" : k % 3 === 1 ? "#4b5f38" : "#364a2a"); if (k === 2) dot(px + 2, py - 2, 2, 3, "#5d6e42"); }
+      if (t.nearHome && h % 17 === 0) {
+        const [px, py] = at(.64, .62);
+        dot(px, py - 2, 1, 3, "#647252");
+        dot(px + 1, py - 3, 2, 1, "#a29371");
+      }
       if (h % 6 === 0) { const [px, py] = at(.3 + (h % 40) / 100, .35); dot(px, py, 7, 3, "#4a3d26"); dot(px + 2, py - 1, 3, 2, "#5e4f30"); }
       if (h % 9 === 1) { const [px, py] = at(.55, .45); dot(px, py, 4, 3, "#6a6a62"); dot(px + 1, py - 1, 3, 1, "#8c8c82"); dot(px, py + 2, 4, 1, "#3a3a36"); }
     } else if (t.surface === "asphalt") {
@@ -164,11 +172,11 @@ const View = (() => {
     } else if (t.surface === "tile" || t.surface === "sand") {
       for (let k = 0; k < 4; k++) { const q = ((h + k * 733) * 2654435761) >>> 0, [px, py] = at((q % 80) / 100 + .1, ((q >> 8) % 80) / 100 + .1); dot(px, py, 2, 2, t.surface === "sand" ? "#c9b98c" : k % 2 ? "#2c2820" : "#5a5444"); }
     }
-    if (!t.nearHome || t.surface === "water") return;
-    const heavy = t.surface === "asphalt" || t.surface === "tile";
-    if (h % (heavy ? 8 : 12) === 0) spot(.5, .5, 3 + (h >> 4) % 4, .7, h);
-    if (h % 71 === 0) { bloodPool(x + .5, y + .5, .20, .13, h % 7, GROUND_BLOOD); spot(.5, .5, 5, .9, h + 5); }
-    if (h % 97 === 0) { for (let k = 1; k < 6; k++) spot(.15 + k * .14, .3 + k * .08, 1, .1, h + k * 13); }
+    if (t.nearHome && (t.surface === "tile" || t.surface === "path") && h % 29 === 0) {
+      const [px, py] = at(.36, .57);
+      dot(px, py, 3, 2, GROUND_BLOOD);
+      dot(px + 5, py + 2, 1, 1, GROUND_BLOOD);
+    }
   }
 
   function tileArt(t) {
@@ -209,6 +217,17 @@ const View = (() => {
       line(p(x, y + .5), p(x + 1, y + .5), "#30353250");
       for (const offset of [.25, .75]) line(p(x + offset, y), p(x + offset, y + .5), "#30353255");
       line(p(x + .5, y + .5), p(x + .5, y + 1), "#30353255");
+      if (t.kerbEdges) {
+        const edges = [[a, d], [a, b], [b, c], [d, c]];
+        for (const [index, [from, to]] of edges.entries()) {
+          if (t.kerbEdges[index]) line(from, to, "#b4b2a666", 2);
+        }
+      }
+      if (t.marks > .6) {
+        line(p(x + .12, y + .73), p(x + .44, y + .73), "#b2b2a342");
+        const [sx, sy] = p(x + .74, y + .59);
+        dot(sx, sy, 2, 1, "#5c6056");
+      }
     } else if (t.surface === "tile") {
       if (darkLook && t.nearHome && t.room) {
         for (const row of [.24, .49, .74]) {
@@ -220,7 +239,7 @@ const View = (() => {
         line(p(x+.25,y),p(x+.25,y+1),"#423c2e4a");
         line(p(x+.62,y),p(x+.62,y+1),"#b9a48130");
       }
-      if (t.marks > .985 && t.kind === "floor") shadow(x+.4,y+.6,8,3,"#77453a8a");
+      if (!darkLook && t.marks > .985 && t.kind === "floor") shadow(x+.4,y+.6,8,3,"#77453a8a");
     }
     if (darkLook) microDetail(t);
   }
@@ -901,11 +920,11 @@ const View = (() => {
   }
 
   // Original 1px sprite art packed into fixed-size atlas pages. A pose is drawn only on first use.
-  const actorFrames = new Map(), actorAtlases = [];
+  const actorFrames = new Map(), actorAtlases = [], strides = new WeakMap();
   const spriteWidth = 24, spriteHeight = 32;
 
-  function actorFrame(shirt, trousers, skin, hair, direction, pose, step, pack) {
-    const key = [shirt, trousers, skin, hair, direction, pose, step, pack].join("|");
+  function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack) {
+    const key = [shirt, trousers, skin, hair, direction, pose, step, lift, pack].join("|");
     if (actorFrames.has(key)) return actorFrames.get(key);
     const index = actorFrames.size, slot = index % 128, page = Math.floor(index / 128);
     if (!actorAtlases[page]) {
@@ -929,12 +948,17 @@ const View = (() => {
       const low = pose === "sneak" ? 3 : 0;
       const leap = pose === "run" ? 2 : 0;
       const lean = pose === "hurt" ? -1 : pose === "chase" || pose === "strike" ? 1 : 0;
-      const shoulder = 9 + low - leap, hip = 19 + low - leap;
+      const shoulder = 9 + low - leap - Number(lift !== 0), hip = shoulder + 10;
       rect(8, hip - 1, 8, 3, ink);
-      for (const [x, y] of [[8, 28 + step], [13, 28 - step]]) {
-        rect(x - 1, hip, 4, y - hip + 3, ink);
-        rect(x, hip, 2, y - hip, trousers);
-        rect(x - 1, y, 4, 2, boots);
+      for (const [index, x] of [8, 13].entries()) {
+        const stride = index ? -step : step;
+        const foot = x + stride;
+        const y = 28 + Math.sign(stride) - (lift === (index ? 1 : -1) ? 2 : 0);
+        rect(x - 1, hip, 4, 4, ink);
+        rect(x, hip, 2, 4, trousers);
+        rect(foot - 1, hip + 3, 4, y - hip - 1, ink);
+        rect(foot, hip + 3, 2, y - hip - 2, trousers);
+        rect(foot - 1, y, 4, 2, boots);
       }
       rect(7 + lean, shoulder, 10, hip - shoulder + 1, ink);
       rect(8 + lean, shoulder + 1, 8, hip - shoulder - 1, shirt);
@@ -968,10 +992,17 @@ const View = (() => {
     return frame;
   }
 
-  function microActor(a, isPlayer, state, clock, alive, x, y, scale) {
+  function microActor(a, isPlayer, state, alive, x, y, scale) {
     const moving = alive && a.moving;
     const running = moving && (isPlayer ? state.running : a.kind === "runner" && a.alert > 0);
-    const step = moving ? [-1, 0, 1, 0][Math.floor(clock * (running ? 14 : 9) + (a.phase || 0)) & 3] * (running ? 2 : 1) : 0;
+    const stride = strides.get(a) ?? {x:a.x, y:a.y, phase:(a.phase || 0) % 1};
+    const distance = Math.hypot(a.x - stride.x, a.y - stride.y);
+    if (moving && distance < 1) stride.phase = (stride.phase + distance / (running ? .94 : .70)) % 1;
+    stride.x = a.x; stride.y = a.y;
+    strides.set(a, stride);
+    const frameIndex = moving ? Math.floor(stride.phase * 6) : 0;
+    const step = [0, 1, 1, 0, -1, -1][frameIndex] * (running ? 2 : 1);
+    const lift = [0, -1, 0, 0, 1, 0][frameIndex];
     const pose = !alive ? "dead" : a.flash > 0 ? "hurt" : a.swing > 0 || a.windup > 0 ? "strike" :
       isPlayer && state.quiet ? "sneak" : running ? "run" : moving && a.stats && a.alert > 0 ? "chase" : "idle";
     const dx = a.headingX ?? (a.face < 0 ? -1 : 1), dy = a.headingY ?? 0;
@@ -980,7 +1011,7 @@ const View = (() => {
       Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
     const frame = actorFrame(shirt, isPlayer ? "#465a5d" : "#56564c",
       pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
-      isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step,
+      isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step, lift,
       a.outfit === "hiker" || Boolean(isPlayer && a.backpack));
     ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight,
       Math.round(x - spriteWidth * scale / 2), Math.round(y - (spriteHeight - 1) * scale),
@@ -1007,7 +1038,7 @@ const View = (() => {
       ctx.restore();
     }
     if (darkLook) {
-      microActor(a, isPlayer, state, clock, alive, x, y, scale);
+      microActor(a, isPlayer, state, alive, x, y, scale);
       if (alive && a.stats && (state.target === a || a.hp < a.stats.hp && a.alert > 0)) {
         ctx.fillStyle = "#1d261d";
         ctx.fillRect(x - 8, y - 42 * scale, 16, 2);

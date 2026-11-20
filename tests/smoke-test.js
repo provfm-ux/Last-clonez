@@ -150,10 +150,15 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   const velocity = Math.hypot(p.velocityX, p.velocityY);
   const sideways = Math.abs(p.velocityX * Math.sin(car.heading) - p.velocityY * Math.cos(car.heading));
   check("carro: curva progressiva e deslocação no eixo das rodas",
-    entered && car.heading > 0 && car.heading <= .121 && velocity > 0 && sideways < 1e-6,
+    entered && car.heading > 0 && car.heading <= velocity * .03 / 1.35 + 1e-6 && velocity > 0 && sideways < 1e-6,
     "ângulo " + car.heading.toFixed(3) + ", desvio " + sideways.toFixed(6));
   const restored = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
   check("carro: orientação preservada na gravação", Sim.vehicle(restored)?.heading === car.heading);
+  const blocked = findTile(s, t => t.building && !t.solid), heading = car.heading;
+  Object.assign(p, blocked, {driveSpeed: 0}); Object.assign(car, blocked);
+  Sim.tick(s, .03, {x: 1, y: 0, run: false});
+  check("carro: volante não roda a carroçaria quando o carro está bloqueado",
+    car.heading === heading && p.x === blocked.x && p.y === blocked.y);
 }
 { let worst = 140, any = 0;
   for (const dir of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {

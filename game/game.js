@@ -41,7 +41,8 @@
   let expandedView = false, changingView = false, pinDraft = null, craftIngredient = null;
   let customRules = null, customBase = "survival", ruleBase = "survival";
   let validatedSave = null, touchRun = false;
-  let crossing = null;
+  let crossing = null, deathOfferUntil = null;
+  const afterlifeOfferMs = 12000;
   let audio, muted = read(soundKey) === "1";
   state.mode = "menu";
   View.prepare(state.world);
@@ -166,6 +167,7 @@
     $("close-dialog").hidden = false;
     dialogView = null;
     deathShown = false;
+    deathOfferUntil = null;
     $("hero").hidden = true;
     canvas.setAttribute("aria-label", "Isometric view of " + Regions.definitions[state.world.region].name);
     $("start-btn").blur();
@@ -249,11 +251,13 @@
     state.afterlifePending = false;
     save();
     close(false);
+    deathOfferUntil = null;
     afterlife = Afterlife.start(state);
     updateHud();
   }
 
   function deathSummary() {
+    deathOfferUntil = null;
     show("Your story ends here", "<p>" + esc(state.player.name) + " survived until day " + day() + " at " + time(state.minutes) +
       " and killed " + state.kills + " infected.</p>" +
       "<p>Cause of death: " + esc(state.deathCause || "unknown causes") + ".</p>" +
@@ -2373,11 +2377,13 @@
       deathShown = true;
       save();
       if (state.afterlifePending) {
-        show("Something moves", "<p>A sound reaches you. Follow it to try the afterlife, or skip to the run summary.</p>" +
+        deathOfferUntil = now + afterlifeOfferMs;
+        show("Something moves", "<p>A sound reaches you. Follow it to try the afterlife. If you wait 12 seconds, the run summary opens automatically.</p>" +
           '<div class="item-actions death-actions">' + button("Follow the sound","afterlife",false,"primary") +
           button("Skip to summary","afterlife-skip") + "</div>","afterlife-offer");
       } else deathSummary();
     }
+    if (dialogView === "afterlife-offer" && deathOfferUntil !== null && now >= deathOfferUntil) skipAfterlife();
     if (state.sounds.length) for (const sound of state.sounds.splice(0)) if (!muted) Soundscape.play(audio,sound,state.player);
     if (now >= nextHud) { updateHud(); nextHud = now + 150; }
     if (now >= nextMap) {

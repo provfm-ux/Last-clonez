@@ -757,6 +757,23 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     Sim.shove(run) && run.player.grabbed === 0 && brute.windup === .4 && brute.x-spot.x < 1.05);
   check("combate: todas as armas têm um estilo",
     Object.values(Data.items).filter(item => item.damage).every(item => Data.combatStyles[item.combat]));
+  run.sounds.length = 0;
+  const zombieCues = () => run.sounds.splice(0).filter(cue => cue.kind.startsWith("zombie.common.")).map(cue => cue.kind.slice(14));
+  strike("bat","walker");
+  check("áudio: golpe não letal dispara hit", zombieCues().join() === "hit");
+  const wounded = run.world.enemies[0];
+  wounded.hp = 1;
+  run.player.cooldown = 0;
+  Sim.attack(run,wounded);
+  Sim.attack(run,wounded);
+  check("áudio: golpe letal dispara death uma vez", zombieCues().join() === "death");
+  const zombie = World.infected(run.world,"voice-test",spot.x+.8,spot.y,"walkers",context.Level.seeded(17));
+  Object.assign(zombie,{dormant:false,windup:.01,windupTarget:"player"});
+  run.world.enemies = [zombie];
+  Sim.tick(run,.033,idle);
+  check("áudio: deteção e início do ataque disparam notice e attack", zombieCues().join() === "notice,attack");
+  Sim.tick(run,.033,idle);
+  check("áudio: deteção não se repete no frame seguinte", !zombieCues().includes("notice"));
 }
 
 {

@@ -8,6 +8,7 @@ const html = fs.readFileSync(path.join(dir, "index.html"), "utf8");
 const files = [...html.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "game");
 const pascal = f => f.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join("");
 const counts = {};
+let heldWeapon = null;
 const mk = () => new Proxy({}, {
   get(t, k) { if (k in t) return t[k]; if (k === "canvas") return {width: 1280, height: 720}; if (k === "measureText") return () => ({width: 10});
     if (k === "createRadialGradient" || k === "createLinearGradient") return () => { counts[k] = (counts[k] || 0) + 1; return {addColorStop() {}}; };
@@ -16,6 +17,7 @@ const mk = () => new Proxy({}, {
       if (k === "drawImage" && args.length === 3 && args[0]?.width === 72 && args[0]?.height === 64) {
         counts.furnitureBlit = (counts.furnitureBlit || 0) + 1;
       }
+      if (k === "drawImage" && args.length === 3 && args[0]?.width === 36 && args[0]?.height === 36) heldWeapon = args[0];
       if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 32) counts.actorBlit = (counts.actorBlit || 0) + 1;
     }; },
   set(t, k, v) { t[k] = v; return true; }});
@@ -97,6 +99,31 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   View.render(interior, 0, 1 / 60);
   const furniture = per(() => View.render(interior, 1 / 60, 1 / 60));
   check("dark pixel: interior desenha vários móveis a partir do cache", (furniture.furnitureBlit || 0) >= 4);
+}
+{
+  const run = Sim.createControl("training", "carer", "shelter");
+  run.look = "dark";
+  View.prepare(run.world);
+  const weapons = Object.keys(context.Data.items).filter(id => context.Data.items[id].damage);
+  const sprites = weapons.map(id => {
+    run.player.bag.push({id, qty:1, uid:"render-" + id, condition:100});
+    Sim.use(run, run.player.bag.length - 1);
+    heldWeapon = null;
+    View.render(run, 0, 1 / 60);
+    return heldWeapon;
+  });
+  check("dark pixel: cada arma equipada tem um sprite distinto", sprites.every(Boolean) && new Set(sprites).size === weapons.length);
+  run.swingVisual = {weapon:"bat", dx:1, dy:0};
+  run.player.swing = .17;
+  View.render(run, 0, 1 / 60);
+  const raised = heldWeapon;
+  run.player.swing = .08;
+  View.render(run, 0, 1 / 60);
+  check("dark pixel: a arma muda de pose durante o ataque", heldWeapon && raised !== heldWeapon);
+  run.swingVisual.weapon = "fists";
+  heldWeapon = null;
+  View.render(run, 0, 1 / 60);
+  check("dark pixel: empurrar não mostra um golpe de arma", heldWeapon === null);
 }
 if (!quiet) console.log("\nOperações por frame (jogo parado): " + Math.round(Object.values(steady).reduce((a, b) => a + b, 0)) + " (clássico: " + Math.round(Object.values(classic).reduce((a, b) => a + b, 0)) + ")");
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");

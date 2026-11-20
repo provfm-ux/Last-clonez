@@ -1764,6 +1764,7 @@ const Sim = (() => {
       return false;
     }
     faceTowards(p, z);
+    s.swingVisual = {weapon:item.id, dx:z.x - p.x, dy:z.y - p.y};
     p.cooldown = w.delay; p.staminaDelay = .7; p.swing = .18;
     p.stamina = Math.max(0, p.stamina - w.effort);
     if (w.firearm) remove(p.bag, "ammo", 1);
@@ -1798,6 +1799,7 @@ const Sim = (() => {
     if (!near) return false;
     if (s.target) endPursuit(s);
     faceTowards(p, near);
+    s.swingVisual = {weapon:"fists", dx:near.x - p.x, dy:near.y - p.y};
     p.stamina -= 10; p.cooldown = .7; p.swing = .18;
     near.stagger = 1.1; near.swing = 0;
     endWindup(near);

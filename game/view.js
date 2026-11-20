@@ -1090,6 +1090,7 @@ const View = (() => {
       c.fillStyle = color;
       c.fillRect(left + (side > 0 ? x : spriteWidth - x - w), top + y, w, h);
     };
+    let grip = null;
     if (pose === "dead") {
       rect(2, 26, 20, 5, ink); rect(3, 27, 7, 3, trousers);
       rect(10, 25, 7, 5, shirt); rect(17, 26, 4, 4, skin); rect(20, 26, 2, 3, hair);
@@ -1125,7 +1126,9 @@ const View = (() => {
       rect(6 + lean, shoulder + 7 + step, 2, 2, skin);
       rect(16 + lean, shoulder + 2 - arm, reaches ? 6 : 3, reaches ? 4 : 7, ink);
       rect(16 + lean, shoulder + 3 - arm, reaches ? 4 : 2, reaches ? 2 : 4, shirt);
-      rect(reaches ? 21 : 17 + lean, shoulder + (reaches ? 3 : 7) - arm, 2, 2, skin);
+      const handX = reaches ? 21 : 17 + lean, handY = shoulder + (reaches ? 3 : 7) - arm;
+      rect(handX, handY, 2, 2, skin);
+      grip = [side > 0 ? handX + 1 : spriteWidth - handX - 1, handY + 1];
       const head = shoulder - 7 + (step ? 1 : 0);
       rect(9 + lean, head, 6, 7, ink);
       rect(10 + lean, head + 1, 5, 5, back ? hair : skin);
@@ -1136,9 +1139,55 @@ const View = (() => {
       }
       if (pose === "hurt") rect(13 + lean, head + 4, 2, 1, "#a35749");
     }
-    const frame = {canvas, left, top};
+    const frame = {canvas, left, top, grip};
     actorFrames.set(key, frame);
     return frame;
+  }
+
+  const woodGrip = "#775239", lightWood = "#b18a5a";
+  const steel = "#747f80", lightSteel = "#a6b0ad", darkSteel = "#394446";
+  const weaponArt = {
+    bat: [[1,0,4,2,woodGrip],[5,-1,8,3,woodGrip],[6,-1,6,1,lightWood]],
+    pipe: [[1,-1,11,2,steel],[10,-2,3,4,darkSteel],[11,-1,2,2,lightSteel]],
+    spear: [[1,0,12,1,lightWood],[12,-1,3,3,steel],[15,0,1,1,lightSteel]],
+    axe: [[1,0,10,2,woodGrip],[8,-3,4,4,darkSteel],[11,-4,2,5,lightSteel]],
+    pistol: [[1,-2,7,2,darkSteel],[2,-3,6,1,steel],[2,0,2,3,darkSteel]],
+    knife: [[1,0,2,2,woodGrip],[3,-1,4,2,lightSteel],[7,-1,1,1,steel]],
+    machete: [[1,0,3,2,darkSteel],[4,-2,7,3,steel],[5,-2,7,1,lightSteel]],
+    shovel: [[1,0,9,2,lightWood],[9,-2,4,5,steel],[12,-1,2,3,lightSteel]],
+    golfclub: [[1,0,3,2,darkSteel],[4,0,9,1,steel],[12,0,3,3,lightSteel]],
+    crowbar: [[1,0,11,2,"#87564a"],[11,-2,2,3,"#a56e5b"],[12,-2,2,1,lightSteel]]
+  };
+  const weaponSprites = new Map();
+  const weaponAngles = [-1.15, -.45, .38, .95, 0, -.25];
+  const weaponExtent = 36;
+
+  function drawHeldWeapon(id, x, y, side, phase) {
+    const art = weaponArt[id];
+    if (!art) return;
+    const key = id + ":" + side + ":" + phase;
+    let sprite = weaponSprites.get(key);
+    if (!sprite) {
+      sprite = document.createElement("canvas");
+      sprite.width = sprite.height = weaponExtent;
+      const c = sprite.getContext("2d"), pivot = weaponExtent / 2;
+      const angle = weaponAngles[phase], cos = Math.cos(angle), sin = Math.sin(angle);
+      for (const [left, top, w, h, color] of art) {
+        c.fillStyle = color;
+        for (let dy = top; dy < top + h; dy++) for (let dx = left; dx < left + w; dx++) {
+          c.fillRect(pivot + side * Math.round(dx * cos - dy * sin),
+            pivot + Math.round(dx * sin + dy * cos), 1, 1);
+        }
+      }
+      if (id === "pistol" && phase === 5) {
+        c.fillStyle = "#e59f52";
+        c.fillRect(pivot + side * 10 - 1, pivot - 6, 3, 3);
+        c.fillStyle = "#ffdf98";
+        c.fillRect(pivot + side * 10, pivot - 5, 1, 1);
+      }
+      weaponSprites.set(key, sprite);
+    }
+    ctx.drawImage(sprite, x - weaponExtent / 2, y - weaponExtent / 2);
   }
 
   const zombieAtlasLink = document.getElementById("micro-zombie-atlas");
@@ -1188,7 +1237,8 @@ const View = (() => {
     const lift = [0, -1, 0, 0, 1, 0][frameIndex];
     const pose = !alive ? "dead" : a.flash > 0 ? "hurt" : a.swing > 0 || a.windup > 0 ? "strike" :
       isPlayer && state.quiet ? "sneak" : running ? "run" : moving && a.stats && a.alert > 0 ? "chase" : "idle";
-    const dx = a.headingX ?? (a.face < 0 ? -1 : 1), dy = a.headingY ?? 0;
+    const swing = isPlayer && a.swing > 0 ? state.swingVisual : null;
+    const dx = swing?.dx ?? a.headingX ?? (a.face < 0 ? -1 : 1), dy = swing?.dy ?? a.headingY ?? 0;
     const direction = Number(dx < dy) + 2 * Number(dx + dy < 0);
     const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, lift);
     if (!imported) {
@@ -1198,9 +1248,15 @@ const View = (() => {
         pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
         isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step, lift,
         a.outfit === "hiker" || Boolean(isPlayer && a.backpack));
-      ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight,
-        Math.round(x - spriteWidth * scale / 2), Math.round(y - (spriteHeight - 1) * scale),
+      const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - (spriteHeight - 1) * scale);
+      ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
         Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
+      if (isPlayer && frame.grip) {
+        const id = swing?.weapon ?? Sim.weapon(state).id;
+        const phase = swing ? (id === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
+          a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : step > 0 ? 2 : 1;
+        drawHeldWeapon(id, left + frame.grip[0], top + frame.grip[1], dx < dy ? -1 : 1, phase);
+      }
     }
     if (alive && (a.windup > 0 || a.stats && a.alert > 0)) {
       const height = Math.round(32 * scale);

@@ -688,3 +688,9 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 .in-afterlife .lesson { display:none; }
 
 .ledger-text { white-space:pre-line; }
+.in-afterlife .afterlife-tools { width:min(30rem,calc(100% - 24px)); color:#f7f7f7; border-color:#929292; background:#0b0b0bf0; }
+.afterlife-copy { display:grid; gap:.15rem; flex:1; min-width:10rem; }
+#afterlife-sound { color:#ddd; font-size:.8rem; }
+.afterlife-copy span:empty,.afterlife-copy strong:empty { display:none; }
+.in-afterlife .touch-controls button.ready { background:#eee; color:#101010; border-color:white; }
+.in-afterlife .touch-controls button.ready .icon { color:#101010; }

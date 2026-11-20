@@ -8,7 +8,7 @@
 <title>Last CloneZ</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link id="micro-zombie-atlas" rel="preload" as="image" href="micro-zombies.png">
-<link rel="stylesheet" href="style.css?v=0.32">
+<link rel="stylesheet" href="style.css?v=0.32-sprites">
 <script src="data.js?v=0.32" defer></script>
 <script src="research.js?v=0.32" defer></script>
 <script src="legacy-level.js?v=0.32" defer></script>
@@ -18,11 +18,11 @@
 <script src="chronicle.js?v=0.32" defer></script>
 <script src="world.js?v=0.32" defer></script>
 <script src="atmosphere.js?v=0.32" defer></script>
-<script src="soundscape.js?v=0.32" defer></script>
-<script src="afterlife.js?v=0.32" defer></script>
+<script src="soundscape.js?v=0.32-sprites" defer></script>
+<script src="afterlife.js?v=0.32-sprites" defer></script>
 <script src="sim.js?v=0.32" defer></script>
-<script src="view.js?v=0.32-weapon-sprites" defer></script>
-<script src="game.js?v=0.32" defer></script>
+<script src="view.js?v=0.32-sprites" defer></script>
+<script src="game.js?v=0.32-sprites" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -83,7 +83,7 @@
       <canvas id="world" aria-label="Isometric view of Cold Vale"></canvas>
       <div class="lens"></div>
       <div id="lesson" class="lesson" hidden><span id="lesson-text" role="status"></span><button type="button" class="small-button" id="lesson-exit">Skip introduction</button></div>
-      <div id="afterlife-tools" class="afterlife-tools" hidden><span id="afterlife-text" role="status"></span><button type="button" class="small-button" id="afterlife-exit">End sequence</button></div>
+      <div id="afterlife-tools" class="afterlife-tools" hidden><div class="afterlife-copy"><strong id="afterlife-objective"></strong><span id="afterlife-sound"></span><span id="afterlife-text" role="status"></span></div><button type="button" class="small-button" id="afterlife-exit">End sequence</button></div>
       <button class="destination-tag" id="destination-btn" hidden><svg class="icon"><use href="#map"/></svg><span id="destination-label">Destination</span></button>
       <div class="world-tools" id="world-tools" hidden><button id="zoom-out" aria-label="Zoom out">−</button><span id="zoom-label">1×</span><button id="zoom-in" aria-label="Zoom in">+</button><button id="roof-toggle" aria-pressed="false" aria-label="Hide roofs" title="Roofs · T"><svg class="icon"><use href="#home"/></svg><span>Roofs</span></button></div>
       <div id="move-stick" class="move-stick" role="group" aria-label="Drag to move" hidden><span class="stick-guide">MOVE</span><span id="stick-knob" class="stick-knob"></span></div>

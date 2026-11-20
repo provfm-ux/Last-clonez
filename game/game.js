@@ -469,6 +469,13 @@
       $("touch-attack-label").textContent = "Bite";
       $("touch-use-label").textContent = "Grab";
       $("touch-shove-label").textContent = "Groan";
+      const objective = afterlife.result ? "" : Afterlife.objective(afterlife);
+      const sound = afterlife.result ? "" : afterlife.soundLabel ?? "";
+      const ready = Afterlife.ready(afterlife);
+      $("touch-attack").classList.toggle("ready",ready === "bite");
+      $("touch-use").classList.toggle("ready",ready === "grab");
+      if ($("afterlife-objective").textContent !== objective) $("afterlife-objective").textContent = objective;
+      if ($("afterlife-sound").textContent !== sound) $("afterlife-sound").textContent = sound;
       const hint = afterlife.clock <= afterlife.messageUntil ? afterlife.message : "";
       if ($("afterlife-text").textContent !== hint) $("afterlife-text").textContent = hint;
       return;
@@ -2020,11 +2027,11 @@
       };
       const steps = Math.max(1, Math.ceil(delta / .03));
       if (afterlife) {
+        const movement = Afterlife.screenInput(input);
         for (let i = 0; i < steps && afterlife; i++) {
-          if (Afterlife.tick(afterlife,delta/steps,input)) endAfterlife();
-          else if (afterlife.cue) {
-            if (!muted) Soundscape.play(audio,afterlife.cue,afterlife.player);
-            afterlife.cue = null;
+          if (Afterlife.tick(afterlife,delta/steps,movement)) endAfterlife();
+          else for (const cue of afterlife.cues.splice(0)) {
+            if (!muted) Soundscape.play(audio,cue,afterlife.player);
           }
         }
       } else {

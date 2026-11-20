@@ -2253,6 +2253,8 @@ const Sim = (() => {
     return false;
   }
 
+  const audibleStride = new WeakMap();
+
   function updatePlayer(s, dt, input) {
     const p = s.player;
     if (p.grabbed > 0 && p.grabbed - dt <= 0) p.grabCool = 4;
@@ -2282,11 +2284,13 @@ const Sim = (() => {
     const surface = World.tileAt(s.world, p.x, p.y)?.surface;
     const footing = surface === "sand" ? .78 : surface === "field" ? .88 : 1;
     const speed = (s.running ? 4 : s.quiet ? 1.6 : 2.55) * (injury ? .8 : 1) * (load > .9 ? .9 : 1) * (p.fatigue > 85 || cold ? .8 : 1) * (p.grabbed > 0 ? .4 : 1) * (p.fracture > 0 ? (p.splinted ? Data.fracture.splintSpeed : Data.fracture.brokenSpeed) : 1) * footing;
+    const startX = p.x, startY = p.y;
     if (manual) {
       const dx = input.x * .5 + input.y, dy = input.y - input.x * .5, mag = Math.hypot(dx, dy);
       const strength = Math.min(1, Math.hypot(input.x, input.y));
       p.moving = move(s, p, dx / mag * speed * dt * strength, dy / mag * speed * dt * strength);
     } else p.moving = follow(s, p, speed * dt);
+    const travelled = Math.hypot(p.x-startX,p.y-startY);
     if (!p.path.length) s.dash = false;
     if (p.grabbed > 0 && p.moving) { p.grabbed = Math.max(0, p.grabbed - dt * 1.2); if (!p.grabbed) p.grabCool = 4; }
     if (!World.clear(s.world, p.x, p.y)) unstick(s, true);
@@ -2306,11 +2310,17 @@ const Sim = (() => {
           surface === "tile" || surface === "rail" ? 1.15 : 1;
         const rain = s.weather === "Rain" && surface !== "tile" ? .8 : 1;
         noise(s, p.x, p.y, (s.running ? 6.5 : s.quiet ? 1 : 2.4) * quiet * terrain * rain);
+      }
+      // Audible strides follow distance; the separate noise timer drives infected AI.
+      let remaining = (audibleStride.get(p) ?? 0) - travelled;
+      if (remaining <= 0) {
+        remaining += s.running ? .92 : 1.05;
         if (!s.sounds.length) {
-          const soft = surface === "grass" || surface === "sand";
+          const soft = surface === "grass" || surface === "sand" || surface === "field";
           hear(s,soft ? "stepSoft" : "stepHard",p,s.quiet ? .38 : s.running ? 1.22 : .78);
         }
       }
+      audibleStride.set(p,remaining);
     }
     const fit = 1 + level(s, "fitness") * .05;
     if (s.running && p.moving) {

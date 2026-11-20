@@ -127,6 +127,25 @@ check("skills novas: cooking, foraging, fishing", ["cooking", "foraging", "fishi
 
 // ---- v0.23: ficar preso, carro, agarrar ----
 const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height - 3; y++) for (let x = 3; x < w.width - 3; x++) { const t = World.tileAt(w, x + .5, y + .5); if (t && test(t)) return {x: x + .5, y: y + .5}; } return null; };
+{
+  const stepCount = strength => {
+    const s = fresh("training");
+    const start = findTile(s,t => [0,1,2,3,4,5].every(offset =>
+      World.clear(s.world,t.x+.5+.5*offset,t.y+.5-.5*offset)));
+    Object.assign(s.player,start);
+    s.world.enemies = [];
+    let count = 0;
+    for (let i = 0; i < 48; i++) {
+      Sim.tick(s,.033,{x:strength,y:0,run:false});
+      count += s.sounds.splice(0).filter(cue => cue.kind === "stepSoft" || cue.kind === "stepHard").length;
+    }
+    return count;
+  };
+  const slow = stepCount(.35), normal = stepCount(1);
+  check("áudio: passos espaçam com movimento lento e param em repouso",
+    stepCount(0) === 0 && slow > 0 && slow < normal, slow + "/" + normal);
+}
+
 { const s = fresh("training"), p = s.player, wall = findTile(s, t => t.solid === true);
   Object.assign(p, {x: wall.x, y: wall.y}); Sim.tick(s, .033, idle);
   check("preso: dentro de uma parede é empurrado para chão livre", World.clear(s.world, p.x, p.y), p.x.toFixed(1) + "," + p.y.toFixed(1)); }

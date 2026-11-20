@@ -16,7 +16,7 @@ const Soundscape = (() => {
     doorOpen:{seconds:.38,gain:.16,cut:3100}, doorClose:{seconds:.23,gain:.18,cut:2200},
     windowSlide:{seconds:.28,gain:.14,cut:3600}, glassSmash:{seconds:.53,gain:.21,cut:5900},
     pry:{seconds:.29,gain:.17,cut:3300}, hammer:{seconds:.45,gain:.17,cut:2800},
-    stepSoft:{seconds:.14,gain:.065,cut:1500}, stepHard:{seconds:.15,gain:.075,cut:2800},
+    stepSoft:{seconds:.14,gain:.026,cut:1350}, stepHard:{seconds:.15,gain:.030,cut:2300},
     strike:{seconds:.15,gain:.18,cut:2400}, shot:{seconds:.42,gain:.26,cut:4700},
     crash:{seconds:.49,gain:.23,cut:2700}
   };

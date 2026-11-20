@@ -26,6 +26,9 @@ const Regions = (() => {
     lighthouse: {name:"Gull Point", direction:"Beyond the coast", tag:"LIGHT", type:"Headland", color:"#6a7480", width:64, height:64, deep:true, host:"coast",
       arrival:[32,58], exitBack:[32,61], hostExit:[100,100], hostArrival:[97,100], vehicles:false, cold:.35,
       detail:"A windy headland with a locked lighthouse, a keeper's cottage and a boat shed."},
+    cinema:{name:"Oxford Night Reel", direction:"Oxford", tag:"CINEMA", color:"#514c46", width:29, height:31,
+      deep:true, host:"coldvale", generator:6, arrival:[14,27], exitBack:[14,29], hostExit:[72,64], hostArrival:[71,64], vehicles:false,
+      detail:"A shuttered Oxford cult cinema. The evening raffle never finished."},
     cavern: {name:"Cinder Grotto", type:"Underground", color:"#655c55", width:42, height:42, underground:true, cold:.62,
       detail:"An abandoned survey tunnel. Bring a flashlight and spare batteries."}
   };
@@ -38,12 +41,24 @@ const Regions = (() => {
   const oldArrivals = {ridge:[47,89],ironworks:[6,47],coast:[47,6],fields:[89,47]};
   const vehicleNames = {"quarry-hauler":"Quarry hauler", "reservoir-van":"Waterworks van", "lighthouse-jeep":"Lighthouse jeep", "ironworks-van":"Yard van", "coast-service":"Coastguard car", "fields-pickup":"Farm pickup"};
 
+  function cinemaOutcome(seed) {
+    const roll = Level.seeded(seed ^ 0x521cf149)();
+    return roll < .07 ? "winner" : roll < .15 ? "trophy" :
+      roll < .25 ? "guest" : roll < .47 ? "projector" : roll < .72 ? "noise" : "quiet";
+  }
+
   function addExits(world) {
     function add(to, at) {
       world.objects.push({id:"exit-" + to, ...point(at), kind:"exit", action:"travel", name:definitions[to].name,
         active:true, solid:false, tint:.5});
     }
     const meta = definitions[world.region];
+    if (world.region === home && world.generator >= definitions.cinema.generator) {
+      const [x,y] = definitions.cinema.hostExit;
+      world.objects = world.objects.filter(o => !(o.kind === "tree" && Math.floor(o.y) === y &&
+        Math.floor(o.x) >= x-1 && Math.floor(o.x) <= x));
+      for (const lane of [x-1,x]) world.tiles[y*world.width+lane].surface = "asphalt";
+    }
     if (world.region === home) for (const id of annexes) add(id,definitions[id].townExit);
     else if (world.region !== cavern && !meta.deep) add(home,meta.entrance);
     if (world.region === "ridge") add(cavern,grottoRoute.ridge.exit);
@@ -51,7 +66,7 @@ const Regions = (() => {
     // Generation 5: the three far areas hang off the outer ones, like the grotto.
     if (world.generator >= 5) {
       if (meta.deep) add(meta.host,meta.exitBack);
-      for (const id of deepIds) if (definitions[id].host === world.region) add(id,definitions[id].hostExit);
+      for (const id of deepIds) if (definitions[id].host === world.region && world.generator >= (definitions[id].generator ?? 5)) add(id,definitions[id].hostExit);
     }
   }
 
@@ -171,6 +186,7 @@ const Regions = (() => {
     }
 
     const regionSurface = {
+      cinema() { return "concrete"; },
       ridge(x,y) {
         const creek = 38 + 4 * Math.sin(x / 12) + 3 * Math.cos(x / 9);
         const lake = ((x - 25) / 15) ** 2 + ((y - 37) / 9) ** 2;
@@ -279,6 +295,7 @@ const Regions = (() => {
       opening(x+w-1,y+Math.floor(h/2),"window");
       hotspots.push({x:entry+.5,y:front+2.5});
       return {
+        opening,
         stash:(ix,iy,kind,label,contents,extra) => loot(x+ix,y+iy,kind,label,contents,extra),
         bed:(ix,iy,label = "Camp bed") => add(x+ix,y+iy,"bed",{name:label,action:"bed"}),
         bench:(ix,iy) => add(x+ix,y+iy,"counter",{name:"Workbench",action:"workbench"}),
@@ -295,7 +312,34 @@ const Regions = (() => {
     const garden = (x,y,crop) => resource(x,y,"garden","Garden bed",{solid:true,
       garden:{crop,moisture:48,growth:Data.crops[crop].minutes}});
 
-    if (region === "ridge") {
+    if (region === "cinema") {
+      const hall = building(5,4,18,20,"Oxford Night Reel","cinema","iron");
+      const front = buildings.at(-1).door;
+      front.name = "Lobby doors";
+      front.open = true;
+      const emergency = hall.opening(22,10,"door");
+      emergency.name = "Emergency exit";
+      emergency.open = true;
+      for (let y=5;y<=22;y++) for (let x=6;x<=21;x++) {
+        at(x,y).room = y >= 19 ? x <= 9 ? "Ticket booth" : x >= 17 ? "Concessions" : "Lobby" :
+          y >= 16 ? x >= 18 ? "Projection booth" : x <= 8 ? "Storage" : "Auditorium" :
+          y <= 7 ? x >= 17 ? "Backstage" : "Stage" : "Auditorium";
+      }
+      for (const [x,y] of [[18,16],[18,18],[19,16],[21,16],[9,16],[9,18],[17,19],[17,21]]) {
+        Object.assign(at(x,y),{kind:"wall",solid:true,outside:false,wallAxis:x === 18 || x === 9 || x === 17 ? "y" : "x"});
+      }
+      add(8,20,"counter",{name:"Ticket booth counter"});
+      add(19,20,"counter",{name:"Concessions counter"});
+      hall.stash(2,12,"shelf","Equipment cupboard",{battery:1,cloth:1});
+      hall.stash(15,17,"crate","Sealed concessions",{food:1,water:1});
+      add(19,17,"projector",{name:"Projector",solid:false});
+      add(20,19,"cinema-guest",{name:"Concessions guest",solid:false});
+      add(19,6,"table",{name:"Backstage table"});
+      for (const y of [9,11,13,15]) for (const x of [9,10,11,15,16,17]) {
+        add(x,y,"chair",{name:"Auditorium seat"});
+        if ((x+y)%3 !== 0) add(x,y,"cinema-body",{name:"Motionless audience member",solid:false});
+      }
+    } else if (region === "ridge") {
       zone("trail","Pine Ridge trail","#657052");
       road([[47,94],[47,83],[53,72],[49,61],[52,51],[48,39],[54,28],[62,25]],1.35,"trail","trail");
       road([[53,72],[43,72],[30,67],[22,57]],1.4,"trail","trail");
@@ -514,5 +558,5 @@ const Regions = (() => {
     }
   }
 
-  return {home,cavern,definitions,annexes,create,expand,addExits,addWilds,connection,oldWidth,oldExit,mapRevision,vehicleNames};
+  return {home,cavern,definitions,annexes,cinemaOutcome,create,expand,addExits,addWilds,connection,oldWidth,oldExit,mapRevision,vehicleNames};
 })();

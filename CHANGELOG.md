@@ -1,5 +1,11 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
+## 0.32 — Oxford Night Reel
+- Added an optional, replayable beginner introduction using the survival controls.
+- Infected deaths can open one of six short afterlife games with reduced visibility and directional sound.
+- Added seed-dependent film Easter eggs and a fictional Oxford cinema with six independent clues.
+- The El Gordo raffle can leave a rare infected winner, a collectible trophy or a quiet screening room.
+
 ## 0.31 — The Second All-Clear
 - Extended the evacuation story into a playable finale in Cinder Grotto.
 - Added six field challenges and marked discovered story sites on the map.

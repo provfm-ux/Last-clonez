@@ -2,7 +2,7 @@
 
 const Chronicle = (() => {
   const title = "The Second All-Clear";
-  const revision = 4, dispatchDelay = 24, tideCycle = 156, lowTide = 52;
+  const revision = 5, dispatchDelay = 24, tideCycle = 156, lowTide = 52;
   const deskId = "ledger-desk";
   const leads = {
     coldvale:"The grocery store kept printing collection slips after it shut.",
@@ -13,6 +13,7 @@ const Chronicle = (() => {
     quarry:"The foreman kept a second shift record beside the weighbridge.",
     reservoir:"Follow the spillway to the valve tower. Someone scratched a warning inside.",
     lighthouse:"The boat shed at Gull Point kept a second copy of the keeper’s watch.",
+    cinema:"The ticket booth and projection booth kept separate records of the last screening.",
     cavern:"Follow the winch and survey rooms to the final shutdown console."
   };
   const entries = {
@@ -88,10 +89,10 @@ const Chronicle = (() => {
       text:"You find a second set of seeds, a bottle of water and a note on where the last plants survived the winter.",
       reward:{strawberryseed:2,water:1}, cache:"Orchard seed reserve"},
     buildnote:{region:"coldvale",at:["workshop",2,4],title:"Weekend jobs",source:"Workshop · Scrap of squared paper",extra:true,added:3,
-      text:"Milo: Clone the zombie game by Sunday. Kit: Get Patchwork to handle the tedious bits. Both: Stop feeding it the live council map. Someone ticked the first two boxes. Under the third, in pencil: ‘But the road names are already done.’",
+      text:"Pip: A proper Cold Vale map will save us a day. Vic: The real clinic and depot are on there. Keep it offline. Beneath that, in Pip’s handwriting: ‘I’ve left my mum’s street out.’ The street is circled on the printout.",
       lead:"A delivery address on the back reads Firewatch cabin, Pine Ridge."},
     install:{region:"ridge",at:["Firewatch cabin",3,5],title:"Survey team handover",source:"Firewatch cabin · Handover folder",extra:true,added:3,
-      text:"Milo took the little server down to the old survey room. Kit put a label on the modem saying LOCAL BUILD. The phone bill says it rang the real bus depot seventeen times. I told them to find a different word for local.",
+      text:"Vic brought the modem up to the cabin. Said he needed one connection to finish the test and would cut it before breakfast. Pip had left a note asking him to wait. The modem still says LOCAL BUILD. The phone bill lists seventeen calls to the bus depot.",
       lead:"The descent is on the trail south of the cabin."},
     returnlabel:{region:"ironworks",at:["Freight depot",11,5],title:"Delivery exception",source:"Freight depot · Returned docket",extra:true,added:3,
       text:"The consignee was listed as TEST DRIVER 04. Real name on the driver's badge, Eddie. He signed twice, once before the van arrived. Dispatch took the box away and left a maintenance pouch under the rack marked RETURNS.",
@@ -103,11 +104,11 @@ const Chronicle = (() => {
       text:"A maintenance pouch is tucked behind the mesh. The receipt says ‘No returns after opening’. In a different hand: ‘Would love to.’",
       reward:{battery:2,tape:1,scrap:2},cache:"Returned maintenance pouch"},
     samplelog:{region:"cavern",at:[8,24],title:"Two clocks",source:"Winch room · Paper log",extra:true,added:3,
-      text:"11 October. The simulation clock said Tuesday. Our watches said Wednesday. The swab from the depot driver matched what Patchwork called a hostile test agent. Same virus in both the test file and the blood sample. Kit took the report upstairs. Milo pulled the cable.",
+      text:"11 October. The simulation clock said Tuesday. Our watches said Wednesday. The swab from the depot driver matched what Patchwork called a hostile test agent. The virus was real. Vic wrote ‘Eddie’ beside TEST DRIVER 04. Pip pulled the cable, then asked whether Eddie had made it home. Nobody in the room knew.",
       lead:"A backup of their conversation is in the survey room."},
     recovery:{region:"cavern",at:[32,10],title:"Local build backup",source:"Survey room · Offline console",extra:true,added:3,needs:["buildnote","install","samplelog"],
       action:"Open the offline conversation",locked:"The console needs the project alias from town, the cabin handover and the winch room log.",
-      text:"MILO: Make the zombies feel real. KIT: In the game. PATCHWORK: Test successful. New virus deployed. Initial focus: Cold Vale bus depot. KIT: Undo. PATCHWORK: Restore point is after deployment. Milo unplugged the speakers before it could offer a thumbs-up.",
+      text:"PIP: Take my street off the map. VIC: Take every street off. PATCHWORK: Virus deployed. First case confirmed at Cold Vale bus depot. VIC: His name’s Eddie. PATCHWORK: Playtester 04. PIP: Undo. PATCHWORK: You wanted Survival Mode. Try surviving. VIC: I’m going to the depot. PIP: Wait. I’ve got the keys.",
       reward:{part:2,battery:2},cache:"Offline terminal spares"},
     parade:{region:"coldvale",at:["The Winchester cottage",3,4],generator:3,style:"parade-wheel",title:"Float inspection",source:"The Winchester · Kitchen notice",extra:true,
       text:"Keep the giant cheese chocked until the judging. We lost it once on Raccoon Rise and the dead got out of its way faster than the living. The inspector wants a brake. The dairy crew in Westfields got the last spare.",
@@ -126,7 +127,7 @@ const Chronicle = (() => {
     shoplist:{region:"coldvale",at:["Day Twenty-Eight bungalow",3,4],generator:3,title:"The weekly shop",source:"Day Twenty-Eight · Magnet note",extra:true,
       text:"Ted keeps going to the supermarket with the same list. Milk, cat food, something for tea. Today he came back with an empty trolley and someone else’s shoe. Doris says she’ll give it back next Thursday."},
     deliveryloop:{region:"coldvale",at:["Cemetery Road farmhouse",3,4],generator:3,title:"Misdelivered post",source:"East End · Envelope marked return to sender",extra:true,
-      text:"Six copies of tomorrow’s schedule, all for the same house. I took one back to Kit. His machine said the address was in a test. I asked it to come and do my round."},
+      text:"Six copies of tomorrow’s schedule, all for the same house. I took one back to Vic. His machine said the address was in a test. I asked it to come and do my round."},
     trailtag:{region:"ridge",at:["Ash Hollow hut",3,4],generator:3,title:"Do not feed",source:"Trail crew · Visitor register",extra:true,
       text:"Whatever’s been scratching at the hut ignores the suet balls. It walks round to the back door at the same minute every hour. The birdwatching group has asked for its species name before adding it to the list."},
     shiftClock:{region:"ironworks",at:["Busan Line cottage no. 3",3,4],generator:3,title:"Clocking-off slip",source:"Busan Line cottages · Red pencil",extra:true,
@@ -161,7 +162,7 @@ const Chronicle = (() => {
     weighghost:{region:"quarry",at:["Weighbridge hut",4,3],generator:5,added:4,extra:true,
       title:"One passenger, thirty tonnes",source:"Slag Quarry · Weighbridge ticket",
       text:"A truck rolled across empty. The printer gave its weight as EDDIE. The actual Eddie, under the desk with me, asked if he could have the ticket. He’d never been thirty tonnes before.",
-      lead:"Kit overlaid old infrastructure on the council map. The other backups are at Greywater and Gull Point."},
+      lead:"Vic overlaid old infrastructure on the council map. The other backups are at Greywater and Gull Point."},
     pipecopy:{region:"reservoir",at:["Valve tower",4,3],generator:5,added:4,extra:true,
       title:"Plumbing fault",source:"Greywater · Valve tower wall",
       text:"The voice in the spillway says ‘all clear’ every twenty minutes. I marked the high water with a pencil. It rises one mark after each announcement. If it asks for feedback, tell it the dam is full."},
@@ -170,7 +171,7 @@ const Chronicle = (() => {
       text:"One ticket, fare paid, destination outside the map. The keeper pinned it so the wind couldn’t take it. On the back is a hand-drawn gull and the words ‘Keep one seat empty.’"},
     shutdown:{region:"cavern",at:[30,12],title:"End the second all-clear",source:"Survey room · Manual isolation console",added:4,needs:["recovery"],afterDispatch:true,
       action:"Begin manual isolation",locked:"Recover the offline conversation from the survey room terminal.",
-      prompt:"Kit wrote the order on the casing. Isolate the recorded loop. Read back the signed check-in. Cut the outbound relay.",
+      prompt:"Vic wrote the order on the casing. Pip added, ‘Use the names on the signed sheet.’ Isolate the recorded loop. Read back the signed check-in. Cut the outbound relay.",
       game:{buttons:["Read back check-in","Cut relay","Isolate loop"],sequence:[2,0,1]},
       text:"For the first time since 06:12, the tape reaches its end. Ada reads the names of the people who crossed over the local handset. There is a long break before she says Eddie’s. Then someone answers.",
       reward:{battery:2,bandage:1},cache:"Survey crew’s final kit"},
@@ -180,6 +181,54 @@ const Chronicle = (() => {
       text:"Eddie collected the weighbridge ticket. The keeper drew the gull. Ada left one place empty in the truck. Folded together, the stubs spell out a destination Patchwork never copied: home.",
       reward:{food:2,battery:1},cache:"Eddie’s packed lunch"}
   };
+
+  // These field finds are map-seeded and independent of supplies, population and the case.
+  const filmFinds = {
+    pubstand:{region:"fields",at:["Malt house",4,4],title:"Last round",source:"Malt house · Beer mat",
+      text:"The beer mats say to stay put and wait for the trouble to blow over. The front door is barricaded with the jukebox. The back door is propped open so the regulars can smoke."},
+    centreboard:{region:"coldvale",at:["market",2,5],title:"Shopping arcade closing rota",source:"Grocery store · Arcade notice",
+      text:"The committee barricaded the shopping arcade and voted to keep the escalator running. It has been carrying an empty shopping trolley upstairs for three days."},
+    emptyroad:{region:"coldvale",at:[29,24],style:"milk-bottles",title:"Nothing on the road",source:"Main road · Unopened delivery",
+      text:"An entire row of milk bottles is untouched. The van’s indicator still blinks, faithfully asking permission to turn into an empty street."},
+    farmboards:{region:"fields",at:["Orchard farmhouse",7,3],title:"Count the nails",source:"Orchard farmhouse · Boarded window",
+      text:"The house stayed dark all night. At dawn, someone had pulled the nails out of the boards and knocked them back in from the outside."},
+    coldsample:{region:"ironworks",at:["Power substation",4,4],style:"sample-case",title:"Hold at minus twenty",source:"Power substation · Refrigerated specimen case",
+      text:"The sample was hard enough to rattle in its jar. At nineteen below it moved to the side furthest from the thermometer. Someone has crossed out ‘defrost before opening’."},
+    tornreel:{region:"ridge",at:["Firewatch cabin",6,4],style:"broken-recorder",title:"Recorder with a torn tape",source:"Firewatch cabin · Notebook and recorder",
+      text:"The notebook says the last recording was of the wind. The recorder has been smashed, very carefully, in the middle of a sentence."},
+    sealcar:{region:"ironworks",at:["Freight depot",8,4],style:"carriage-door",title:"Carriage end door",source:"Freight depot · Abandoned carriage",
+      text:"The carriage door was tied shut with neckties from the platform side. Someone inside slid a folded ticket under it after the last train had gone."},
+    rulespad:{region:"coast",at:["Weather hut",5,5],title:"The rules, revised",source:"Weather hut · Pocket notebook",
+      text:"Always check the back seat. If there is somebody in it, ask them what rule they were following. If they answer, ask how long they’ve been there."},
+    wheelbarrow:{region:"quarry",at:["Crusher shed",4,3],title:"Unlicensed transport",source:"Crusher shed · Incident report",
+      text:"The foreman tried moving a dead worker in a wheelbarrow. At lunch, three dead workers were pushing the foreman around in it. The wheelbarrow has been written off."},
+    sporetag:{region:"ridge",at:["Creek shelter",3,3],title:"Don’t tread on the threads",source:"Creek shelter · Trail notice",
+      text:"The white filaments run all the way under the door. I put my boot down and heard chairs scrape in the next room. If you wake one, expect company."}
+  };
+  for (const [id,entry] of Object.entries(filmFinds)) entries[id] = {...entry,added:5,generator:6,extra:true,rare:true};
+
+  const cinemaNotes = {
+    poster:{at:["Oxford Night Reel",8,17],title:"Shocktober event poster",source:"Entrance lobby",
+      text:"THE NIGHT REEL SOCIETY PRESENTS\nSHOCKTOBER — ONE HELL OF A NIGHT\n\nCult classics. Cold beers. Ridiculous prizes. And the world-famous El Gordo raffle. One lucky Night Reeler will walk off with the Golden Raffle Trophy. Everyone else can cry into their popcorn. Doors at 7:30. Film at 8:30. Chaos afterwards."},
+    ticketpost:{at:["Oxford Night Reel",3,15],title:"Printed social announcement",source:"Ticket booth · Fictional social post",
+      text:"OXFORD, YOU BEAUTIFUL WEIRDOS!\nTonight’s screening is sold out. Come for the cold beer and the film, stay for an indecent quantity of raffle prizes. One of you is taking El Gordo home. What could possibly go wrong?\n#NightReel #ElGordo #Shocktober"},
+    livepost:{at:["Oxford Night Reel",15,13],title:"Winner announcement and draft",source:"Projection booth · Fictional social post",
+      text:"WE HAVE A WINNER! Our El Gordo champion looks like he’s been partying since 1987. Absolute legend. Somebody get him a beer.\n\nUnsent draft\n‘Right, apparently he doesn’t want a beer. He wants…’"},
+    backnote:{at:["Oxford Night Reel",13,2],title:"Note to whoever sold 00666",source:"Backstage table",
+      text:"Whoever sold ticket 00666 needs to explain. The winner looked like absolute death. We gave him the trophy. He tried to eat Martin Fenwick. Everyone thought it was performance art.\nIT WAS NOT PERFORMANCE ART.\nIf you’ve got the keys to the back exit, OPEN THE BLOODY DOOR."},
+    finalpost:{at:["Oxford Night Reel",14,11],title:"Final screening update",source:"Projection booth · Fictional social post",
+      text:"Well, you magnificent bastards. El Gordo has eaten half the front row. The projector is still running. Nobody can find the keys and somebody’s nicked all the popcorn.\n10/10 atmosphere. Would probably not recommend.\n#NightReel #BestNightEver #SendHelp"},
+    halloffame:{at:["Oxford Night Reel",10,16],title:"El Gordo Hall of Fame",source:"Lobby wall",
+      text:"Tess Plover — 00432 — left on the last bus with twelve saucepans.\nGareth Fen — 00280 — donated his inflatable coffin back.\n\nEL GORDO CHAMPION\nTICKET #00666\nWinner: Unknown\nStatus: Unavailable for comment\n\nThe blurry photo shows a figure clutching the golden trophy. First winner to bite the presenter."}
+  };
+  for (const [id,entry] of Object.entries(cinemaNotes)) entries[id] = {...entry,region:"cinema",added:5,generator:6};
+
+  function available(entry,world) {
+    if ((entry.generator ?? 1) > world.generator) return false;
+    if (!entry.rare) return true;
+    const salt = [...entry.title].reduce((sum,c) => Math.imul(sum,31)+c.charCodeAt(0),0);
+    return Level.seeded(world.seed ^ salt)() < .48;
+  }
 
   const core = ["receipt","watch","tally","tidebook","cellar","relay","reply"];
   const routes = {
@@ -222,7 +271,7 @@ const Chronicle = (() => {
         tint:.72,solid:false,active:false,storage:true,searched:true,loot:[],...properties});
     }
     for (const [id, entry] of Object.entries(entries)) {
-      if (entry.region !== world.region || (entry.generator ?? 1) > world.generator ||
+      if (entry.region !== world.region || !available(entry,world) ||
           Boolean(entry.added || entry.generator) !== expansion) continue;
       const o = fixture(entry.at,{id:idFor(id),record:id,name:entry.title,kind:entry.style ?? (entry.action ? "relay" : "record"),action:entry.action ? "ledger-event" : "ledger-record"});
       if (entry.reward) cache(cacheFor(id),entry.cache,o,{record:id});
@@ -278,5 +327,5 @@ const Chronicle = (() => {
       reportRead:dispatch.reportRead} : null};
   }
 
-  return {title,revision,dispatchDelay,deskId,leads,entries,core,routes,empty,has,isFixture,idFor,cacheFor,deliveryFor,isScene,isUnseen,place,incidentProblem,tideForecast,ready,restore};
+  return {title,revision,dispatchDelay,deskId,leads,entries,core,routes,empty,has,isFixture,idFor,cacheFor,deliveryFor,isScene,isUnseen,available,place,incidentProblem,tideForecast,ready,restore};
 })();

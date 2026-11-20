@@ -7,6 +7,8 @@ const Soundscape = (() => {
     horde:{seconds:3.2,gain:.43,cut:990}, twig:{seconds:.57,gain:.37,cut:2500},
     tin:{seconds:1.34,gain:.31,cut:2250}, fungus:{seconds:1.38,gain:.36,cut:1300},
     crib:{seconds:1.45,gain:.24,cut:1700}, alarm:{seconds:1.9,gain:.32,cut:2200},
+    wings:{seconds:.65,gain:.3,cut:2600}, heartbeat:{seconds:.8,gain:.36,cut:340},
+    footsteps:{seconds:.85,gain:.29,cut:1250}, glass:{seconds:.65,gain:.24,cut:3000},
     stone:{seconds:1.65,gain:.25,cut:1400}
   };
 
@@ -38,6 +40,14 @@ const Soundscape = (() => {
           const hit = tap(t,.01,13) + .47*tap(t,.21,14)+.37*tap(t,.40,15)+.23*tap(t,.57,18)+.16*tap(t,.72,20)+.10*tap(t,.85,22);
           sample = (.28*tone(666,t)+.18*tone(927,t)+.13*tone(1463,t)+.22*fuzz)*hit; break;
         }
+        case "wings":
+          sample = fuzz*.45*(tap(t,.04,16)+.7*tap(t,.25,16)+.5*tap(t,.43,18)); break;
+        case "heartbeat":
+          sample = tone(58,t)*(.8*tap(t,.04,22)+.55*tap(t,.22,25)); break;
+        case "footsteps":
+          sample = (.55*grain+.2*tone(94,t))*(tap(t,.04,17)+.75*tap(t,.41,19)); break;
+        case "glass":
+          sample = (.38*tone(1294,t)+.23*tone(2325,t))*(tap(t,.02,15)+.48*tap(t,.17,21)); break;
         case "stone": {
           const impact = tap(t,.03,23)+.55*tap(t,.19,18)+.37*tap(t,.37,16)+.2*tap(t,.63,13)+.12*tap(t,.87,13);
           sample = (.56*grain+.36*tone(224,t)+.14*tone(317,t))*impact; break;

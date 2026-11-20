@@ -126,5 +126,19 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   check("dark pixel: empurrar não mostra um golpe de arma", heldWeapon === null);
 }
 if (!quiet) console.log("\nOperações por frame (jogo parado): " + Math.round(Object.values(steady).reduce((a, b) => a + b, 0)) + " (clássico: " + Math.round(Object.values(classic).reduce((a, b) => a + b, 0)) + ")");
+const cinema = Sim.create(17,"survival","carer",6,undefined,"cinema");
+Object.assign(cinema.player,{x:13.5,y:12.5});
+Sim.tick(cinema,.03);
+View.prepare(cinema.world);
+const auditorium = per(() => View.render(cinema,0,.016));
+check("Oxford auditorium renders with the shared renderer", auditorium.fill > 0);
+const shadow = context.Afterlife.start(cinema,.1,.6);
+context.Afterlife.tick(shadow,.1,{x:0,y:0});
+const limited = per(() => View.renderAfterlife(shadow));
+shadow.blind = true;
+const blind = per(() => View.renderAfterlife(shadow));
+check("afterlife draws a small field without filters or gradient passes",
+  limited.fill <= 60 && blind.fill < limited.fill &&
+  !limited.createRadialGradient && !limited.createLinearGradient);
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

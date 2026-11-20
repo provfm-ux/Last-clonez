@@ -267,7 +267,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("portas: com a porta aberta o infetado entra e chega ao jogador", withOpen === true);
   check("portas: com a porta fechada o infetado (sem alerta) não vem", withClosed === false); }
 // ---- v0.26: mundo maior (geração 4) ----
-{ check("mundo: jogos novos usam a geração 5", fresh("survival").world.generator === 5);
+{ check("mundo: jogos novos usam a geração 6", fresh("survival").world.generator === 6);
   for (const region of ["ridge", "ironworks", "coast", "fields"]) {
     const w4 = World.build(Data.control.seed, "survival", 4, Data.worldRules("survival"), region), w3 = World.build(Data.control.seed, "survival", 3, Data.worldRules("survival"), region);
     const wild = w4.objects.filter(o => o.id.startsWith("wild-"));
@@ -309,7 +309,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("viagem: Cold Vale → Ironworks → Slag Quarry → Ironworks", trail.join(" > ") === "ironworks > quarry > ironworks", trail.join(" > "));
   let q = s; try { for (const id of ["fields", "reservoir"]) q = go(q, id); } catch (e) { trail.push(e.message); }
   let back = null, why = ""; try { back = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(q)))); } catch (e) { why = e.message; }
-  check("viagem: gravar e restaurar dentro do Greywater Reservoir", back?.world.region === "reservoir" && back.world.generator === 5, why || q.world.region);
+  check("viagem: gravar e restaurar dentro do Greywater Reservoir", back?.world.region === "reservoir" && back.world.generator === 6, why || q.world.region);
   let boom = ""; try { for (let i = 0; i < 400; i++) Sim.tick(q, .1, {x: 1, y: 0, run: false}); } catch (e) { boom = e.message; }
   check("viagem: 400 ticks no reservatório sem erros", boom === "", boom); }
 // ---- v0.31: case finale, regional challenges, and hidden records ----
@@ -380,6 +380,159 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   let rejected = false;
   try { Sim.restore(bad); } catch { rejected = true; }
   check("save rejects a shutdown without the signed check-in", rejected);
+}
+{
+  const run = fresh("training");
+  check("marked locations show the selected landmark", Sim.markDestination(run,"market") && Boolean(Sim.destination(run)));
+  const waypoint = run.waypoint;
+  run.hideNavigation = true;
+  check("mapless exploration hides waypoint guidance without changing the run",
+    Sim.destination(run) === null && run.waypoint === waypoint);
+  run.hideNavigation = false;
+  check("marked locations can be restored without losing the waypoint", Boolean(Sim.destination(run)));
+}
+// ---- v0.32: infected deaths and the Oxford cinema ----
+{
+  const {Afterlife} = context;
+  const s = fresh("training");
+  check("only infected deaths qualify for the default 60% chance",
+    s.rules.afterlifeChance === 60 && !Afterlife.eligible(s,0));
+  s.player.exposure = 4;
+  check("afterlife probability boundary", Afterlife.eligible(s,.5999) && !Afterlife.eligible(s,.60));
+  s.rules.afterlifeChance = 0;
+  check("zero chance disables the afterlife", !Afterlife.eligible(s,0));
+  s.rules.afterlifeChance = 100;
+  s.player.hp = 0;
+  Sim.tick(s,.03);
+  const snapshot = JSON.parse(JSON.stringify(Sim.snapshot(s)));
+  const dead = Sim.restore(snapshot);
+  check("eligible death is rolled once and saved as an optional offer",
+    dead.mode === "dead" && dead.afterlifePending && dead.player.hp === 0);
+  const healthy = fresh("training");
+  healthy.rules.afterlifeChance = 100;
+  healthy.player.hp = 0;
+  Sim.tick(healthy,.03);
+  check("ordinary death skips the offer even at 100%", healthy.mode === "dead" && !healthy.afterlifePending);
+  delete snapshot.rules.afterlifeChance;
+  delete snapshot.afterlifePending;
+  check("old dead saves default to no pending offer", !Sim.restore(snapshot).afterlifePending);
+  const unchanged = JSON.stringify(Sim.snapshot(dead));
+  const rolls = {crow:.1,rot:.3,horde:.5,brains:.64,trapped:.86,chardonnay:.02};
+  for (const [id,roll] of Object.entries(rolls)) {
+    const losing = Afterlife.start(dead,roll,.42);
+    for (let i=0;i<800;i++) Afterlife.tick(losing,.1,idle);
+    check("afterlife timeout: " + id, losing.id === id && losing.result === "failure" &&
+      losing.finishAt >= 30 && losing.finishAt <= 90 && (id !== "crow" || losing.blind));
+    const winning = Afterlife.start(dead,roll,.42);
+    if (winning.locked) {
+      Object.assign(winning.player,winning.latch);
+      Afterlife.action(winning,"grab");
+      check("trapped latch releases", !winning.locked);
+    }
+    if (id === "crow") {
+      Object.assign(winning.player,winning.route.find(p => Sim.distance(p,winning.origin) >= 1.6));
+      Afterlife.tick(winning,.1,idle);
+      check("moving early saves the crow's victim's sight", winning.crowGone && !winning.blind);
+    }
+    for (let i=0;i<(id === "horde" ? 3 : 1);i++) {
+      Object.assign(winning.player,winning.target);
+      if (id === "brains" || id === "rot") Afterlife.action(winning,"bite");
+      else if (id === "chardonnay") Afterlife.action(winning,"grab");
+      else Afterlife.tick(winning,.1,idle);
+    }
+    check("afterlife success: " + id, winning.result === "success" && winning.finishAt >= 30);
+  }
+  const walking = Afterlife.start(dead,.1,.3);
+  const start = {...walking.player};
+  const next = walking.route[1];
+  const x = next.x-start.x, y = next.y-start.y, twist = walking.drift*walking.opposite;
+  for (let i=0;i<20;i++) Afterlife.tick(walking,.03,{x:x+y*twist,y:y-x*twist});
+  check("responsive movement with fixed drag bias", Sim.distance(walking.player,next) < .6);
+  check("afterlife leaves the human run unchanged", unchanged === JSON.stringify(Sim.snapshot(dead)));
+}
+{
+  const {Chronicle,Afterlife} = context;
+  const s = fresh("survival");
+  const exit = s.world.objects.find(o => o.id === "exit-cinema");
+  const old = Sim.create(17,"survival","carer",5);
+  check("Oxford crossing is generation-gated", exit && World.clear(s.world,exit.x,exit.y) &&
+    !old.world.objects.some(o => o.id === "exit-cinema"));
+  for (const seed of [0,1,42,937,90009]) {
+    const town = Sim.create(seed,"training","carer",6).world;
+    const [x,y] = ctxRegions.definitions.cinema.hostArrival;
+    const crossing = town.objects.find(o => o.id === "exit-cinema");
+    check("Oxford return lane is reserved for seed " + seed, World.clear(town,x+.5,y+.5) && World.clear(town,crossing.x,crossing.y));
+  }
+  Object.assign(s.player,{x:exit.x-1,y:exit.y});
+  const cinema = Sim.travel(s,exit);
+  check("Oxford foot crossing works", cinema?.world.region === "cinema");
+  const hall = cinema.world.buildings[0];
+  const notes = cinema.world.objects.filter(o => Chronicle.isScene(o));
+  check("all six Oxford notes lead to reachable floor", notes.length === 6 &&
+    notes.every(o => World.clear(cinema.world,o.x,o.y) && World.route(cinema.world,cinema.player.x,cinema.player.y,o.x,o.y).length));
+  for (const note of notes.slice().reverse()) {
+    Object.assign(cinema.player,{x:note.x,y:note.y});
+    check("Oxford note is independently readable: " + note.record, Sim.resolveScene(cinema,note));
+  }
+  const reprise = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(cinema))));
+  check("cinema notes survive save and restore", notes.every(note => Chronicle.has(reprise.ledger,note.record)));
+  const emergency = reprise.world.objects.find(o => o.name === "Emergency exit");
+  check("entrance and emergency exit are clear", World.clear(reprise.world,hall.door.x,hall.door.y) &&
+    World.clear(reprise.world,emergency.x,emergency.y) &&
+    World.route(reprise.world,hall.door.x,hall.door.y,emergency.x+1,emergency.y).length > 0);
+  const back = reprise.world.objects.find(o => o.id === "exit-coldvale");
+  Object.assign(reprise.player,{x:back.x,y:back.y-1});
+  check("Oxford return crossing works", Sim.travel(reprise,back)?.world.region === "coldvale");
+  const films = Object.entries(Chronicle.entries).filter(([,entry]) => entry.rare);
+  const selected = films.filter(([,entry]) => Chronicle.available(entry,s.world));
+  check("film references are optional and vary by seed", films.length === 10 && selected.length > 0 &&
+    selected.length < films.length && films.some(([,entry]) => Chronicle.available(entry,s.world) !==
+      Chronicle.available(entry,{generator:6,seed:s.seed+1})));
+  const echoes = Afterlife.start(cinema,.02,.31);
+  check("cinema Chardonnay is in concessions", World.tileAt(cinema.world,echoes.target.x,echoes.target.y).room === "Concessions");
+
+  const seeds = new Map();
+  let rare = 0;
+  for (let seed=0;seed<1000;seed++) {
+    const outcome = ctxRegions.cinemaOutcome(seed);
+    if (outcome === "winner") rare++;
+    if (!seeds.has(outcome)) seeds.set(outcome,seed);
+  }
+  check("El Gordo appears on a small fraction of seeds", rare >= 35 && rare <= 105, rare + "/1000");
+  for (const [outcome,seed] of seeds) {
+    const run = Sim.create(seed,"survival","carer",6,undefined,"cinema");
+    check("cinema outcome: " + outcome, run.world.cinema === outcome && run.world.enemies.length <= 3);
+    if (outcome === "projector" || outcome === "noise") {
+      Object.assign(run.player,{x:12.5,y:17.5});
+      Sim.tick(run,.03);
+      check("cinema sleepers respect the event trigger: " + outcome,
+        run.world.enemies.length >= 2 && run.world.enemies.every(z => z.dormant === (outcome === "noise")));
+      if (outcome === "noise") {
+        const z = run.world.enemies[0];
+        Object.assign(run.player,{x:z.x+1,y:z.y});
+        Sim.tick(run,.03,{x:1,y:0,run:true});
+        check("player noise can wake dormant audience members", run.world.enemies.every(z => !z.dormant));
+      }
+    }
+    if (outcome === "guest") {
+      Object.assign(run.player,{x:18.5,y:19.5});
+      Sim.tick(run,.03);
+      check("concessions guest is a brief encounter", run.cinemaGuestUntil > run.elapsed && run.atmosphere.awake);
+    }
+    if (outcome === "winner") {
+      const winner = run.world.enemies[0];
+      winner.hp = 1;
+      Object.assign(run.player,{x:winner.x,y:winner.y+1});
+      check("winner can be defeated with an ordinary hit", Sim.attack(run,winner) && winner.hp === 0);
+    }
+    if (outcome === "winner" || outcome === "trophy") {
+      const prize = run.world.objects.find(o => o.loot?.some(item => item.id === "raffletrophy"));
+      Object.assign(run.player,{x:prize.x,y:prize.y});
+      check("trophy is unique and collectible: " + outcome,
+        Sim.collect(run,prize,0) === 1 && Sim.quantity(run.player.bag,"raffletrophy") === 1 &&
+        Sim.quantity(Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(run)))).player.bag,"raffletrophy") === 1);
+    }
+  }
 }
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");

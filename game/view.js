@@ -555,6 +555,23 @@ const View = (() => {
       for (const [dx,dy,h] of [[-.28,.1,2],[.07,-.14,4],[.13,.19,3]]) f(dx,dy,1,.13,.12,h,sap);
       return;
     }
+    if (kind === "projector") {
+      f(-.26,-.29,0,.53,.55,15,rubber);
+      f(-.14,-.20,15,.33,.34,8,olive);
+      f(-.23,-.26,18,.12,.12,4,state.atmosphere.awake && state.world.cinema === "projector" ? cream : rubber);
+      return;
+    }
+    if (kind === "cinema-body") {
+      f(-.13,-.08,12,.35,.31,8,rubber);
+      f(.08,-.05,17,.22,.20,4,olive);
+      return;
+    }
+    if (kind === "cinema-guest") {
+      if (state.elapsed >= (state.cinemaGuestUntil ?? 0)) return;
+      f(-.09,-.08,0,.3,.28,20,olive);
+      f(-.05,-.07,20,.22,.19,7,cream);
+      return;
+    }
     if (kind === "sleeper") {
       if (state.atmosphere.awake) return;
       shadow(x,y,19,7);
@@ -633,6 +650,29 @@ const View = (() => {
       f(-.21,-.18,24,.43,.34,1,teal);
       f(.07,-.27,24,.07,.11,8,iron);
       f(.07,-.23,31,.07,.19,2,plastic);
+      return;
+    }
+    if (kind === "milk-bottles") {
+      for (const dx of [-.24,0,.24]) f(dx,-.1,0,.15,.16,7,cream);
+      return;
+    }
+    if (kind === "sample-case") {
+      f(-.28,-.24,0,.56,.48,10,iron);
+      f(-.16,-.12,10,.20,.21,6,teal);
+      f(.09,-.12,10,.15,.16,4,olive);
+      return;
+    }
+    if (kind === "broken-recorder") {
+      f(-.26,-.18,0,.52,.36,4,rubber);
+      f(-.2,-.11,4,.12,.12,2,iron);
+      f(.1,-.13,4,.13,.13,2,iron);
+      return;
+    }
+    if (kind === "carriage-door") {
+      f(-.37,-.18,0,.74,.24,4,iron);
+      f(-.30,-.12,4,.64,.11,32,teal);
+      f(-.23,-.13,23,.48,.12,10,rubber);
+      line(p(x-.26,y-.11,12),p(x+.28,y-.11,19),"#ab825d",2);
       return;
     }
     if (kind === "record") {
@@ -1281,6 +1321,13 @@ const View = (() => {
     }
     if (darkLook) {
       microActor(a, isPlayer, state, alive, x, y, scale);
+      if (alive && a.origin === "cinema-winner") {
+        const hand = x+(a.face || 1)*9, bob = a.moving ? Math.round(Math.sin(clock*5)*2) : 0;
+        ctx.fillStyle = "#d5ad52";
+        ctx.fillRect(hand-2,y-22+bob,5,4);
+        ctx.fillRect(hand,y-18+bob,1,4);
+        ctx.fillRect(hand-2,y-14+bob,5,1);
+      }
       if (alive && a.stats && (state.target === a || a.hp < a.stats.hp && a.alert > 0)) {
         ctx.fillStyle = "#1d261d";
         ctx.fillRect(x - 8, y - 42 * scale, 16, 2);
@@ -1346,6 +1393,12 @@ const View = (() => {
     if (isPlayer) {
       ctx.fillStyle = "#b8aa78";
       ctx.fillRect(striking ? 13 : 7, top + (striking ? 5 : 11), striking ? 7 : 4, 2.5);
+    }
+    if (a.origin === "cinema-winner") {
+      ctx.fillStyle = "#d5ad52";
+      ctx.fillRect(handX-3,handY-6,6,4);
+      ctx.fillRect(handX-1,handY-2,2,4);
+      ctx.fillRect(handX-3,handY+2,6,1);
     }
     if (a.outfit === "patrol" || isPlayer && a.gear.arms) {
       line([handX - 5, handY], [handX - 1, handY], "#334652", 5.4);
@@ -1497,6 +1550,218 @@ const View = (() => {
     ctx.restore();
   }
 
+  // Restrained tinted shades keep the white navigation cue legible in every scenario.
+  const afterlifeArt = {
+    crow:{ground:["#252b30","#15191f","#404a52","#89989f"], wall:"#3d4750",
+      prop:["...44....","..4434...","...33..4.",".4.33.44.","..43344..","...33....","...33....","..3223..."]},
+    rot:{ground:["#2a3025","#191d16","#424b33","#97a272"], wall:"#4b5038",
+      prop:["...44....","..4444...","...33..4.","44.33.444",".3.33..3.","..333.33.","..222222."]},
+    horde:{ground:["#292632","#18151f","#444052","#9891a5"], wall:"#50485e",
+      prop:["...4.....","..444....","...3...4.","...3..443","...3...3.","...3...3.","..333.333"]},
+    brains:{ground:["#332522","#201513","#583b36","#b38a78"], wall:"#584341",
+      prop:[".4444444.",".4343434.",".4444444.","..33..33.","..344433.","..342433.","..333333."]},
+    trapped:{ground:["#222b2d","#131c20","#374d52","#87a4a6"], wall:"#3e5057",
+      prop:["..44444..",".4333334.",".4322234.",".4333434.",".4333334.","..33333..","...2.2..."]},
+    chardonnay:{ground:["#34282b","#22181d","#594147","#b68989"], wall:"#59464b",
+      prop:["....44...","....43...","...4334..","...4334..","...4444..","..222222.","...3..3.."]}
+  };
+
+  const afterlifeDetails = {
+    crow:[".....44.....","...443344...","..43333334..",".4333322334.","433333223334",".2222222222."],
+    rot:[".....4......","...4.4.44...","...44444....",".4..444..4..","..33333333..","...333333...","....2222...."],
+    horde:["..444.......","..43344.....","..4333344...","..43333334..","..44444444..","..3....3....","..3....3...."],
+    brains:["....4444....","...433334...","..43333334..","..43333334..","...443344...",".....33.....","....2222...."],
+    trapped:["...333333...","..34444443..","...333333...",".....33.....","....3333....","...333333...","....2222...."],
+    chardonnay:["..333..333..",".34443.343..",".34343.343..",".34443.343..","..333...3...","...3....3...","..222..222.."]
+  };
+
+  function afterlifePixels(c, frame, x, y, colors, unit) {
+    for (const [row,line] of frame.entries()) {
+      for (let col=0;col<line.length;col++) {
+        if (line[col] === ".") continue;
+        c.fillStyle = colors[Number(line[col])-1];
+        c.fillRect(x+col*unit,y+row*unit,unit,unit);
+      }
+    }
+  }
+
+  const afterlifeActors = {
+    zombie:[".......333.......","......34443......","......35443......",".......343.......","......22331......",
+      ".....2233321.....","...1233333221....","..123.333.221....","..22..332..221...","..44..221...44...",
+      "......2221.......",".....22221.......",".....22.221......","....221..221....."],
+    human:[".......222.......","......23332......","......34443......",".......343.......","......22221......",
+      ".....2333321.....","....233333221....","...221333.222....","...442333..44....",".....22221.......",
+      ".....22321.......",".....22.221......","....221..221.....","....221...22....."],
+    mannequin:[".......333.......","......34443......","......34443......",".......343.......","......23332......",
+      "....233333332....","...23333333332...","..233.333.332....","..33..333..33....","......2222.......",
+      "......2222.......","......2222.......",".......22........",".....222222......"]
+  };
+  const afterlifeFeet = [
+    ["....22...221.....","...221....221....","...11......11...."],
+    ["....221..221.....","....221..22......","....11...11......"],
+    [".....221.22......","......22.221.....","......11..11....."]
+  ];
+  const afterlifePortraits = new Map();
+  function afterlifePortrait(role,colors,step) {
+    const key = [role,step,...colors].join(":");
+    if (afterlifePortraits.has(key)) return afterlifePortraits.get(key);
+    const sprite = document.createElement("canvas");
+    sprite.width = 17;
+    sprite.height = 16;
+    const torso = afterlifeActors[role].slice(0,13);
+    afterlifePixels(sprite.getContext("2d"),[...torso,...afterlifeFeet[step]],0,0,colors,1);
+    afterlifePortraits.set(key,sprite);
+    return sprite;
+  }
+
+  function renderAfterlife(session) {
+    if (!size.width) resize();
+    const {width,height,dpr} = size, {player,world,target,decoy,id} = session;
+    const c = mainCtx, art = afterlifeArt[id];
+    const [ground,fringe,grain,rim] = art.ground;
+    c.setTransform(dpr,0,0,dpr,0,0);
+    c.fillStyle = "#080808";
+    c.fillRect(0,0,width,height);
+    const radius = Afterlife.range(session);
+    const scale = Math.min(1.1,width/440);
+    const project = (x,y) => {
+      const [px,py] = p(x-player.x,y-player.y);
+      return [Math.round(width*.5+px*scale),Math.round(height*.51+py*scale)];
+    };
+    const props = [];
+    const reach = Math.ceil(radius);
+    const px = Math.floor(player.x), py = Math.floor(player.y);
+    for (let y=py-reach;y<=py+reach;y++) for (let x=px-reach;x<=px+reach;x++) {
+      const d = Math.hypot(x+.5-player.x,y+.5-player.y), tile = World.tileAt(world,x,y);
+      if (!tile || d > radius) continue;
+      const [sx,sy] = project(x+.5,y+.5), hw = halfW*scale, hh = halfH*scale;
+      c.fillStyle = tile.baseSolid ? art.wall : d < radius*.7 ? ground : fringe;
+      c.beginPath();
+      c.moveTo(sx-hw,sy); c.lineTo(sx,sy-hh); c.lineTo(sx+hw,sy); c.lineTo(sx,sy+hh); c.closePath(); c.fill();
+      if (tile.solid) {
+        c.fillStyle = "#101010";
+        c.fillRect(sx-hw*.54,sy-hh*.45,hw*1.15,hh*.85);
+        c.fillStyle = art.wall;
+        const height = Math.round(hh*(1+(x+y)%3*.18));
+        const top = Math.round(sy-hh*.55-height);
+        c.fillRect(sx-hw*.38,top,hw*.76,height);
+        c.fillRect(sx-hw*.52,top+4,hw*1.04,height-4);
+        c.fillStyle = rim;
+        c.fillRect(sx-hw*.32,top,hw*.53,1);
+        c.fillRect(sx-hw*.49,top+4,hw*.17,1);
+        c.fillStyle = fringe;
+        c.fillRect(sx+hw*.28,top+6,hw*.19,height-6);
+        c.fillRect(sx-hw*.31,top+height*.61,hw*.41,2);
+      } else {
+        const pattern = (x*31+y*17)%19;
+        c.fillStyle = grain;
+        c.fillRect(sx-9+pattern,sy-3,2,1);
+        c.fillRect(sx+5-pattern,sy+2,3,1);
+        c.fillStyle = "#101010";
+        c.fillRect(sx-6,sy+4,4,2);
+        if (id === "chardonnay" && (x+y)%2 === 0) {
+          c.fillStyle = grain;
+          c.fillRect(sx-5,sy-1,11,1);
+        }
+        if (!session.blind && pattern < 4 && d < radius*.84) props.push([sx,sy,pattern]);
+      }
+    }
+    for (const [x,y,pattern] of props) {
+      c.fillStyle = "#070707";
+      c.fillRect(x-8,y-2,17,4);
+      const detail = pattern%2 ? art.prop : afterlifeDetails[id];
+      afterlifePixels(c,detail,x-detail[0].length,y-detail.length*2,["#101010",ground,grain,rim],2);
+    }
+    const visible = a => a && Math.hypot(a.x-player.x,a.y-player.y) < radius && World.sees(world,player.x,player.y,a.x,a.y);
+    const figure = (a,color,lean = 0,role = "zombie",moving = false) => {
+      const [x,y] = project(a.x,a.y);
+      const step = moving ? Math.floor(session.clock*7)%3 : 1;
+      const unit = width < 560 ? 2 : 3;
+      const sprite = afterlifePortrait(role,["#101010",grain,color,rim,"#f4ede1"],step);
+      c.fillStyle = "#050505";
+      c.fillRect(x-8,y-2,16,4);
+      c.fillRect(x-5,y+2,11,2);
+      c.imageSmoothingEnabled = false;
+      c.drawImage(sprite,x-Math.floor(sprite.width*unit/2)+lean,y-sprite.height*unit,sprite.width*unit,sprite.height*unit);
+    };
+    for (const z of world.enemies) if (z.hp > 0 && visible(z)) figure(z,"#595959",1);
+    if (visible(decoy)) {
+      const [x,y] = project(decoy.x,decoy.y);
+      if (id === "brains" && session.fakeLabel.startsWith("A mannequin.")) figure(decoy,"#666666",0,"mannequin");
+      else {
+        c.fillStyle = "#626262";
+        c.fillRect(x-4,y-5+Math.sin(session.clock*5)*Number(id === "rot"),8,4);
+      }
+    }
+    if (visible(target)) {
+      if (id === "chardonnay") {
+        const [x,y] = project(target.x,target.y);
+        c.fillStyle = session.result === "success" ? "#e2e2e2" : "#c9c9c9";
+        if (session.result === "success") {
+          c.fillRect(x-8,y-2,4,2); c.fillRect(x-1,y-5,2,3); c.fillRect(x+5,y,3,2);
+        } else {
+          c.fillRect(x-2,y-9,4,9); c.fillRect(x-1,y-12,2,4);
+        }
+      } else if (session.animal) {
+        const [x,y] = project(target.x,target.y);
+        c.fillStyle = "#ababab";
+        c.fillRect(x-6,y-5,10,4); c.fillRect(x+3,y-7,4,4); c.fillRect(x-10,y-3,5,1);
+      } else {
+        figure(target,id === "horde" ? "#999999" : "#cdcdcd",0,id === "horde" ? "zombie" : "human",true);
+        if (id === "horde") {
+          for (const [dx,dy] of [[.45,0],[-.35,.55]]) {
+            const shadow = {x:target.x+dx,y:target.y+dy};
+            if (visible(shadow)) figure(shadow,"#727272",-1);
+          }
+        }
+      }
+    }
+    const [x,y] = project(player.x,player.y);
+    figure(player,"#ddd",0,"zombie",Math.hypot(session.vx,session.vy) > .15);
+    if (id === "crow" && !session.crowGone) {
+      const flutter = Math.sin(session.clock*13)*5;
+      const up = Math.sin(session.clock*13) > 0;
+      afterlifePixels(c,up ? ["44.....44",".33...33.","..33333..","...3434..","...233..."] :
+        ["...344...","..33334..","443333344",".3322233.","..2...2.."],
+        x-9,Math.round(y-59+flutter),["#101010","#353535","#999999","#eee"],2);
+    }
+    if (session.gesture?.until > session.clock) {
+      c.fillStyle = "#fff";
+      const {kind} = session.gesture;
+      if (kind === "grab") c.fillRect(x+8,y-23,8,3);
+      else if (kind === "bite") c.fillRect(x-2,y-29,5,2);
+      else { c.fillRect(x+7,y-35,2,2); c.fillRect(x+12,y-38,2,2); }
+    }
+    if (session.locked && visible(session.latch)) {
+      const [lx,ly] = project(session.latch.x,session.latch.y);
+      const [ox,oy] = project(session.origin.x,session.origin.y);
+      const shelter = session.trap === "car" ?
+        [".....3333.....","...43222234...","..4322222234..",".433333333334.","43233333333234","43333333333334",".111......111."] :
+        ["...33333333...","..3422222234..","..3422222234..","..3422224234..","..3422222234..","..3333333333..","...11111111..."];
+      afterlifePixels(c,shelter,ox-21,oy+1,["#090909",fringe,grain,rim],3);
+      c.fillStyle = "#ededed";
+      c.fillRect(lx-3,ly-10,6,3);
+    }
+    if (session.pathHint && !session.result && !Afterlife.ready(session)) {
+      const [sx,sy] = project(session.pathHint.x,session.pathHint.y);
+      const length = Math.hypot(sx-x,sy-y);
+      if (length > 2) {
+        const angle = Math.atan2(sy-y,sx-x);
+        c.save();
+        c.translate(x+Math.cos(angle)*43,y+Math.sin(angle)*43);
+        c.rotate(angle);
+        c.strokeStyle = "#0a0a0a";
+        c.lineWidth = 6;
+        c.beginPath();
+        c.moveTo(-5,-6); c.lineTo(3,0); c.lineTo(-5,6); c.stroke();
+        c.strokeStyle = session.clock-session.pulseAt < .55 ? "#fff" : "#b5b5b5";
+        c.lineWidth = 2.5;
+        c.stroke();
+        c.restore();
+      }
+    }
+  }
+
   function render(state, clock, dt) {
     if (!size.width) resize();
     if (!size.width || !size.height) return;
@@ -1624,7 +1889,7 @@ const View = (() => {
           const firearm = Sim.weaponData(state).firearm;
           const label = entity !== reachable ? "Closing in" : Sim.weaponProblem(state) ||
             (player.cooldown > 0 ? "Recovering" : firearm ? Math.round(Sim.aimChance(state, entity) * 100) + "% hit chance" : "In range");
-          marker(entity.x, entity.y, entity.kind === "brute" ? 79 : 66, label);
+          marker(entity.x, entity.y, entity.kind === "brute" ? 79 : 66, entity.origin === "cinema-winner" ? "The El Gordo Winner" : label);
         }
       }
     }
@@ -1823,7 +2088,7 @@ const View = (() => {
       dot(exit.x,exit.y,"#e5d48f",4);
       if (w >= 350) {
         const dest = Regions.definitions[exit.id.slice(5)];
-        const label = world.region === Regions.home ? dest.direction[0] :
+        const label = exit.id === "exit-cinema" ? "CINEMA" : world.region === Regions.home ? dest.direction[0] :
           world.underground ? "UP" : exit.id === "exit-" + Regions.cavern ? "DOWN" : dest?.deep ? dest.tag :
           Regions.definitions[world.region].deep ? "BACK" : "TOWN";
         const shift = exit.y > world.height/2 ? -10 : 14;
@@ -1845,5 +2110,5 @@ const View = (() => {
     c.font="700 10px monospace";c.fillStyle="#d6d7ba";c.textAlign="center";
     if(world.base)c.fillText("SHELTER",ox+10*unit,oy+40*unit+15);
   }
-  return {prepare,render,locate,minimap,mapPoint,visible};
+  return {prepare,render,renderAfterlife,locate,minimap,mapPoint,visible};
 })();

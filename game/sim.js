@@ -32,7 +32,16 @@ const Sim = (() => {
   const weaponData = s => Data.items[weapon(s).id] || fists;
   const level = (s, skill) => Math.min(Data.skillMax, Math.floor(Math.sqrt((s.player.skills[skill] ?? 0) / 12)));
   const season = s => Data.seasons[Math.floor(s.minutes / 1440 / Data.seasonDays) % Data.seasons.length];
-  const clothingWarmth = s => Object.values(s.player.gear).reduce((n, id) => n + (Data.items[id]?.warmth ?? 0), 0);
+  function wornItem(s, slot) {
+    const id = s.player.gear[slot];
+    return id ? s.player.bag.find(item => item.id === id) : undefined;
+  }
+  const wearableCondition = item => (item?.condition ?? 100) / 100;
+  const canMend = item => Boolean(Data.items[item?.id]?.warmth || Data.items[item?.id]?.guard);
+  const clothingWarmth = s => Object.keys(s.player.gear).reduce((total, slot) => {
+    const item = wornItem(s,slot);
+    return total + (Data.items[item?.id]?.warmth ?? 0) * wearableCondition(item);
+  }, 0);
   function addXp(s, skill, amount) {
     const skills = s.player.skills, before = level(s, skill);
     skills[skill] = (skills[skill] ?? 0) + amount;
@@ -64,7 +73,7 @@ const Sim = (() => {
         ...(id === "flashlight" ? {charge:0} : {}), uid:Date.now().toString(36) + "-" + itemSerial++, ...extra});
       return;
     }
-    const match = !item.perish && bag.find(entry => entry.id === id);
+    const match = !item.perish && bag.find(entry => entry.id === id && (!canMend(entry) || (entry.condition ?? 100) === (extra.condition ?? 100)));
     if (match) match.qty += qty;
     else bag.push({id, qty, condition: 100, born: 0, ...extra});
   }
@@ -174,6 +183,18 @@ const Sim = (() => {
     notify(s,"A wooden bat lies nearby. Pick it up and equip it in your inventory.");
   }
 
+  function stockSkillBooks(world) {
+    if (world.region !== Regions.home || world.booksStocked) return;
+    const shelter = world.objects.find(o => o.storage && o.building === world.base?.id);
+    for (const [index,[id,book]] of Object.entries(Data.skillBooks).entries()) {
+      const sites = world.buildings.filter(b => b.type === book.site);
+      const site = sites.length ? sites[index % sites.length] : null;
+      const container = (site && world.objects.find(o => o.building === site.id && o.action === "loot")) || shelter;
+      if (container) add(container.loot,id,1);
+    }
+    world.booksStocked = true;
+  }
+
   function create(seed, difficulty = "survival", role = "carer", generator = 2, options, region = Regions.home, profile) {
     const rules = Data.worldRules(difficulty, options);
     const world = World.build(seed, difficulty, generator, rules, region);
@@ -182,6 +203,7 @@ const Sim = (() => {
     if (town) {
       addUtilities(world);
       stockFieldGear(world);
+      stockSkillBooks(world);
     }
     if (region === "cinema") {
       const rng = Level.seeded(seed ^ 0x3beb2d58);
@@ -380,7 +402,7 @@ const Sim = (() => {
   }
 
   const canStore = o => o.storage || o.kind === "car" || o.kind === "fridge";
-  const isEquipped = (s, item) => weapon(s) === item || s.player.gear[Data.items[item.id].slot] === item.id ||
+  const isEquipped = (s, item) => weapon(s) === item || wornItem(s,Data.items[item.id].slot) === item ||
     item.id === "flashlight" && item.uid && item.uid === s.player.lightUid;
   const isBarrier = o => o?.kind === "fence" || o?.kind === "gate";
   const itemState = item => ({condition:item.condition ?? 100, born:item.born ?? 0, cold:item.cold ?? 0,
@@ -496,6 +518,8 @@ const Sim = (() => {
     const item = s.player.bag[index];
     if (!item) return 0;
     const wasEquipped = Data.items[item.id].damage && weapon(s) === item;
+    const slot = Data.items[item.id].slot;
+    const wasWorn = slot && wornItem(s,slot) === item;
     const qty = all ? item.qty : 1;
     if (store) {
       const target = containers(s).find(o => canStore(o) && (store === true || store === o));
@@ -514,8 +538,7 @@ const Sim = (() => {
     item.qty -= qty;
     if (!item.qty) s.player.bag.splice(index, 1);
     if (item.id === "flashlight" && item.uid === s.player.lightUid) s.player.lightUid = null;
-    const slot = Data.items[item.id].slot;
-    if (slot && s.player.gear[slot] === item.id && !quantity(s.player.bag, item.id)) s.player.gear[slot] = null;
+    if (wasWorn && !item.qty) s.player.gear[slot] = null;
     if (wasEquipped) unequipWeapon(s);
     return qty;
   }
@@ -536,9 +559,13 @@ const Sim = (() => {
     const data = Data.items[item.id];
     if (item.id === "flashlight") return toggleLight(s, item);
     if (data.slot) {
-      const worn = p.gear[data.slot] === item.id;
+      const worn = wornItem(s,data.slot) === item;
       p.gear[data.slot] = worn ? null : item.id;
-      if (!worn) recordPlaytest(s, "equip");
+      if (!worn) {
+        const first = p.bag.findIndex(other => other.id === item.id);
+        if (first !== index) [p.bag[first],p.bag[index]] = [item,p.bag[first]];
+        recordPlaytest(s, "equip");
+      }
       notify(s, (worn ? "Removed " : "Equipped ") + data.name.toLocaleLowerCase("en") + ".");
       return true;
     }
@@ -548,6 +575,15 @@ const Sim = (() => {
       recordPlaytest(s, "equip");
       if (s.guideStep === 1 && item.id === "bat") s.guideStep = 2;
       notify(s, data.name + " equipped.");
+      return true;
+    }
+    if (data.use === "book") {
+      if (p.readBooks?.includes(item.id)) { notify(s,"You already studied this title."); return false; }
+      if (threats(s).length || p.grabbed > 0) { notify(s,"Find a safe place to read."); return false; }
+      const skill = Data.skillBooks[item.id].skill;
+      (p.readBooks ??= []).push(item.id);
+      addXp(s,skill,24);
+      notify(s,data.name + " studied. +24 " + Data.skills[skill].name + " XP.");
       return true;
     }
     if (data.use === "food") {
@@ -650,9 +686,15 @@ const Sim = (() => {
     return true;
   }
 
+  const repairAmount = s => 35 + 3*level(s,"crafting");
+
   function recipeProblem(s, recipe, repairItem = weapon(s)) {
-    if (recipe.repair && (!s.player.bag.includes(repairItem) || !Data.items[repairItem.id]?.damage ||
-        repairItem.condition >= 100)) return "Choose a damaged weapon you carry.";
+    if (recipe.repair || recipe.mend) {
+      if (!s.player.bag.includes(repairItem) || (repairItem.condition ?? 100) >= 100 ||
+          (recipe.mend ? !canMend(repairItem) : !Data.items[repairItem.id]?.damage)) {
+        return recipe.mend ? "Choose damaged clothing in Equipment." : "Choose a damaged weapon you carry.";
+      }
+    }
     const missing = Object.entries(recipe.inputs).filter(([id, n]) => available(s, id) < n);
     if (missing.length) return missing.map(([id, n]) => (n - available(s, id)) + " " + Data.items[id].name).join(" · ");
     if (recipe.out) {
@@ -669,10 +711,16 @@ const Sim = (() => {
     if (problem) { notify(s, problem, true); return false; }
     if (recipe.build) { s.blueprint = id; notify(s, "Tap a clear spot within reach to build."); return true; }
     if (!consume(s, recipe.inputs)) return false;
-    if (recipe.repair) repairItem.condition = Math.min(100, repairItem.condition + 35);
+    if (recipe.repair || recipe.mend) {
+      if (repairItem.qty > 1) {
+        s.player.bag.splice(s.player.bag.indexOf(repairItem)+1,0,{...repairItem,qty:repairItem.qty-1});
+        repairItem.qty = 1;
+      }
+      repairItem.condition = Math.min(100, repairItem.condition + repairAmount(s));
+    }
     else add(s.player.bag, recipe.out, recipe.qty, {born: s.minutes});
     addXp(s, "crafting", 4);
-    notify(s, recipe.repair ? Data.items[repairItem.id].name + " repaired." : recipe.name + " completed.");
+    notify(s, recipe.repair || recipe.mend ? Data.items[repairItem.id].name + " repaired." : recipe.name + " completed.");
     return true;
   }
 
@@ -2053,7 +2101,19 @@ const Sim = (() => {
     if (z.kind === "brute" && !(p.fracture > 0) && s.world.rng() < .08) breakLeg(s, "A heavy blow breaks your leg.");
     const roll = s.world.rng(), type = roll < .06 ? "bite" : roll < .46 ? "cut" : "scratch";
     const part = s.world.rng() < .5 ? "arm" : "leg";
-    const guard = Math.min(.7, (part === "arm" ? ["arms", "hands", "body"] : ["legs", "feet"]).reduce((n, slot) => n + (Data.items[p.gear[slot]]?.guard ?? 0), 0));
+    let guard = 0;
+    const wear = Math.max(1, Math.round(z.stats.damage * infectedDamage(s) * .45));
+    for (const slot of part === "arm" ? ["arms","hands","body"] : ["legs","feet"]) {
+      const item = wornItem(s,slot);
+      guard += (Data.items[item?.id]?.guard ?? 0) * wearableCondition(item);
+      if (!canMend(item) || item.condition === 0) continue;
+      if (item.qty > 1) {
+        p.bag.splice(p.bag.indexOf(item)+1,0,{...item,qty:item.qty-1});
+        item.qty = 1;
+      }
+      item.condition = Math.max(0,(item.condition ?? 100)-wear);
+    }
+    guard = Math.min(.7,guard);
     const amount = z.stats.damage * infectedDamage(s) * (1 - guard);
     const absorbed = guard > 0 && s.world.rng() < guard * .9;
     p.hp = Math.max(0, p.hp - amount); p.flash = .75; p.resting = false;
@@ -2362,8 +2422,8 @@ const Sim = (() => {
   function updateExposure(s, dt) {
     if (s.rules.exposure === "off") return;
     const p = s.player, shelter = p.vehicle || World.tileAt(s.world, p.x, p.y)?.building;
-    const rain = !shelter && s.weather === "Rain", jacket = p.gear.body === "raincoat";
-    const wetRate = rain ? (jacket ? .55 : 2.1) : shelter ? -1.4 : -.45;
+    const rain = !shelter && s.weather === "Rain", jacket = p.gear.body === "raincoat" ? wearableCondition(wornItem(s,"body")) : 0;
+    const wetRate = rain ? (2.1 - 1.55*jacket) : shelter ? -1.4 : -.45;
     p.wetness = clamp(p.wetness + dt * wetRate, 0, 100);
     const target = shelter ? 37 - p.wetness * .007 : 36.6 - p.wetness * .016 - Number(isNight(s)) * .7 - (Regions.definitions[s.world.region].cold || 0) +
       clothingWarmth(s) + (s.running ? .35 : 0) - season(s).chill;
@@ -2616,7 +2676,7 @@ const Sim = (() => {
 
   function snapshotZone(s) {
     const a = s.atmosphere;
-    return {mapRevision:Regions.mapRevision,ledgerRevision:Chronicle.revision,atmosphere:{...a,pending:a.pending?{...a.pending}:null,alarm:a.alarm?{...a.alarm}:null},
+    return {booksStocked:s.world.booksStocked, mapRevision:Regions.mapRevision,ledgerRevision:Chronicle.revision,atmosphere:{...a,pending:a.pending?{...a.pending}:null,alarm:a.alarm?{...a.alarm}:null},
       waypoint:s.waypoint,mapPins:s.mapPins.map(pin => ({...pin})),npc:{...s.world.npc,path:[],moving:false},
       objects:s.world.objects,enemies:s.world.enemies.map(({stats,path,...enemy}) => ({...enemy,path:[]})),
       explored:Array.from(s.world.explored),rng:s.world.rng.state()};
@@ -2826,6 +2886,12 @@ const Sim = (() => {
       const overlaps = original.decor && [p,data.npc,...data.enemies,...data.objects.filter(o => o.active && o.solid)].some(a => distance(a,original) < .72);
       s.world.objects.push(overlaps ? {...original,solid:false} : original);
     }
+    if (data.booksStocked !== undefined && typeof data.booksStocked !== "boolean") throw new Error("Invalid book stock.");
+    s.world.booksStocked = data.booksStocked === true;
+    stockSkillBooks(s.world);
+    if (p.readBooks !== undefined && (!Array.isArray(p.readBooks) || p.readBooks.length > Object.keys(Data.skillBooks).length ||
+        p.readBooks.some(id => typeof id !== "string" || !Object.hasOwn(Data.skillBooks,id)))) throw new Error("Invalid studied books.");
+    s.player.readBooks = [...new Set(p.readBooks ?? [])];
     const savedObjects = new Map(s.world.objects.map(o => [o.id, o]));
     for (const building of s.world.buildings) building.door = savedObjects.get(building.door.id);
     if (!p.belt && s.world.base) {
@@ -2934,7 +3000,7 @@ const Sim = (() => {
   return {create, createControl, createRecommended, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
-    craft, recipeProblem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,
+    craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,
     weapon, unequipWeapon, weaponData, weaponProblem, damageFactor, aimChance, attackTarget, touchAttackTarget, inAttackRange,
     threats, notify, level, addXp, moodles, sleep, unstick, season, snapshot, restore, distance, lineOfSight,
     vehicle, enterVehicle, exitVehicle, refuel, repairVehicle, vehicleRepairProblem, vehicleRepairAmount, brake, canListen, listenAtDoor,

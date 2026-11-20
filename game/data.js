@@ -72,6 +72,22 @@ const Data = (() => {
     boots: {name:"Hiking boots", group:"Equipment", weight:.8, slot:"feet", icon:"badge", warmth:.15, guard:.08,
       detail:"Warm feet and some protection from leg hits"}
   };
+  const skillBooks = {
+    diyguide:{title:"DIY Repair Manual", skill:"crafting", site:"base"},
+    aidguide:{title:"Field First Aid", skill:"medical", site:"clinic"},
+    gardenguide:{title:"Kitchen Garden Handbook", skill:"gardening", site:"home"},
+    cookguide:{title:"Cooking Without Power", skill:"cooking", site:"market"},
+    forageguide:{title:"Cold Vale Foraging Guide", skill:"foraging", site:"home"},
+    fishguide:{title:"Fishing the Local Waters", skill:"fishing", site:"market"},
+    combatguide:{title:"Defence Drills", skill:"combat", site:"police"},
+    strengthguide:{title:"Strength at Home", skill:"strength", site:"workshop"},
+    fitnessguide:{title:"Endurance Basics", skill:"fitness", site:"clinic"},
+    quietguide:{title:"Moving Quietly", skill:"sneaking", site:"home"}
+  };
+  for (const [id, book] of Object.entries(skillBooks)) {
+    items[id] = {name:book.title, group:"Books", weight:.25, use:"book", icon:"book"};
+  }
+
   const recipes = [
     {id:"bandage",name:"Tear cloth",out:"bandage",qty:2,inputs:{cloth:1},desc:"Makes two clean bandages."},
     {id:"splint",name:"Make a splint",out:"splint",qty:1,inputs:{wood:1,cloth:1},desc:"A rigid brace that helps a broken leg heal."},
@@ -83,7 +99,8 @@ const Data = (() => {
     {id:"gardenbed",name:"Garden bed",build:"garden",inputs:{wood:2,nails:4},desc:"Grow radishes or potatoes in a raised bed on outdoor grass."},
     {id:"fence",name:"Plank fence",build:"fence",inputs:{wood:2,nails:4},desc:"Place adjoining sections outdoors to block movement and sight. Infected can break them."},
     {id:"gate",name:"Plank gate",build:"gate",inputs:{wood:3,nails:6},desc:"Add a door to a fence line. Close it after passing through."},
-    {id:"repair",name:"Repair equipped weapon",repair:true,inputs:{scrap:1,tape:1},desc:"Restores 35 points of weapon condition."}
+    {id:"repair",name:"Repair equipped weapon",repair:true,inputs:{scrap:1,tape:1},desc:"Restores weapon condition. Higher DIY skill improves repairs."},
+    {id:"mend",name:"Mend worn clothing",mend:true,inputs:{cloth:1,tape:1},desc:"Restores condition to damaged clothing from Equipment."}
   ];
   const combatStyles = {
     unarmed:{name:"Unarmed", damage:{brute:.6}},
@@ -190,7 +207,7 @@ const Data = (() => {
     strength:{name:"Strength", desc:"Melee hits harder and you carry more. Grows by fighting in melee."},
     fitness:{name:"Fitness", desc:"Stamina drains slower and returns faster. Grows by running."},
     sneaking:{name:"Sneaking", desc:"Quieter footsteps. Grows by sneaking."},
-    crafting:{name:"Building", desc:"Stronger barricades and better repairs."},
+    crafting:{name:"DIY & building", desc:"Stronger barricades and more condition restored per repair."},
     medical:{name:"First aid", desc:"Wounds are treated more effectively."},
     gardening:{name:"Gardening", desc:"Bigger harvests from the garden."},
     cooking:{name:"Cooking", desc:"Food cooks faster. Grows by collecting campfire batches."},
@@ -286,6 +303,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,garden,crops,supplyCache,story,saveVersion:1};
 })();

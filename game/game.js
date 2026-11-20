@@ -830,6 +830,9 @@
         parts.push((multiplier > 1 ? "Strong vs " : "Weaker vs ") + Data.infected[kind].name.toLowerCase() + "s");
       }
     }
+    if (Sim.canMend(item)) parts.push(weaponCondition(item));
+    const book = Data.skillBooks[item.id];
+    if (book) parts.push((state.player.readBooks?.includes(item.id) ? "Studied" : "+24 XP") + " · " + esc(Data.skills[book.skill].name));
     if (item.id === "flashlight") parts.push(item.charge > 0 ? Math.ceil(item.charge) + " game min of light" : "Empty battery");
     if (d.nutrition) parts.push("+" + d.nutrition + " food" + (d.hydration ? " · +" + d.hydration + " thirst relief" : ""));
     if (d.perish) {
@@ -859,14 +862,14 @@
       Data.items[a.item.id].name.localeCompare(Data.items[b.item.id].name));
     return ordered.map(({item, index}) => {
       const d = Data.items[item.id], equipped = current === item;
-      const worn = d.slot && state.player.gear[d.slot] === item.id;
+      const worn = d.slot && Sim.wornItem(state,d.slot) === item;
       const pinned = state.player.pinned.includes(item.id);
       const useLabel = item.id === "flashlight" ? item === Sim.activeLight(state) ? "Switch off" : "Switch on" :
         d.damage ? equipped ? "Unequip" : "Equip" : d.slot ? worn ? "Remove" : "Equip" :
-        ({food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take"}[d.use] || "");
+        ({book:state.player.readBooks?.includes(item.id) ? "Studied" : "Read", food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take"}[d.use] || "");
       return '<div class="item-row bag-item ' + (equipped || worn ? "equipped-item" : "") + '"><div><div class="item-top">' +
         itemIcon(item.id) + "<b>" + esc(d.name) + " ×" + item.qty + '</b></div><div class="item-meta">' + itemDescription(item) + '</div></div><div class="item-actions">' +
-        (useLabel ? button(useLabel, (equipped ? "unequip-" : "use-") + index, d.use === "food" && Sim.isSpoiled(state, item), "primary") : "") +
+        (useLabel ? button(useLabel, (equipped ? "unequip-" : "use-") + index, (d.use === "food" && Sim.isSpoiled(state,item)) || (d.use === "book" && state.player.readBooks?.includes(item.id)), "primary") : "") +
         (store ? button(item.qty > 1 ? "Store stack" : "Store", "store-" + index) : "") + button("Drop", "drop-" + index) +
         (hasRecipes(item.id) ? button("Recipes", "recipes-" + item.id) : "") +
         '<button type="button" class="small-button pin-button" data-action="pin-' + index + '" aria-pressed="' + pinned + '">' +
@@ -946,7 +949,7 @@
     bagFilter = "";
     bagTab = "all";
     const categories = [["all","All"], ["Food","Food & drink"], ["Medical","Medical"], ["Weapons","Weapons"],
-      ["Materials","Materials"], ["Equipment","Gear"], ["pinned","Pinned"]];
+      ["Materials","Materials"], ["Equipment","Gear"], ["Books","Books"], ["pinned","Pinned"]];
     if (source && Sim.canStore(source)) storeSource = source.id;
     show("Inventory", '<div class="bag-controls"><div class="bag-header"><div class="bag-panes" aria-label="Inventory view">' +
       '<button type="button" id="bag-nearby" data-action="bag-nearby">Nearby</button><button type="button" id="bag-carried" data-action="bag-carried">Backpack</button>' +
@@ -1014,6 +1017,7 @@
     if (!active()) return;
     const p = state.player, current = Sim.weapon(state), lamp = Sim.activeLight(state), weapons = [], equipment = [], lighting = [];
     const repair = Data.recipes.find(recipe => recipe.repair);
+    const mend = Data.recipes.find(recipe => recipe.mend);
     p.bag.forEach((item, index) => {
       const d = Data.items[item.id], backpack = d.use === "backpack";
       if (item.id === "flashlight") {
@@ -1025,18 +1029,20 @@
       }
       if (!d.damage && !d.slot && !backpack) return;
       const equipped = item === current || (backpack && p.backpack);
-      const worn = d.slot && p.gear[d.slot] === item.id;
+      const worn = d.slot && Sim.wornItem(state,d.slot) === item;
       const details = itemDescription(item) + (d.firearm ? " · " + itemCount("ammo") + " rounds" : "") +
         (backpack ? " · Adds 10 kg of capacity" : "");
-      const needsRepair = d.damage && item.condition < 100;
-      const repairProblem = needsRepair ? Sim.recipeProblem(state,repair,item) : "";
+      const recipe = d.damage ? repair : Sim.canMend(item) ? mend : null;
+      const needsRepair = recipe && item.condition < 100;
+      const repairProblem = needsRepair ? Sim.recipeProblem(state,recipe,item) : "";
       const row = '<div class="item-row' + (equipped || worn ? " equipped-item" : "") + '"><div><div class="item-top">' +
         itemIcon(item.id) + "<b>" + esc(d.name) + '</b></div><div class="item-meta">' + details + '</div></div>' +
         '<div class="item-actions">' +
         button(item === current ? "Unequip" : equipped ? "Equipped" : worn ? "Remove" : "Equip",
           (item === current ? "unequip-" : "equip-") + index, equipped && item !== current, worn || equipped ? "" : "primary") +
-        (needsRepair ? button("Repair", "repairweapon-" + index, Boolean(repairProblem)) +
-          '<div class="item-meta">' + (repairProblem ? "Need " + esc(repairProblem) : "+35 condition max · 1 scrap · 1 tape") + '</div>' : "") + "</div></div>";
+        (needsRepair ? button(recipe.mend ? "Mend" : "Repair", "repairitem-" + index, Boolean(repairProblem)) +
+          '<div class="item-meta">' + (repairProblem ? "Need " + esc(repairProblem) : "+" + Sim.repairAmount(state) +
+            " condition max · " + (recipe.mend ? "1 cloth" : "1 scrap") + " · 1 tape") + '</div>' : "") + "</div></div>";
       (d.damage ? weapons : equipment).push(row);
     });
     const slots = [["In hand",current.id === "fists" ? "Fists" : Data.items[current.id].name],
@@ -2030,9 +2036,9 @@
         updateHud();
         return;
       }
-      if (kind === "repairweapon" && dialogView === "gear") {
+      if (kind === "repairitem" && dialogView === "gear") {
         const item = state.player.bag[index];
-        if (item && Sim.craft(state,"repair",item)) save();
+        if (item && Sim.craft(state,Sim.canMend(item) ? "mend" : "repair",item)) save();
         gear();
         updateHud();
         return;

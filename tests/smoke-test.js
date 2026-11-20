@@ -805,6 +805,41 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     Sim.weapon(Sim.restore(legacy)).id === "bat");
 }
 
+{
+  const run = Sim.createControl("training","carer","shelter",undefined,{seed:17});
+  const p = run.player;
+  const diy = run.world.objects.find(o => o.loot?.some(item => item.id === "diyguide"));
+  check("livros: existem manuais para todas as competências na cidade",
+    Boolean(diy) && Object.keys(Data.skillBooks).every(id => run.world.objects.some(o => o.loot?.some(item => item.id === id))));
+  p.bag.push({id:"diyguide",qty:1,condition:100});
+  const i = p.bag.length-1;
+  const read = Sim.use(run,i) && !Sim.use(run,i);
+  const reloaded = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(run))));
+  check("livros: dá XP uma vez e conserva leitura após carregar",
+    read && reloaded.player.skills.crafting === 24 && !Sim.use(reloaded,i) && Sim.repairAmount(run) === 38);
+  const old = JSON.parse(JSON.stringify(Sim.snapshot(run)));
+  delete old.booksStocked;
+  delete old.player.readBooks;
+  for (const o of old.objects) if (o.loot) o.loot = o.loot.filter(item => !Object.hasOwn(Data.skillBooks,item.id));
+  const upgraded = Sim.restore(old);
+  check("livros: aparecem em mapas antigos sem duplicar ao gravar de novo",
+    upgraded.world.booksStocked && upgraded.world.objects.filter(o => o.loot?.some(item => item.id === "diyguide")).length === 1 &&
+    upgraded.player.readBooks.length === 0);
+
+  p.bag.push({id:"wintercoat",qty:1,condition:100},{id:"tape",qty:1,condition:100});
+  Sim.use(run,p.bag.length-2);
+  const z = World.infected(run.world,"wear-test",p.x,p.y,"walkers",context.Level.seeded(17));
+  Object.assign(z,{windup:.01,windupTarget:"player"});
+  run.world.enemies.push(z);
+  Sim.tick(run,.033);
+  const worn = ["body","legs","feet"].map(slot => Sim.wornItem(run,slot)).filter(item => item?.condition < 100);
+  check("roupa: um golpe danifica a roupa na zona atingida", worn.length > 0);
+  const damaged = worn[0];
+  if (damaged) damaged.condition = 20;
+  check("reparação DIY: tecido e fita melhoram a condição da roupa", Boolean(damaged) &&
+    Sim.craft(run,"mend",damaged) && damaged.condition === 58 && p.skills.crafting === 28);
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

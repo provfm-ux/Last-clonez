@@ -27,6 +27,9 @@ Jogo de sobrevivência isométrica para teclado, rato e toque. Escolhe uma apar�
 - Abre **Inventory → Equipment**, toca em **Gear** no HUD ou prime **G** para veres a personagem, os espaços de equipamento e as armas que transportas. Podes equipar ou retirar roupa nesta vista.
 - Atacar desgasta a arma. A zero, deixa de funcionar até ser reparada. Em **Equipment**, **Repair** recupera até 35 pontos da arma escolhida por uma sucata e uma fita, mesmo que a arma não esteja equipada.
 
+- Os golpes desgastam a roupa equipada na zona atingida. A roupa perde proteção, isolamento e impermeabilidade à medida que se estraga. Usa **Equipment → Mend** com um pano e uma fita.
+- **DIY & building** melhora as reparações de armas e roupa. Procura dez livros de competências no abrigo e noutros edifícios de Cold Vale. Em segurança, escolhe **Inventory → Books → Read** para ganhar 24 XP uma vez por título. O **DIY Repair Manual** está na caixa do abrigo.
+
 ## Bairros e exploração
 
 - **Casas compactas.** Explora cozinhas, quartos e quintais em Cold Vale e nos quatro mapas exteriores. Procura no frigorífico, no armário do quarto e nos móveis do corredor. Nos trilhos e quintais há amoras, maçãs e isco.

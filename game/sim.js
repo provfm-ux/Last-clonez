@@ -612,7 +612,9 @@ const Sim = (() => {
     const p = s.player, point = positions[0] || {x: car.x, y: car.y};
     p.vehicle = null; p.x = point.x; p.y = point.y; p.path = [];
     p.driveSpeed = 0; p.velocityX = 0; p.velocityY = 0;
-    car.solid = Boolean(positions.length);
+    const carTile = World.tileAt(s.world, car.x, car.y);
+    const overlapsCar = Math.abs(point.x - carTile.x - .5) <= .68 && Math.abs(point.y - carTile.y - .5) <= .68;
+    car.solid = Boolean(positions.length) && !overlapsCar;
     const npc = s.world.npc;
     if (npc.ridingVehicle === car.id) {
       const next = positions[1] || point;
@@ -665,26 +667,40 @@ const Sim = (() => {
   function updateVehicle(s, dt, input) {
     const p = s.player, car = vehicle(s);
     if (!car || car.hp <= 0) { exitVehicle(s, true); return; }
-    const moving = Boolean(input.x || input.y || p.path.length);
+    const manual = Boolean(input.x || input.y);
+    const moving = manual || p.path.length > 0;
     const surface = World.tileAt(s.world, p.x, p.y)?.surface;
     const footing = surface === "sand" ? .64 : surface === "field" ? .78 : 1;
-    const desired = moving && car.fuel > 0 ? (input.run || s.dash ? 6.2 : 4.6) * footing * (car.hp < 45 ? .7 : 1) : 0;
+    const strength = manual ? Math.min(1, Math.hypot(input.x, input.y)) : 1;
+    const desired = moving && car.fuel > 0 ? (input.run || s.dash ? 6.2 : 4.6) * footing * strength * (car.hp < 45 ? .7 : 1) : 0;
     const crashSpeed = p.driveSpeed;
     p.driveSpeed += clamp(desired - p.driveSpeed, -8 * dt, 4.5 * dt);
     const beforeX = p.x, beforeY = p.y;
+    let wantsToMove = car.fuel > 0 && moving;
     if (car.fuel <= 0) {
       p.path = [];
       if (!car.warnedFuel) { notify(s, "Out of fuel. Exit to refuel.", true); car.warnedFuel = true; }
       p.moving = false;
-    } else if (input.x || input.y) {
-      const dx = input.x * .53 + input.y, dy = input.y - input.x * .53;
-      const length = Math.hypot(dx, dy), strength = Math.min(1, Math.hypot(input.x, input.y));
-      p.moving = move(s, p, dx / length * p.driveSpeed * dt * strength, dy / length * p.driveSpeed * dt * strength);
+    } else if (manual) {
+      p.path = [];
+      const target = Math.atan2(input.y - input.x * .53, input.x * .53 + input.y);
+      const heading = car.heading ?? (car.axis === "x" ? Math.PI : -Math.PI / 2);
+      const delta = Math.atan2(Math.sin(target - heading), Math.cos(target - heading));
+      const backing = Math.abs(delta) > Math.PI * .55;
+      const turn = backing ? delta - Math.sign(delta) * Math.PI : delta;
+      const steering = clamp(turn, -dt * 4, dt * 4);
+      const angle = heading + steering;
+      car.heading = Math.atan2(Math.sin(angle), Math.cos(angle));
+      // Steering rotates the car before the wheels can carry it sideways.
+      const traction = Math.max(0, Math.cos(turn - steering));
+      const step = p.driveSpeed * dt * traction * (backing ? -.65 : 1);
+      wantsToMove = Math.abs(step) > .0001;
+      p.moving = wantsToMove && move(s, p, Math.cos(angle) * step, Math.sin(angle) * step);
     } else p.moving = follow(s, p, p.driveSpeed * dt);
     p.velocityX = (p.x - beforeX) / dt;
     p.velocityY = (p.y - beforeY) / dt;
     car.x = p.x; car.y = p.y; car.face = p.face;
-    const wantsToMove = car.fuel > 0 && Boolean(input.x || input.y || p.path.length);
+    if (!manual && p.moving) car.heading = Math.atan2(p.velocityY, p.velocityX);
     if (wantsToMove && !p.moving) {
       if (s.carMoving && crashSpeed > 2.2) {
         s.carMoving = false;
@@ -1834,6 +1850,11 @@ const Sim = (() => {
     const radius = driving ? .40 : .18;
     const passable = (x, y) => World.clear(s.world, x, y, radius) &&
       (!driving || World.drivable(World.tileAt(s.world, x, y)));
+    if (driving) {
+      if (!passable(actor.x + dx, actor.y + dy)) return false;
+      actor.x += dx; actor.y += dy;
+      return Math.hypot(dx, dy) > .0001;
+    }
     if (passable(actor.x + dx, actor.y)) actor.x += dx;
     if (passable(actor.x, actor.y + dy)) actor.y += dy;
     // Corner assist: when blocked head-on beside an opening (door, gap), slide toward the opening.
@@ -2522,7 +2543,7 @@ const Sim = (() => {
       (o.broken === undefined || typeof o.broken === "boolean" && (!o.broken || (o.boards > 0 ? !o.open : o.open && o.hp === 0)));
     const foreignCar = o => o.kind === "car" && o.action === "loot" && o.active && !o.away && o.homeRegion !== region &&
       (o.homeRegion === Regions.home ? /^o\d{1,3}$/.test(o.id) : Object.hasOwn(Regions.vehicleNames, o.id) && o.id.startsWith(o.homeRegion + "-"));
-    const validCar = (o, original) => o.kind !== "car" || ((!original || o.homeRegion === undefined || o.homeRegion === region) &&
+    const validCar = (o, original) => o.kind !== "car" || ((o.heading === undefined || Number.isFinite(o.heading) && Math.abs(o.heading) <= Math.PI) && (!original || o.homeRegion === undefined || o.homeRegion === region) &&
       (o.away === undefined || typeof o.away === "boolean" && (!o.away || original && !o.active && !o.solid)));
     const savedIds = new Set(data.objects.map(o => o?.id));
     if (savedIds.size !== data.objects.length ||

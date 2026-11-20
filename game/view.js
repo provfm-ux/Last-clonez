@@ -659,16 +659,32 @@ const View = (() => {
       f(.45,-.12,54,.32,.24,3,cream);
       return;
     }
-    if(kind==="car") {
-      shadow(x,y,39,15);
+    if (kind === "car") {
+      const heading = o.heading ?? (o.axis === "x" ? Math.PI : -Math.PI / 2);
+      const forwardX = Math.cos(heading), forwardY = Math.sin(heading);
+      const at = (side, forward, z) => p(x + side * -forwardY + forward * forwardX, y + side * forwardX + forward * forwardY, z);
+      const panel = (side, front, z, width, length, height, colors, inset = 0) => {
+        const footprint = [[side, front], [side + width, front], [side + width, front + length], [side, front + length]];
+        const signs = [[-forwardX, -forwardY], [-forwardY, forwardX], [forwardX, forwardY], [forwardY, -forwardX]];
+        const bottom = footprint.map(([u, v]) => at(u, v, z));
+        const top = footprint.map(([u, v], i) => at(u + (i === 0 || i === 3 ? inset : -inset),
+          v + (i < 2 ? inset : -inset), z + height));
+        for (let i = 0; i < 4; i++) {
+          const j = (i + 1) % 4;
+          if (signs[i][0] + signs[i][1] > 0) poly([bottom[i], bottom[j], top[j], top[i]], colors[1 + i % 2]);
+        }
+        poly(top, colors[0]);
+      };
+      poly([at(-.59, -.88, 0), at(.59, -.88, 0), at(.59, .87, 0), at(-.59, .87, 0)], "#090e0a75");
       const body = o.hp <= 0 ? rubber : tone > .55 ? teal : red;
-      const carBox = (dx,dy,z,w,d,h,c) => o.axis === "x" ? f(dy,dx,z,d,w,h,c) : f(dx,dy,z,w,d,h,c);
-      for(const dx of [-.4,.25]) for(const dy of [-.6,.35]) carBox(dx,dy,0,.18,.27,5,rubber);
-      carBox(-.46,-.79,5,.92,1.58,12,body);
-      carBox(-.4,-.43,17,.80,.85,9,iron);
-      carBox(-.39,.4,17,.78,.18,2,plastic);
-      carBox(-.34,-.77,11,.22,.04,3,cream);
-      carBox(.12,-.77,11,.22,.04,3,cream);
+      for (const side of [-.48, .29]) for (const axle of [-.59, .38]) panel(side, axle, 0, .19, .25, 7, rubber);
+      panel(-.46, -.82, 5, .92, 1.64, 10, body);
+      panel(-.42, -.47, 15, .84, .86, 11, [body[0], "#354d4b", "#263b39"], .11);
+      panel(-.43, .44, 15, .86, .31, 2, body);
+      const frontVisible = forwardX + forwardY > 0;
+      for (const side of [-.37, .19]) {
+        panel(side, frontVisible ? .78 : -.84, 10, .18, .06, 3, frontVisible ? cream : red);
+      }
       return;
     }
     if(kind==="radio") {

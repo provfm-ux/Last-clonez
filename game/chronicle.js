@@ -2,7 +2,7 @@
 
 const Chronicle = (() => {
   const title = "The Second All-Clear";
-  const revision = 3, dispatchDelay = 24, tideCycle = 156, lowTide = 52;
+  const revision = 4, dispatchDelay = 24, tideCycle = 156, lowTide = 52;
   const deskId = "ledger-desk";
   const leads = {
     coldvale:"The grocery store kept printing collection slips after it shut.",
@@ -10,11 +10,14 @@ const Chronicle = (() => {
     ironworks:"The freight depot should still have its passenger tally.",
     coast:"The coastguard logged each arrival and false alarm.",
     fields:"A farm family wrote down its own way to tell who was at the door.",
-    cavern:"Look for the paper trail in the survey and winch rooms."
+    quarry:"The foreman kept a second shift record beside the weighbridge.",
+    reservoir:"Follow the spillway to the valve tower. Someone scratched a warning inside.",
+    lighthouse:"The boat shed at Gull Point kept a second copy of the keeper’s watch.",
+    cavern:"Follow the winch and survey rooms to the final shutdown console."
   };
   const entries = {
     receipt:{region:"coldvale", at:["market",5,3], title:"Uncollected till roll", source:"Grocery store", time:"06:12 and 06:32",
-      text:"Two tins, one customer, and twenty minutes between receipts. The same order kept coming out of the printer. A clerk circled R7 on both and wrote that the doors had been locked since six.",
+      text:"The doors had been locked since six. At 06:12 the till offered the same order to a boy who was no longer there. At 06:32 it printed his name again. Ada took the boy to her orchard before dawn. The receipt still lists him as collected under R7.",
       lead:"The civil defence desk needs a second record of R7. Check what the freight crew was counting."},
     checkout:{region:"coldvale", at:["market",6,7], title:"Service flap", source:"Grocery store", needs:["receipt","tally"],
       action:"Check the R7 compartment", locked:"Find the till roll and compare R7 with the freight tally.",
@@ -37,7 +40,7 @@ const Chronicle = (() => {
       text:"The scratches come in groups of three and one. A crew from Westfields left a box beneath the trail marker and scratched directions to a source of clean water after boiling.",
       reward:{emptybottle:2,wood:2}, cache:"Trail marker cache"},
     tally:{region:"ironworks", at:["Freight depot",9,10], title:"Passenger tally", source:"Freight depot", time:"06:32",
-      text:"The board shows twelve passengers cleared. A driver wrote that the counter was wired to the axles, and that the front carriage had been sealed before it rolled out. R7 is the switch circuit. The real passenger list is missing.",
+      text:"Twelve cleared. Eddie wrote in the margin that the counter was wired to the axles. He sealed the front carriage when a man inside answered to every name he called. R7 is the switch circuit. Eddie took the real passenger list when he jumped.",
       lead:"The freight horn has an isolation switch near the depot."},
     horn:{region:"ironworks", at:[70,34], title:"Freight horn cabinet", source:"Freight sidings", needs:["tally","relay"],
       action:"Test the freight circuit", locked:"Find the passenger tally and test the separate live line at the ranger station.", noise:22,
@@ -59,7 +62,7 @@ const Chronicle = (() => {
       text:"A single green flash answers from the ridge. The receiver is still awake. The watch left an emergency bag behind the shutter for the next runner.",
       reward:{raincoat:1,battery:2}, cache:"Weather watch bag"},
     cellar:{region:"fields", at:["Orchard farmhouse",5,4], title:"Note on a flour sack", source:"Orchard farmhouse", time:"07:10",
-      text:"We were told to wait in the cellar. We stopped answering anyone who called down the stairs. Three knocks, wait, then one. If the speaker says your name, it may be reading the book.",
+      text:"The speaker used my son’s name. He was asleep beside me. From now on, three knocks, wait, then one. Ellis knows the signal and has a truck near the shore. If you reach him first, tell him we’re still here. · Ada",
       lead:"The hatch at the field cottage still has an answer, if the coastguard heard the same signal."},
     reply:{region:"fields", at:["Field cottage",3,9], title:"Field cellar hatch", source:"Field cottage", needs:["cellar","tidebook"],
       action:"Knock three, pause, then one", locked:"Confirm the family's knock with the coastguard record.",
@@ -129,7 +132,53 @@ const Chronicle = (() => {
     shiftClock:{region:"ironworks",at:["Busan Line cottage no. 3",3,4],generator:3,title:"Clocking-off slip",source:"Busan Line cottages · Red pencil",extra:true,
       text:"We locked the night shift out at four. At five, twelve of them clocked in and fourteen clocked out. Payroll has asked us to explain the extra hours before it will close the incident."},
     ferryfare:{region:"coast",at:["Ferry keeper's house",3,4],generator:3,title:"A return, please",source:"Ferry keeper · Ticket book",extra:true,
-      text:"The last passenger paid for a return and then stopped breathing. When he got back up, I asked if he still wanted the receipt. I’d worked that window for twenty-seven years. Habit is a powerful thing."}
+      text:"The last passenger paid for a return and then stopped breathing. When he got back up, I asked if he still wanted the receipt. I’d worked that window for twenty-seven years. Habit is a powerful thing."},
+    tilltest:{region:"coldvale",at:["market",3,4],title:"Till reconciliation",source:"Grocery store · Return terminal",added:4,needs:["receipt"],
+      action:"Reconcile the duplicate",locked:"Read the uncollected till roll.",prompt:"Enter the two receipt times from earliest to latest, then enter their shared circuit.",
+      game:{buttons:["06:12","06:32","R7","07:10"],sequence:[0,1,2]},
+      text:"The till releases a parcel and prints Ada’s handwritten objection: ‘He was never on your bus.’",
+      reward:{food:1,battery:1},cache:"Unclaimed return"},
+    ridgecode:{region:"ridge",at:["Creek shelter",4,3],title:"Firewatch night drill",source:"Creek shelter · Signal trainer",added:4,needs:["watch"],
+      action:"Run the night drill",locked:"Read the firewatch duty slip first.",prompt:"The drill card says to cover the lamp, send two short flashes, then leave it dark.",
+      game:{buttons:["Short flash","Long flash","Cover lamp"],sequence:[2,0,0,2]},
+      text:"A spare battery drops from the trainer. On the back of the card Ellis wrote, ‘If nobody answers, try the real line.’",
+      reward:{battery:2},cache:"Signal trainer spares"},
+    yardboard:{region:"ironworks",at:["Dispatch office",4,3],title:"Dead shift rehearsal",source:"Dispatch office · Isolated siding board",added:4,needs:["tally"],
+      action:"Start siding rehearsal",locked:"Read the freight passenger tally.",prompt:"The drill moves the infected off the route. Close the shop gate, ring the eastern bell, then open the runner’s gate. The bell still makes noise.",
+      game:{buttons:["Eastern bell","Runner’s gate","Shop gate"],sequence:[2,0,1],noisyChoice:0},
+      text:"The board marks the route clear on the rehearsal track. Someone drew a path from the eastern sidings to the Slag Quarry weighbridge.",
+      reward:{scrap:2,part:1},cache:"Yard maintenance drawer"},
+    tidegame:{region:"coast",at:["Net shed",5,3],title:"Crossing practice",source:"Net shed · Peg chart",added:4,needs:["tidebook"],
+      action:"Plot a dry crossing",locked:"Read the coastguard arrival book.",prompt:"Move the runner from the first dry stone to the last. The dry stones are chalk, flint, then slate. The brick sinks.",
+      game:{buttons:["Slate","Brick","Chalk","Flint"],sequence:[2,3,0]},
+      text:"At the edge of the chart, a boatman drew the path to Gull Point. He circled the boat shed twice.",
+      reward:{bait:2,water:1},cache:"Net crew’s ration tin"},
+    knockgame:{region:"fields",at:["Hay barn",4,3],title:"The cellar signal",source:"Hay barn · False pantry door",added:4,needs:["cellar"],
+      action:"Answer the latch",locked:"Read Ada’s note at the orchard.",prompt:"Use the family signal from the flour sack. One knock at a time.",
+      game:{buttons:["Knock","Wait","Rattle latch"],sequence:[0,0,0,1,0]},
+      text:"The latch opens onto a seed tin. A message inside warns that somebody at Greywater’s valve tower heard the same broadcast through a pipe.",
+      reward:{seedpotato:2,water:1},cache:"Pantry seed tin"},
+    weighghost:{region:"quarry",at:["Weighbridge hut",4,3],generator:5,added:4,extra:true,
+      title:"One passenger, thirty tonnes",source:"Slag Quarry · Weighbridge ticket",
+      text:"A truck rolled across empty. The printer gave its weight as EDDIE. The actual Eddie, under the desk with me, asked if he could have the ticket. He’d never been thirty tonnes before.",
+      lead:"Kit overlaid old infrastructure on the council map. The other backups are at Greywater and Gull Point."},
+    pipecopy:{region:"reservoir",at:["Valve tower",4,3],generator:5,added:4,extra:true,
+      title:"Plumbing fault",source:"Greywater · Valve tower wall",
+      text:"The voice in the spillway says ‘all clear’ every twenty minutes. I marked the high water with a pencil. It rises one mark after each announcement. If it asks for feedback, tell it the dam is full."},
+    fogfare:{region:"lighthouse",at:["Boat shed",4,3],generator:5,added:4,extra:true,
+      title:"A ticket for the fog",source:"Gull Point · Boat shed receipt spike",
+      text:"One ticket, fare paid, destination outside the map. The keeper pinned it so the wind couldn’t take it. On the back is a hand-drawn gull and the words ‘Keep one seat empty.’"},
+    shutdown:{region:"cavern",at:[30,12],title:"End the second all-clear",source:"Survey room · Manual isolation console",added:4,needs:["recovery"],afterDispatch:true,
+      action:"Begin manual isolation",locked:"Recover the offline conversation from the survey room terminal.",
+      prompt:"Kit wrote the order on the casing. Isolate the recorded loop. Read back the signed check-in. Cut the outbound relay.",
+      game:{buttons:["Read back check-in","Cut relay","Isolate loop"],sequence:[2,0,1]},
+      text:"For the first time since 06:12, the tape reaches its end. Ada reads the names of the people who crossed over the local handset. There is a long break before she says Eddie’s. Then someone answers.",
+      reward:{battery:2,bandage:1},cache:"Survey crew’s final kit"},
+    gullseat:{region:"cavern",at:[33,13],generator:5,added:4,extra:true,needs:["weighghost","pipecopy","fogfare","shutdown"],
+      title:"The empty seat",source:"Survey room · Undelivered envelope",
+      action:"Open the envelope",locked:"Compare the three outlying records and finish the manual shutdown.",
+      text:"Eddie collected the weighbridge ticket. The keeper drew the gull. Ada left one place empty in the truck. Folded together, the stubs spell out a destination Patchwork never copied: home.",
+      reward:{food:2,battery:1},cache:"Eddie’s packed lunch"}
   };
 
   const core = ["receipt","watch","tally","tidebook","cellar","relay","reply"];
@@ -191,6 +240,7 @@ const Chronicle = (() => {
     const entry = entries[id];
     if (has(ledger,id)) return "Already recorded in your ledger.";
     if (entry.needs?.some(needed => !has(ledger,needed))) return entry.locked;
+    if (entry.afterDispatch && !ledger.dispatch?.reportRead) return "Send a diversion and read the crew’s signed check-in first.";
     if (entry.window === "night" && !night) return "Try the lantern after 20:00 or before dawn.";
     if (entry.window === "tide" && minutes % tideCycle >= lowTide) return "The washbox is under water. Low tide in " + Math.ceil(tideCycle - minutes % tideCycle) + " in-game minutes.";
     return "";
@@ -222,6 +272,8 @@ const Chronicle = (() => {
           dispatch.moved !== null && (!Number.isInteger(dispatch.moved) || dispatch.moved < 0 || dispatch.moved > 7) ||
           (dispatch.delivered || dispatch.moved !== null) && dispatch.sent + dispatchDelay > minutes) invalid();
     }
+    if (Object.entries(raw.found).some(([id, when]) =>
+      entries[id].afterDispatch && (!dispatch?.reportRead || when < dispatch.sent + dispatchDelay))) invalid();
     return {found:{...raw.found},dispatch:dispatch ? {route:dispatch.route,sent:dispatch.sent,moved:dispatch.moved,delivered:dispatch.delivered,
       reportRead:dispatch.reportRead} : null};
   }

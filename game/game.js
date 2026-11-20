@@ -466,10 +466,12 @@
 
   function landmarks() {
     const knownHomes = state.world.homes?.filter(b => Sim.exploredTile(state,b.door.x,b.door.y)) ?? [];
+    const storySites = state.world.objects.filter(o => Chronicle.isScene(o) && !Chronicle.entries[o.record].extra &&
+      Sim.exploredTile(state,o.x,o.y)).map(o => [o.id,o.name]);
     if (state.world.region === Regions.home) return [["base","Shelter"],["market","Grocery store"],["clinic","Clinic"],
-      ["workshop","Workshop"],["police","Police station"],["fuel","Petrol station"],...knownHomes.map(b=>[b.id,b.name])];
+      ["workshop","Workshop"],["police","Police station"],["fuel","Petrol station"],...knownHomes.map(b=>[b.id,b.name]),...storySites];
     return [...state.world.buildings.filter(b=>!b.compact).map(b => [b.id,b.name]),...knownHomes.map(b=>[b.id,b.name]),
-      ...state.world.objects.filter(o => o.action === "spring" || o.action === "fish").map(o => [o.id,o.name])];
+      ...state.world.objects.filter(o => o.action === "spring" || o.action === "fish").map(o => [o.id,o.name]),...storySites];
   }
 
   function map(pin = null) {
@@ -501,7 +503,7 @@
       button("Cancel", "pincancel") + (pinDraft.id ? button("Remove", "pinremove-" + pinDraft.id, false, "danger") : "") + "</div></form>" : "";
     show(area.name + " · Map", '<div class="map-layout"><div><canvas class="dialog-map" id="dialog-map" width="560" height="520" aria-label="Explored map of ' + area.name + '"></canvas>' +
       '<div class="region-routes" aria-label="Regional crossings">' + routes + '</div></div>' +
-      '<div class="map-notes"><p>' + (editable ? "Tap explored ground to add a pin. Tap a pin to edit it." : "Start or continue a run to add pins.") +
+      '<div class="map-notes"><p>' + (editable ? "Tap explored ground to add a pin. Pale dots mark unread story sites and amber dots mark challenges." : "Start or continue a run to add pins.") +
       '</p><div class="item-actions">' + button("Pin my position", "pinhere", !editable) + '</div><p id="pin-status" role="status"></p>' +
       '<details class="map-landmarks"><summary>Landmarks</summary><div class="item-actions">' + landmarks().map(([id,label]) =>
         button(esc(label), "mark-" + id, !editable)).join("") + '</div></details>' +
@@ -850,18 +852,25 @@
     const {ledger, world} = state;
     const gathered = Chronicle.core.filter(id => Chronicle.has(ledger,id)).length;
     const visibleRegions = Object.keys(Chronicle.leads).filter(region =>
-      region !== Regions.cavern || world.underground || state.regionStates[region]);
+      (region !== Regions.cavern && !Regions.definitions[region].deep) || world.region === region || state.regionStates[region]);
     const recordList = visibleRegions.map(region => {
       const local = Object.entries(Chronicle.entries).filter(([,entry]) => entry.region === region && (entry.generator ?? 1) <= world.generator);
       const read = local.filter(([id]) => Chronicle.has(ledger,id));
-      const unseen = local.find(([id,entry]) => !entry.action && (!entry.extra || region === Regions.cavern) && !Chronicle.has(ledger,id));
+      const unseen = local.find(([id,entry]) => (!entry.action || entry.afterDispatch) &&
+        (!entry.extra || region === Regions.cavern || Regions.definitions[region].deep) && !Chronicle.has(ledger,id));
+      const challenge = local.find(([id,entry]) => entry.game && !entry.afterDispatch && !Chronicle.has(ledger,id) &&
+        entry.needs.every(need => Chronicle.has(ledger,need)));
+      const hint = challenge ? '<p>' + esc(challenge[1].title + " · " + challenge[1].source) + '</p>' : "";
       return '<article class="ledger-region"><h3>' + Regions.definitions[region].name + '</h3><div class="item-meta">' + read.length + ' / ' + local.length +
-        ' recorded</div>' + (unseen ? '<p>' + esc(Chronicle.leads[region]) + '</p>' : '') + '<div class="item-actions">' +
+        ' recorded</div>' + (unseen ? '<p>' + esc(Chronicle.leads[region]) + '</p>' : '') + hint + '<div class="item-actions">' +
         read.map(([id,entry]) => button(esc(entry.title),"ledgerread-" + id)).join("") + '</div></article>';
     }).join("");
     const town = world.region === Regions.home;
     const back = world.underground ? "ridge" : Regions.home;
-    show("Field ledger", '<section class="ledger-case"><h3>' + Chronicle.title + '</h3><p>The civil defence signal keeps repeating. Compare independent records from all five maps.</p>' +
+    const chapter = Chronicle.has(ledger,"shutdown") ? "The recorded all-clear has stopped. Your signed check-in and the survey room record are filed below." :
+      ledger.dispatch?.reportRead ? "The crew made it through. Follow the survey trail below Pine Ridge to find the source of the broadcast." :
+      "The same all-clear has aired twice. Trace it across the five surface regions and give the survivors one live signal.";
+    show("Field ledger", '<section class="ledger-case"><h3>' + Chronicle.title + '</h3><p>' + esc(chapter) + '</p>' +
       '<p class="item-meta">' + gathered + ' / ' + Chronicle.core.length + ' core records and checks</p>' +
       (world.region === "coast" && Chronicle.has(ledger,"tidebook") ? '<p>' + esc(Chronicle.tideForecast(state.minutes)) + '</p>' : '') + dispatchStatus() +
       '<div class="item-actions">' + button(town ? "Mark civil defence desk" : "Mark crossing to " + Regions.definitions[back].name,
@@ -909,6 +918,15 @@
     const read = found ? ledgerEntryText(entry) : '<div class="ledger-source">' + esc(entry.source) + '</div>' +
       (problem ? '<p>' + esc(problem) + '</p>' : '<p>' + esc(entry.prompt || "Check this lead against what you recorded.") + '</p>') +
       (entry.noise && !problem ? '<p class="item-meta">The test makes noise nearby.</p>' : '');
+    if (!found && !problem && entry.game) {
+      const attempt = state.sceneAttempt?.record === o.record ? state.sceneAttempt : null;
+      const status = attempt?.failed ? "That input reset the sequence. Try again." :
+        (attempt?.step ?? 0) + " / " + entry.game.sequence.length + " inputs accepted";
+      const controls = entry.game.buttons.map((label, choice) => button(esc(label), "ledgerplay-" + index + "-" + choice)).join("");
+      show(o.name, read + '<p class="item-meta" role="status">' + esc(status) + '</p><div class="item-actions">' +
+        controls + back + '</div>', "object-" + index);
+      return;
+    }
     const action = found ? (Sim.reachableObject(state,cache) ? button("Open parcel", "ledgerloot-" + index, false, "primary") : '') :
       entry.action ? button(esc(entry.action), "ledgertrigger-" + index, Boolean(problem), "primary") : '';
     show(o.name, read + '<div class="item-actions">' + action + back + '</div>', "object-" + index);
@@ -1573,9 +1591,13 @@
         updateHud();
         return;
       }
-      if (dialogView === "object-" + index && kind === "ledgertrigger" && o?.action === "ledger-event") {
-        if (Sim.resolveScene(state,o)) save();
+      if (dialogView === "object-" + index && (kind === "ledgertrigger" || kind === "ledgerplay") && o?.action === "ledger-event") {
+        if (Sim.resolveScene(state,o,kind === "ledgerplay" ? Number(second) : undefined)) save();
         ledgerPanel(o);
+        if (kind === "ledgerplay") {
+          (body.querySelector('[data-action="' + kind + "-" + index + "-" + Number(second) + '"]') ||
+            body.querySelector('[data-action="ledgerloot-' + index + '"]'))?.focus();
+        }
         updateHud();
         return;
       }

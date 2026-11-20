@@ -768,7 +768,7 @@ const Sim = (() => {
   }
 
   const canMarkFeature = o => o.active && (o.action === "travel" || o.action === "spring" || o.action === "fish" ||
-    o.action === "ledger-desk" || o.delivery);
+    o.action === "ledger-desk" || o.delivery || Chronicle.isScene(o));
 
   const isStation = o => o?.active && (o.kind === "barrel" || o.kind === "campfire" || o.kind === "garden" || utilityIds.has(o.id));
 
@@ -1097,10 +1097,25 @@ const Sim = (() => {
     for (const [item, qty] of Object.entries(contents)) add(cache.loot,item,qty,{born:s.minutes});
   }
 
-  function resolveScene(s, o) {
+  function resolveScene(s, o, choice) {
     const problem = sceneProblem(s,o);
     if (problem) return false;
     const entry = Chronicle.entries[o.record];
+    if (entry.game) {
+      const {buttons, sequence, noisyChoice} = entry.game;
+      if (!Number.isInteger(choice) || choice < 0 || choice >= buttons.length) return false;
+      const step = s.sceneAttempt?.record === o.record ? s.sceneAttempt.step : 0;
+      if (choice === noisyChoice) noise(s,o.x,o.y,14);
+      if (sequence[step] !== choice) {
+        s.sceneAttempt = {record:o.record, step:0, failed:true};
+        return false;
+      }
+      if (step + 1 < sequence.length) {
+        s.sceneAttempt = {record:o.record, step:step+1};
+        return false;
+      }
+      s.sceneAttempt = null;
+    }
     s.ledger.found[o.record] = s.minutes;
     if (entry.reward) revealLedgerCache(s,Chronicle.cacheFor(o.record),entry.reward);
     if (entry.noise) noise(s,o.x,o.y,entry.noise);
@@ -2403,7 +2418,7 @@ const Sim = (() => {
     const supportedMap = data?.mapRevision === Regions.mapRevision ||
       region !== Regions.cavern && (data?.mapRevision === undefined || data.mapRevision === 2);
     return data && Object.hasOwn(Regions.definitions, region) && supportedMap &&
-      (data.ledgerRevision === undefined || [1,2,Chronicle.revision].includes(data.ledgerRevision)) &&
+      (data.ledgerRevision === undefined || [1,2,3,Chronicle.revision].includes(data.ledgerRevision)) &&
       Array.isArray(data.objects) && data.objects.length <= 1000 &&
       Array.isArray(data.enemies) && data.enemies.length <= 200 && Array.isArray(data.explored) && data.explored.length === mapSize &&
       data.npc && ["injured", "follow", "wait", "refuge", "dead", "away"].includes(data.npc.mode);

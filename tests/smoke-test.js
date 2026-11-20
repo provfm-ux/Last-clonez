@@ -312,6 +312,75 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("viagem: gravar e restaurar dentro do Greywater Reservoir", back?.world.region === "reservoir" && back.world.generator === 5, why || q.world.region);
   let boom = ""; try { for (let i = 0; i < 400; i++) Sim.tick(q, .1, {x: 1, y: 0, run: false}); } catch (e) { boom = e.message; }
   check("viagem: 400 ticks no reservatório sem erros", boom === "", boom); }
+// ---- v0.31: case finale, regional challenges, and hidden records ----
+{
+  const {Chronicle} = context;
+  const serialise = value => JSON.parse(JSON.stringify(value));
+  const fixture = (s, id) => s.world.objects.find(o => o.id === Chronicle.idFor(id));
+  const standAt = (s, o) => Object.assign(s.player, {x:o.x, y:o.y});
+  const ledger = Chronicle.empty();
+  const sites = Object.entries(Chronicle.entries).filter(([,entry]) => entry.added === 4);
+  let finale;
+  for (const [id, entry] of sites) {
+    const s = Sim.create(17,"training","carer",5,undefined,entry.region);
+    const o = fixture(s,id);
+    check("story fixture in " + entry.region + ": " + id, o && World.clear(s.world,o.x,o.y));
+    if (!entry.game) continue;
+    s.ledger = ledger;
+    standAt(s,o);
+    check("challenge prerequisites: " + id, Boolean(Sim.sceneProblem(s,o)));
+    for (const needed of entry.needs) ledger.found[needed] = s.minutes;
+    if (entry.afterDispatch) {
+      check("survey isolation needs a signed check-in", Boolean(Sim.sceneProblem(s,o)));
+      for (const id of [...Chronicle.core,"horn","buildnote","install","samplelog"]) {
+        ledger.found[id] = s.minutes - Chronicle.dispatchDelay;
+      }
+      delete ledger.found.recovery;
+      const recovery = fixture(s,"recovery");
+      standAt(s,recovery);
+      check("survey backup can be recovered before the check-in", Sim.resolveScene(s,recovery));
+      standAt(s,o);
+      finale = s;
+      ledger.dispatch = {route:"freight",sent:s.minutes-Chronicle.dispatchDelay,moved:0,delivered:true,reportRead:true};
+    }
+    const {sequence, buttons} = entry.game;
+    const wrong = (sequence[1]+1) % buttons.length;
+    const [first, ...rest] = sequence;
+    const start = Sim.resolveScene(s,o,first);
+    const rejected = Sim.resolveScene(s,o,wrong);
+    const bypass = Sim.resolveScene(s,o);
+    Object.assign(s.player,s.world.start);
+    const remote = Sim.resolveScene(s,o,first);
+    standAt(s,o);
+    check("challenge resets and rejects remote or missing input: " + id, !start && !rejected && !bypass && !remote &&
+      s.sceneAttempt?.step === 0 && !Chronicle.has(ledger,id));
+    const result = [first,...rest].map(choice => Sim.resolveScene(s,o,choice));
+    if (entry.game.noisyChoice !== undefined) {
+      check("rehearsal bell attracts infected through the real noise system", s.noiseRings?.some(ring => ring.x === o.x && ring.y === o.y));
+    }
+    const cache = s.world.objects.find(item => item.id === Chronicle.cacheFor(id));
+    check("challenge completes once with a cache: " + id, result.every((complete, i) => complete === (i === sequence.length-1)) &&
+      Chronicle.has(ledger,id) && cache?.active && cache.loot.length > 0 && !Sim.resolveScene(s,o,first));
+    if (id === "tilltest") {
+      const restored = Sim.restore(serialise(Sim.snapshot(s)));
+      check("solved challenge and cache survive reload", Chronicle.has(restored.ledger,id) &&
+        restored.world.objects.find(item => item.id === cache.id)?.active);
+    }
+  }
+  const s = finale;
+  const o = fixture(s,"gullseat");
+  standAt(s,o);
+  s.ledger = ledger;
+  check("secret ending is locked without the outlying records", !Sim.resolveScene(s,o));
+  for (const id of ["weighghost","pipecopy","fogfare"]) ledger.found[id] = s.minutes;
+  check("secret ending unlocks after all three records", Sim.resolveScene(s,o));
+  check("secret ending survives reload", Chronicle.has(Sim.restore(serialise(Sim.snapshot(s))).ledger,"gullseat"));
+  const bad = serialise(Sim.snapshot(s));
+  bad.ledger.dispatch.reportRead = false;
+  let rejected = false;
+  try { Sim.restore(bad); } catch { rejected = true; }
+  check("save rejects a shutdown without the signed check-in", rejected);
+}
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

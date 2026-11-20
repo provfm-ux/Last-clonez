@@ -141,6 +141,28 @@ const Sim = (() => {
     add(toolbox.loot, "battery", 2);
     const crate = world.objects.find(o => o.storage && o.building === world.base.id);
     add(crate.loot, "battery", 1);
+    const finds = [["workshop","wrench"],["workshop","hatchet"],["market","rollingpin"],
+      ["market","broom"],["fuel","pipe"]];
+    for (const [type,id] of finds) {
+      const site = world.buildings.find(b => b.type === type);
+      const storage = world.objects.find(o => o.building === site.id && o.action === "loot");
+      add(storage.loot,id,1);
+    }
+    const kitchen = world.objects.find(o => o.kind === "fridge" && o.building === world.base.id);
+    add((kitchen ?? crate).loot,"fryingpan",1);
+  }
+
+  function placeStartingBat(s) {
+    const item = s.player.bag.findIndex(i => i.id === "bat");
+    if (item < 0 || !drop(s,item)) return;
+    const {x,y} = s.player;
+    const pile = s.world.objects.at(-1);
+    const point = [[1,0],[0,1],[-1,0],[0,-1]].map(([dx,dy]) => ({x:x+dx,y:y+dy})).find(p =>
+      World.clear(s.world,p.x,p.y) && !s.world.objects.some(o => o.active && distance(o,p) < .65));
+    if (point) Object.assign(pile,point);
+    s.player.weapon = "fists";
+    s.player.weaponUid = null;
+    notify(s,"A wooden bat lies nearby. Pick it up and equip it in your inventory.");
   }
 
   function create(seed, difficulty = "survival", role = "carer", generator = 2, options, region = Regions.home, profile) {
@@ -223,7 +245,10 @@ const Sim = (() => {
     const seed = Number.isInteger(profile?.seed) && profile.seed >= 0 && profile.seed <= 999999999 ? profile.seed : Data.control.seed;
     const s = create(seed, difficulty, role, 6, options, Regions.home, profile);
     s.controlStart = startId;
-    if (startId === "shelter") return s;
+    if (startId === "shelter") {
+      placeStartingBat(s);
+      return s;
+    }
     const start = Data.control.starts[startId];
     const entrance = s.world.buildings.find(b => b.type === start.type)?.door;
     if (!entrance) throw new Error("The selected landmark is missing.");
@@ -253,6 +278,7 @@ const Sim = (() => {
     s.waypoint = "base";
     s.messages.pop();
     notify(s, start.detail + " Your shelter is marked on the map.");
+    placeStartingBat(s);
     return s;
   }
 

@@ -701,3 +701,5 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 .opening-navigation .small-button { min-height:44px; }
 .opening-navigation p { margin:.25rem 0 0; }
 #map-btn[hidden],#map-card[hidden],#destination-btn[hidden] { display:none; }
+
+.weapon-item-icon { width:34px; height:20px; object-fit:contain; image-rendering:pixelated; }

@@ -517,7 +517,7 @@
         "Take a bandage from Nearby. Close inventory when you have it.",
         "Open Pack or press I, then select Backpack to see what you carry.",
         "Close inventory. Something is moving outside the shelter.",
-        "Get within reach and use Attack or Space. Shove with X or the Shove button.",
+        "Use Attack or Space when you’re in reach. You can punch or pick up and equip the nearby bat.",
         "You’re ready. Start your own run from the title screen."
       ];
       if ($("lesson-text").textContent !== prompts[lesson.stage]) $("lesson-text").textContent = prompts[lesson.stage];
@@ -673,6 +673,11 @@
     $("pin-status").textContent = "Pin saved.";
   }
 
+  function itemIcon(id) {
+    const sprite = View.weaponIcon(id);
+    return sprite ? '<img class="weapon-item-icon" src="' + sprite + '" alt="">' : icon(Data.items[id].icon);
+  }
+
   function itemDescription(item) {
     const d = Data.items[item.id], parts = [];
     parts.push(formatWeight(d.weight * item.qty) + " kg");
@@ -713,7 +718,7 @@
         d.damage ? equipped ? "Equipped" : "Equip" : d.slot ? worn ? "Remove" : "Equip" :
         ({food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take"}[d.use] || "");
       return '<div class="item-row bag-item ' + (equipped || worn ? "equipped-item" : "") + '"><div><div class="item-top">' +
-        icon(d.icon) + "<b>" + esc(d.name) + " ×" + item.qty + '</b></div><div class="item-meta">' + itemDescription(item) + '</div></div><div class="item-actions">' +
+        itemIcon(item.id) + "<b>" + esc(d.name) + " ×" + item.qty + '</b></div><div class="item-meta">' + itemDescription(item) + '</div></div><div class="item-actions">' +
         (useLabel ? button(useLabel, "use-" + index, equipped || d.use === "food" && Sim.isSpoiled(state, item), "primary") : "") +
         (store ? button(item.qty > 1 ? "Store stack" : "Store", "store-" + index) : "") + button("Drop", "drop-" + index) +
         (hasRecipes(item.id) ? button("Recipes", "recipes-" + item.id) : "") +
@@ -729,7 +734,7 @@
         if (!matches(item)) return;
         const d = Data.items[item.id], room = Sim.roomFor(state, item.id), ref = objectIndex(o) + "-" + index;
         const equip = d.damage || d.slot && state.player.gear[d.slot] !== item.id || d.use === "backpack" && !state.player.backpack;
-        result.push('<div class="item-row bag-item"><div><div class="item-top">' + icon(d.icon) + "<b>" + esc(d.name) + " ×" + item.qty +
+        result.push('<div class="item-row bag-item"><div><div class="item-top">' + itemIcon(item.id) + "<b>" + esc(d.name) + " ×" + item.qty +
           '</b></div><div class="item-meta">' + esc(o.name) + " · " + itemDescription(item) +
           (room < item.qty ? " · " + (room ? room + " will fit" : "No room") : "") + '</div></div><div class="item-actions">' +
           button("Take", "take-" + ref, !room, "primary") + (item.qty > 1 ? button("Take stack", "all-" + ref, !room) : "") +

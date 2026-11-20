@@ -104,6 +104,14 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   const run = Sim.createControl("training", "carer", "shelter");
   run.look = "dark";
   View.prepare(run.world);
+  heldWeapon = null;
+  View.render(run,0,1/60);
+  check("the starting bat has a ground sprite", Sim.weapon(run).id === "fists" && Boolean(heldWeapon));
+  const bat = run.world.objects.find(o => o.kind === "drop" && o.loot.some(i => i.id === "bat"));
+  bat.active = false;
+  heldWeapon = null;
+  View.render(run,0,1/60);
+  check("an unarmed survivor has no held weapon sprite", heldWeapon === null);
   const weapons = Object.keys(context.Data.items).filter(id => context.Data.items[id].damage);
   const sprites = weapons.map(id => {
     run.player.bag.push({id, qty:1, uid:"render-" + id, condition:100});

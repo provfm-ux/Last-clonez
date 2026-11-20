@@ -76,6 +76,7 @@
 <main class="console">
   <section class="stage" aria-label="Survival world">
     <div class="stage-top"><div class="camera"><span class="camera-dot"></span><span id="location">COLD VALE</span></div><div class="world-clock"><span id="day">DAY 01</span><span class="divider">/</span><b id="timer">08:00</b><span class="weather" id="weather">Overcast</span></div></div>
+    <div class="event-status" id="event-status" role="status" hidden><span id="event-text"></span></div>
     <div class="viewport">
       <canvas id="world" aria-label="Isometric view of Cold Vale"></canvas>
       <div class="lens"></div>
@@ -83,15 +84,14 @@
       <div class="world-tools" id="world-tools" hidden><button id="zoom-out" aria-label="Zoom out">−</button><span id="zoom-label">1×</span><button id="zoom-in" aria-label="Zoom in">+</button><button id="roof-toggle" aria-pressed="false" aria-label="Hide roofs" title="Roofs · T"><svg class="icon"><use href="#home"/></svg><span>Roofs</span></button></div>
       <div id="move-stick" class="move-stick" role="group" aria-label="Drag to move" hidden><span class="stick-guide">MOVE</span><span id="stick-knob" class="stick-knob"></span></div>
       <div class="touch-controls" id="touch-controls" role="group" aria-label="Touch actions" hidden>
-        <button type="button" id="touch-run" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#bolt"/></svg>Run</button>
+        <button type="button" id="touch-attack" hidden><svg class="icon" aria-hidden="true"><use href="#aim"/></svg>Attack</button>
         <button type="button" id="touch-use"><svg class="icon" aria-hidden="true"><use id="touch-use-icon" href="#search"/></svg><span id="touch-use-label">Use</span></button>
         <button type="button" id="touch-shove"><svg class="icon" aria-hidden="true"><use id="touch-shove-icon" href="#shove"/></svg><span id="touch-shove-label">Shove</span></button>
+        <button type="button" id="touch-run" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#bolt"/></svg>Run</button>
       </div>
-      <button type="button" id="touch-attack" class="touch-attack" hidden><svg class="icon" aria-hidden="true"><use href="#aim"/></svg>Attack</button>
       <div class="scope scope-tl"></div><div class="scope scope-tr"></div><div class="scope scope-bl"></div><div class="scope scope-br"></div>
       <div class="live-tag" id="live-tag" hidden><svg class="icon"><use href="#signal"/></svg><span id="noise">WALKING</span></div>
       <button class="status-chips" id="status-chips" hidden aria-label="View status and injuries"></button>
-      <div class="toast" id="toast" role="status" hidden></div>
       <div class="hero" id="hero">
         <div class="hero-inner">
           <div class="hero-copy">

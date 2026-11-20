@@ -6,6 +6,7 @@ const View = (() => {
   const mainCtx = ctx;
   let lowCanvas = null, lowCtx = null, darkLook = false;
   const halfW = 32, halfH = 17;
+  const wallWidth = .14, wallInset = (1 - wallWidth) / 2;
   const camera = {x: 0, y: 0, zoom: 1, ready: false};
   const size = {width: 0, height: 0, dpr: 1};
   const objectLabels = [];
@@ -93,6 +94,13 @@ const View = (() => {
     camera.ready = false;
     const buildings = new Map(world.buildings.map(b => [b.id, b]));
     world.roofTiles = new Map(world.buildings.map(b => [b.id, []]));
+    for (const home of world.buildings.filter(b => b.type === "home")) {
+      for (let y = Math.max(0, home.y - 2); y < Math.min(world.height, home.y + home.h + 2); y++) {
+        for (let x = Math.max(0, home.x - 2); x < Math.min(world.width, home.x + home.w + 2); x++) {
+          world.tiles[y * world.width + x].nearHome = true;
+        }
+      }
+    }
     const surfaces = {grass:world.region === "ridge" ? "#435944" : world.region === "fields" ? "#526244" : "#45553a",
       asphalt:"#484d43",path:"#77806e",trail:"#77684e",water:world.region === "coast" ? "#325961" : "#3b6164",
       rock:world.underground ? "#393f40" : "#656d64",concrete:"#61635d",rail:"#615952",sand:"#a39771",bridge:"#88745c",field:"#726247"};
@@ -100,6 +108,30 @@ const View = (() => {
       if (t.kind === "void") continue;
       const building = buildings.get(t.building);
       if (building) world.roofTiles.get(building.id).push(index);
+      if (t.kind === "wall") {
+        const joins = (dx, dy, axis) => {
+          const next = World.tileAt(world, t.x + dx, t.y + dy);
+          if (!next || next.building !== t.building) return false;
+          if (next.kind === "wall") return t.wallAxis === axis || next.wallAxis === axis;
+          return Boolean(next.doorId) && next.wallAxis === axis;
+        };
+        const lo = wallInset, hi = lo + wallWidth;
+        const left = joins(-1, 0, "x"), right = joins(1, 0, "x");
+        const back = joins(0, -1, "y"), front = joins(0, 1, "y");
+        if (!back && !front && t.wallAxis === "x") {
+          t.wallOutline = [[0, lo], [1, lo], [1, hi], [0, hi]];
+        } else if (!left && !right && t.wallAxis === "y") {
+          t.wallOutline = [[lo, 0], [hi, 0], [hi, 1], [lo, 1]];
+        } else {
+          // Each arm meets its neighbour at the tile edge. One cap covers the joint.
+          t.wallOutline = [
+            [lo, lo], ...(back ? [[lo, 0], [hi, 0]] : []),
+            [hi, lo], ...(right ? [[1, lo], [1, hi]] : []),
+            [hi, hi], ...(front ? [[hi, 1], [lo, 1]] : []),
+            [lo, hi], ...(left ? [[0, hi], [0, lo]] : [])
+          ];
+        }
+      }
       const floors = {home: t.room ? "#80735f" : "#787d69", clinic: "#708078", market: "#7d8071", workshop: "#6b6354", police: "#6d7669", fuel: "#747566"};
       if (building?.compact) floors.home = t.room === "Bedroom" ? "#6c665b" : building.color;
       const color = surfaces[t.surface] || floors[building?.type] || world.zones[t.zone].color;
@@ -109,15 +141,16 @@ const View = (() => {
   }
 
   const BLOOD = ["#4a0c0f", "#6a1216", "#8c1a1c", "#2c070a"];
+  const GROUND_BLOOD = ["#4a191d80", "#662f3466", "#75363b55", "#32191b80"];
   const dot = (x, y, w, h, color) => { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
-  function bloodPool(wx, wy, rx, ry, seed) {
+  function bloodPool(wx, wy, rx, ry, seed, colors = BLOOD) {
     const ring = (k, color) => poly(Array.from({length: 10}, (_, i) => p(wx + Math.cos(i / 10 * 6.283) * rx * k * (1 + .18 * Math.sin(seed + i * 2.3)), wy + Math.sin(i / 10 * 6.283) * ry * k)), color);
-    ring(1, BLOOD[3]); ring(.72, BLOOD[0]); ring(.34, BLOOD[1]);
-    const [hx, hy] = p(wx - rx * .2, wy - ry * .1); dot(hx, hy, 3, 2, BLOOD[2]);
+    ring(1, colors[3]); ring(.72, colors[0]); ring(.34, colors[1]);
+    const [hx, hy] = p(wx - rx * .2, wy - ry * .1); dot(hx, hy, 3, 2, colors[2]);
   }
   function microDetail(t) {
     const {x, y} = t, h = ((x * 73856093) ^ (y * 19349663)) >>> 0, at = (u, v) => p(x + u, y + v);
-    const spot = (u, v, n, r, seed) => { for (let k = 0; k < n; k++) { const q = ((seed + k * 40503) * 2654435761) >>> 0, [px, py] = at(Math.min(.95, Math.max(.05, u + ((q % 100) / 100 - .5) * r)), Math.min(.95, Math.max(.05, v + (((q >> 8) % 100) / 100 - .5) * r))); dot(px, py, 2 + (q >> 16 & 1), 2, BLOOD[k % 3 ? (q >> 20 & 1) : 3]); } };
+    const spot = (u, v, n, r, seed) => { for (let k = 0; k < n; k++) { const q = ((seed + k * 40503) * 2654435761) >>> 0, [px, py] = at(Math.min(.95, Math.max(.05, u + ((q % 100) / 100 - .5) * r)), Math.min(.95, Math.max(.05, v + (((q >> 8) % 100) / 100 - .5) * r))); dot(px, py, 2 + (q >> 16 & 1), 2, GROUND_BLOOD[k % 3 ? (q >> 20 & 1) : 3]); } };
     if (t.surface === "grass" || t.surface === "field") {
       for (let k = 0; k < 6; k++) { const q = ((h + k * 977) * 2246822519) >>> 0, [px, py] = at(.12 + (q % 76) / 100, .12 + ((q >> 7) % 76) / 100);
         dot(px, py - 3, 2, 4, k % 3 === 0 ? "#2a3a22" : k % 3 === 1 ? "#4b5f38" : "#364a2a"); if (k === 2) dot(px + 2, py - 2, 2, 3, "#5d6e42"); }
@@ -129,11 +162,11 @@ const View = (() => {
     } else if (t.surface === "tile" || t.surface === "sand") {
       for (let k = 0; k < 4; k++) { const q = ((h + k * 733) * 2654435761) >>> 0, [px, py] = at((q % 80) / 100 + .1, ((q >> 8) % 80) / 100 + .1); dot(px, py, 2, 2, t.surface === "sand" ? "#c9b98c" : k % 2 ? "#2c2820" : "#5a5444"); }
     }
-    if (t.surface === "water") return;
+    if (!t.nearHome || t.surface === "water") return;
     const heavy = t.surface === "asphalt" || t.surface === "tile";
-    if (h % (heavy ? 5 : 8) === 0) spot(.5, .5, 3 + (h >> 4) % 4, .7, h);
-    if (h % 47 === 0) { const [px, py] = at(.5, .5); bloodPool(x + .5, y + .5, .26, .16, h % 7); spot(.5, .5, 5, .9, h + 5); }
-    if (h % 61 === 0) { for (let k = 1; k < 6; k++) spot(.15 + k * .14, .3 + k * .08, 1, .1, h + k * 13); }
+    if (h % (heavy ? 8 : 12) === 0) spot(.5, .5, 3 + (h >> 4) % 4, .7, h);
+    if (h % 71 === 0) { bloodPool(x + .5, y + .5, .20, .13, h % 7, GROUND_BLOOD); spot(.5, .5, 5, .9, h + 5); }
+    if (h % 97 === 0) { for (let k = 1; k < 6; k++) spot(.15 + k * .14, .3 + k * .08, 1, .1, h + k * 13); }
   }
 
   function tileArt(t) {
@@ -241,36 +274,21 @@ const View = (() => {
   }
 
   function wall(t, player, menu) {
-    const {x, y} = t;
-    let h = t.outside ? t.rear ? 34 : 18 : 26;
-    if (!menu && x + y > player.x + player.y && sq(x + .5 - player.x, y + .5 - player.y, 3.3)) h = 10;
-    if (t.kind === "shutter") {
-      const gate = ["#7a5040", "#53352f", "#382d27"];
-      box(x + .37, y, 0, .27, 1, 28, gate);
-      for (let i = 6; i <= 24; i += 6) line(p(x + .65, y + .06, i), p(x + .65, y + .94, i), "#9e635280");
-      box(x + .38, y + .37, 24, .33, .20, 3, ["#fd896c", "#9c4b39", "#633428"]);
-      return;
-    }
-    const across = t.wallAxis === "x";
-    const xx = x + (across ? 0 : .37), yy = y + (across ? .37 : 0);
-    const w = across ? 1 : .26, d = across ? .26 : 1;
-    const caps = t.outside ? ["#667369", "#454e44", "#343f35"] : ["#727b6c", "#475248", "#39463e"];
-    const trim = ["#829181", "#566453", "#4c5b4e"];
-    box(xx, yy, 0, w, d, h, caps);
-    if (h > 14) box(xx, yy, 6, w, d, 2, trim);
-    line(p(xx, yy + d, h), p(xx + w, yy + d, h), "#aab19a65");
-    line(p(xx + w, yy, h), p(xx + w, yy + d, h), "#929c8d5f");
-    if (h > 24 && t.tint > .70) {
-      if (across) {
-        poly([p(xx + .17, yy + d + .005, h - 4), p(xx + .82, yy + d + .005, h - 4),
-          p(xx + .82, yy + d + .005, h - 15), p(xx + .17, yy + d + .005, h - 15)], "#293c38");
-        line(p(xx + .50, yy + d + .01, h - 4), p(xx + .50, yy + d + .01, h - 15), "#657c72");
-      } else {
-        poly([p(xx + w + .005, yy + .15, h - 4), p(xx + w + .005, yy + .85, h - 4),
-          p(xx + w + .005, yy + .85, h - 15), p(xx + w + .005, yy + .15, h - 15)], "#293c38");
-        line(p(xx + w + .01, yy + .50, h - 4), p(xx + w + .01, yy + .50, h - 15), "#657c72");
+    const {x, y, wallOutline: outline} = t;
+    const fullHeight = t.outside ? 34 : 26;
+    const dx = x + .5 - player.x, dy = y + .5 - player.y;
+    const cutaway = !menu && dx + dy > 0 && sq(dx, dy, 3.3);
+    const height = cutaway ? 10 : fullHeight;
+    const [cap, south, east] = t.outside ? ["#667369", "#454e44", "#343f35"] : ["#727b6c", "#475248", "#39463e"];
+    const top = outline.map(([u, v]) => p(x + u, y + v, height));
+    for (let i = 0; i < outline.length; i++) {
+      const j = (i + 1) % outline.length;
+      const [u, v] = outline[i], [nextU, nextV] = outline[j];
+      if (nextU < u || nextV > v) {
+        poly([top[i], top[j], p(x + nextU, y + nextV), p(x + u, y + v)], nextU < u ? south : east);
       }
     }
+    poly(top, cap);
   }
 
   const iron = ["#6b8279", "#425954", "#30463e"];
@@ -537,7 +555,8 @@ const View = (() => {
       if (o.open && !o.boards) {
         f(-.4,-.3,0,.08,.65,29,wood);
       } else {
-        f(horizontal?-.48:-.1,horizontal?-.1:-.48,0,horizontal?.96:.2,horizontal?.2:.96,29,kind==="window"?iron:wood);
+        f(horizontal ? -.48 : -wallWidth / 2, horizontal ? -wallWidth / 2 : -.48, 0,
+          horizontal ? .96 : wallWidth, horizontal ? wallWidth : .96, 29, kind === "window" ? iron : wood);
         for(let i=0;i<(o.boards||0);i++) f(-.44,-.13,7+i*7,.88,.26,3,olive);
         if (o.locked || o.latched) f(horizontal ? .22 : .07, horizontal ? .07 : .24, 13, .08, .08, 3, olive);
       }

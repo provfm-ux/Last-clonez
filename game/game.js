@@ -439,15 +439,19 @@
     const multiple = choices.length + Number(talk) > 1 && !taskTarget(o);
     const context = car ? (exit ? "Cross" : "Exit") : multiple ? "Nearby" : o ? interactionLabel(o) : talk ? "Talk" : "Use";
     $("context-label").textContent = context;
-    $("touch-use-label").textContent = context;
+    $("touch-use-label").textContent = car ? context : "Use";
     $("touch-use-icon").setAttribute("href", exit || o?.action === "travel" ? "#map" : car ? "#exit" : "#search");
     $("touch-use").classList.toggle("ready", Boolean(car || talk || o));
     setHtml("objectives", objectiveHtml());
     $("quest-count").textContent = objectives().filter(o => o.done).length + " / 4";
     setHtml("radio-log", state.messages.filter(m => m?.lang === "en" && typeof m.text === "string").slice(-3).reverse().map(m => '<p' + (m.danger ? ' class="danger"' : "") + "><time>" + time(m.time) + "</time><span>" + esc(m.text) + "</span></p>").join(""));
     const notice = state.notice;
-    $("toast").hidden = !notice || notice.until < state.elapsed || !active() || Boolean(notice.range && targetInReach);
-    if (notice) { $("toast").textContent = notice.text; $("toast").classList.toggle("warn", notice.danger); }
+    const event = notice && notice.until >= state.elapsed && !(notice.range && targetInReach) ? notice :
+      state.messages.findLast(m => m?.lang === "en" && typeof m.text === "string");
+    $("event-status").hidden = !active();
+    $("event-status").classList.toggle("warn", Boolean(event?.danger));
+    const eventText = $("event-text"), text = event?.text ?? "";
+    if (eventText.textContent !== text) eventText.textContent = text;
   }
 
   function help() {
@@ -1317,7 +1321,7 @@
       '</div><div class="item-actions">' + button("Open nearby inventory", "bag-open") + "</div>", "interactions");
   }
 
-  function nearbyAction() {
+  function nearbyAction(useClosest = false) {
     if (!active() || dialog.open) return;
     if (state.player.vehicle) {
       const exit = nearbyExit();
@@ -1325,7 +1329,20 @@
       else { Sim.exitVehicle(state); updateHud(); save(); }
       return;
     }
-    const choices = nearbyObjects(), o = choices[0], talk = canTalk();
+    const choices = nearbyObjects(), talk = canTalk();
+    if (useClosest === true && choices.length) {
+      const closest = choices.reduce((a, b) => Sim.distance(state.player, a) <= Sim.distance(state.player, b) ? a : b);
+      if (closest.kind === "drop" && !closest.corpse && closest.loot?.length === 1) {
+        const {id} = closest.loot[0], qty = Sim.collect(state, closest, 0, true);
+        if (qty) {
+          Sim.notify(state, "Took " + qty + " × " + Data.items[id].name + ".");
+          save();
+        }
+        updateHud();
+      } else objectPanel(closest);
+      return;
+    }
+    const o = choices[0];
     if (taskTarget(o) || o && choices.length === 1 && !talk) objectPanel(o);
     else if (!talk && choices.length > 1 && choices.every(choice => choice.action === "loot" && choice.kind !== "car")) bag("nearby");
     else if (choices.length) interactions(choices, talk);
@@ -1748,7 +1765,7 @@
     else Sim.shove(state);
   }
 
-  bindTap($("touch-use"), nearbyAction);
+  bindTap($("touch-use"), () => nearbyAction(true));
   bindTap($("touch-attack"), () => strike());
   bindTap($("touch-shove"), shoveOrBrake);
   bindTap($("touch-run"), () => {

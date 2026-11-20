@@ -32,3 +32,8 @@ O jogo está em `game/`. Guia do jogador: `docs/GAME_GUIDE.md`.
 `npm test` | `npm run test:full` | `npm run index` | `npm run build` | `npm run test:compat` (precisa de `../old-version`)
 
 Last CloneZ — Cloudflare deployment.
+
+## Testar alterações de um PR no Android
+
+Os Workers Builds podem criar um URL de pré-visualização por ramo a partir de
+`game/`. Consulta a [configuração das pré-visualizações](docs/WORKERS_PREVIEWS.md).

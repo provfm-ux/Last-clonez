@@ -135,7 +135,7 @@ const Data = (() => {
   };
   const maxMapPins = 64;
   const control = {
-    version:"0.32",
+    version:"0.33",
     seed:17,
     starts:{
       shelter:{name:"Shelter", detail:"Start indoors by the supplies crate. Test the garden, campfire and rain collector."},

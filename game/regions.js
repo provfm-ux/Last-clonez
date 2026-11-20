@@ -32,6 +32,7 @@ const Regions = (() => {
     cavern: {name:"Cinder Grotto", type:"Underground", color:"#655c55", width:42, height:42, underground:true, cold:.62,
       detail:"An abandoned survey tunnel. Bring a flashlight and spare batteries."}
   };
+  Object.assign(definitions, Expedition.districts);
   const annexes = Object.keys(definitions).filter(id => id !== home && id !== cavern && !definitions[id].deep);
   const deepIds = Object.keys(definitions).filter(id => definitions[id].deep);
   const point = ([x,y]) => ({x:x+.5, y:y+.5});
@@ -66,7 +67,20 @@ const Regions = (() => {
     // Generation 5: the three far areas hang off the outer ones, like the grotto.
     if (world.generator >= 5) {
       if (meta.deep) add(meta.host,meta.exitBack);
-      for (const id of deepIds) if (definitions[id].host === world.region && world.generator >= (definitions[id].generator ?? 5)) add(id,definitions[id].hostExit);
+      for (const id of deepIds) {
+        const next = definitions[id];
+        if (next.host !== world.region || world.generator < (next.generator ?? 5)) continue;
+        if (Object.hasOwn(Expedition.districts,id)) {
+          const lane = [next.hostExit,next.hostArrival];
+          world.objects = world.objects.filter(o => o.kind !== "tree" ||
+            !lane.some(([x,y]) => Math.floor(o.x) === x && Math.floor(o.y) === y));
+          for (const [x,y] of lane) {
+            const tile = world.tiles[y*world.width+x];
+            if (!tile.building) Object.assign(tile,{surface:"asphalt",solid:false,baseSolid:false});
+          }
+        }
+        add(id,next.hostExit);
+      }
     }
   }
 
@@ -173,6 +187,7 @@ const Regions = (() => {
 
   function create(seed, region, generator) {
     if (region === cavern) return createGrotto(seed,generator);
+    const district = Expedition.districts[region];
     const meta = definitions[region], width = meta.deep ? meta.width : oldSize, height = meta.deep ? meta.height : oldSize;
     const rng = Level.seeded(seed ^ Math.imul(annexes.indexOf(region) + 1 || 20 + deepIds.indexOf(region), 0x9e3779b9));
     const zones = {wild:{name:meta.name, short:meta.name.toUpperCase(), color:meta.color}};
@@ -225,7 +240,13 @@ const Regions = (() => {
         const spine = 32 + 3 * Math.sin(y / 9), half = 14 - Math.abs(y - 30) / 4, d = Math.abs(x - spine);
         return d > half ? "water" : d > half - 3 ? "sand" : "grass";
       }
-    }[region];
+    }[region] ?? ((x,y) => {
+      if ((region === "lowtide" || region === "highmoor") && x > 6 && (y < 9 || y > height-10)) {
+        return region === "lowtide" ? "water" : "rock";
+      }
+      if (region === "slagline" && y > 44 && y < 50) return "rail";
+      return district.surface;
+    });
 
     for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
       const surface = regionSurface(x,y);
@@ -312,7 +333,23 @@ const Regions = (() => {
     const garden = (x,y,crop) => resource(x,y,"garden","Garden bed",{solid:true,
       garden:{crop,moisture:48,growth:Data.crops[crop].minutes}});
 
-    if (region === "cinema") {
+    if (district) {
+      zone("routes","District footpaths","#626457");
+      const roadSurface = district.surface === "concrete" ? "asphalt" : "trail";
+      const east = width-3;
+      for (const y of [34,60,88]) road([[2,y],[east,y]],2,roadSurface,"routes");
+      for (const x of [3,26,48,70,92,east]) road([[x,30],[x,92]],1.3,roadSurface,"routes");
+      for (const [index,[name]] of district.sites.entries()) {
+        const x = 5+22*(index%5), y = index < 5 ? 14 : 68;
+        const station = building(x,y,16,16,name,"district",district.style);
+        road([[x+8,y+16],[x+8,y+20]],1.25,"path","routes");
+        station.stash(2,6,"crate","Emergency supplies",{water:1,food:1},{storage:true});
+        station.table(11,11);
+        if (index%3 === 0) station.bed(2,13,"Relief crew cot");
+        if (index%3 === 1) collector(x+13,y+18);
+        if (index%3 === 2) campfire(x+2,y+18);
+      }
+    } else if (region === "cinema") {
       const hall = building(5,4,18,20,"Oxford Night Reel","cinema","iron");
       const front = buildings.at(-1).door;
       front.name = "Lobby doors";
@@ -503,7 +540,7 @@ const Regions = (() => {
     }
 
     const occupied = new Set(objects.map(o => Math.floor(o.y)*width + Math.floor(o.x)));
-    const density = {ridge:.085, ironworks:.04, coast:.035, fields:.045, quarry:.012, reservoir:.05, lighthouse:.03}[region];
+    const density = {ridge:.085, ironworks:.04, coast:.035, fields:.045, quarry:.012, reservoir:.05, lighthouse:.03}[region] ?? .023;
     for (const t of tiles) {
       t.baseKind = t.kind; t.baseSolid = t.solid;
       if (t.surface !== "grass" || t.solid || occupied.has(t.y*width+t.x) || Math.hypot(t.x+.5-start.x,t.y+.5-start.y) < 6) continue;

@@ -1,5 +1,10 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
+## 0.33 — The Outer Districts
+- Expanded Cold Vale and its surrounding regions with five connected districts and 50 explorable sites.
+- Added local witness stories, 300 hidden curios, and a five-district follow-up to The Second All-Clear.
+- New runs use generation 7. Existing saves retain their original layouts.
+
 ## 0.32 — Oxford Night Reel
 - Added an optional, replayable beginner introduction using the survival controls.
 - Infected deaths can open one of six short afterlife games with reduced visibility and directional sound.

@@ -148,5 +148,9 @@ const blind = per(() => View.renderAfterlife(shadow));
 check("afterlife draws a small field without filters or gradient passes",
   limited.fill <= 60 && blind.fill < limited.fill &&
   !limited.createRadialGradient && !limited.createLinearGradient);
+const borough = Sim.create(17,"training","carer",7,undefined,"southbank");
+View.prepare(borough.world);
+const districtDraw = per(() => View.render(borough,0,.016));
+check("outer district shares the isometric renderer",districtDraw.fill > 0);
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

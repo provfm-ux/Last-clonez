@@ -35,6 +35,10 @@ const Atmosphere = (() => {
     ],
     cavern:[]
   };
+  for (const [id,district] of Object.entries(Expedition.districts)) {
+    arrivals[id] = [{name:"the eastern lane",entry:[district.width-3,60],goal:[83,60]},
+      {name:"the north road",entry:[district.width-3,34],goal:[83,34]}];
+  }
   const nestBuildings = {coldvale:"Workshop",ridge:"Ranger station",ironworks:"Power substation",coast:"Weather hut",fields:"Hay barn",quarry:"Crusher shed",reservoir:"Pump house",lighthouse:"Boat shed"};
   const furnishings = {
     home:["wardrobe","sideboard","bookcase","armchair","sink"],
@@ -49,7 +53,7 @@ const Atmosphere = (() => {
   const marker = (x,y) => ({x:x+.5,y:y+.5});
 
   function place(world) {
-    if (world.underground || world.region === "cinema") return;
+    if (world.underground || world.region === "cinema" || Object.hasOwn(Expedition.districts,world.region)) return;
     const occupied = new Set(world.objects.map(o => Math.floor(o.y)*world.width + Math.floor(o.x)));
     function clearCell(x,y) {
       const tile = World.tileAt(world,x,y);

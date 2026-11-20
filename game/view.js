@@ -2126,7 +2126,7 @@ const View = (() => {
       dot(exit.x,exit.y,"#e5d48f",4);
       if (w >= 350) {
         const dest = Regions.definitions[exit.id.slice(5)];
-        const label = exit.id === "exit-cinema" ? "CINEMA" : world.region === Regions.home ? dest.direction[0] :
+        const label = Object.hasOwn(Expedition.districts,exit.id.slice(5)) ? dest.tag : exit.id === "exit-cinema" ? "CINEMA" : world.region === Regions.home ? dest.direction[0] :
           world.underground ? "UP" : exit.id === "exit-" + Regions.cavern ? "DOWN" : dest?.deep ? dest.tag :
           Regions.definitions[world.region].deep ? "BACK" : "TOWN";
         const shift = exit.y > world.height/2 ? -10 : 14;

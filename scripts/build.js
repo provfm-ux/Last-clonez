@@ -16,8 +16,20 @@ const embedded = Object.fromEntries(Object.entries(recordings).map(([id,name]) =
   if (!match) throw new Error("Invalid recorded cue path for " + id);
   return [id,"data:"+mime[match[1]]+";base64,"+fs.readFileSync(path.join(game,name)).toString("base64")];
 }));
+const zombieEvents = JSON.parse(fs.readFileSync(path.join(game,"catalogo/eventos.json"),"utf8")).events;
+function embedZombie(name,ext) {
+  if (!new RegExp("^assets/audio/zombies/lcz_zombie_[0-9]{2}\\."+ext+"$").test(name)) {
+    throw new Error("Invalid zombie cue path: " + name);
+  }
+  return "data:"+mime[ext]+";base64,"+fs.readFileSync(path.join(game,name)).toString("base64");
+}
+const standaloneEvents = Object.fromEntries(Object.entries(zombieEvents).map(([id,event]) => {
+  if (!event.files_ogg.length || event.files_ogg.length !== event.files_mp3.length) throw new Error("Unpaired files for "+id);
+  return [id,{files_ogg:event.files_ogg.map(name => embedZombie(name,"ogg")),
+    files_mp3:event.files_mp3.map(name => embedZombie(name,"mp3"))}];
+}));
 const blocks = names.map(n => {
-  const js = n === "recordings" ? "const Recordings = Object.freeze(" + JSON.stringify(embedded) + ");" :
+  const js = n === "recordings" ? "const Recordings = Object.freeze(" + JSON.stringify(embedded) + ");\nconst ZombieEventFiles = " + JSON.stringify(standaloneEvents) + ";" :
     fs.readFileSync(path.join(game,n+".js"),"utf8");
   if (js.includes("</script")) throw new Error(n+".js contains </script");
   return "<script>\n"+js+"\n</script>\n";

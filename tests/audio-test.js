@@ -7,29 +7,33 @@ const path = require("node:path");
 
 async function run() {
   const sources = [], fetched = [], decoded = [];
-  const node = () => ({connect: next => next, frequency:{value:0}, gain:{value:0}, pan:{value:0}});
+  const events = JSON.parse(fs.readFileSync(path.join(__dirname,"../game/catalogo/eventos.json"),"utf8")).events;
+  const node = () => ({connect(next) { this.next = next; return next; }, frequency:{value:0}, gain:{value:0}, pan:{value:0}});
   const ctx = {
     state:"running", destination:{},
     async decodeAudioData(bytes) { decoded.push(bytes.byteLength); return {recorded:bytes.byteLength}; },
     createBuffer(channel,length) { return {getChannelData:() => new Float32Array(length)}; },
     createBufferSource() {
-      const source = {...node(),start() { sources.push(this); },stop() { this.stopped = true; }};
+      const source = {...node(),playbackRate:{value:1},start() { sources.push(this); },stop() { this.stopped = true; }};
       return source;
     },
     createGain:node,createBiquadFilter:node,createStereoPanner:node
   };
   const sandbox = vm.createContext({
     Recordings:{near:"audio/near.wav",tin:"audio/missing.wav",glass:"data:audio/wav;base64,AQID"},
-    Level:{seeded:() => () => .5}, atob,
+    Level:{seeded:() => () => .5}, atob, performance,
     async fetch(url) {
       fetched.push(url);
-      return {ok:!url.endsWith("missing.wav"),async arrayBuffer() { return new ArrayBuffer(4); }};
+      if (url.endsWith("eventos.json")) return {ok:true,async json() { return {events}; }};
+      const clip = /_(\d+)\.mp3$/.exec(url);
+      return {ok:!url.endsWith("missing.wav") && !url.endsWith(".ogg"),
+        async arrayBuffer() { return new ArrayBuffer(clip ? Number(clip[1])+100 : 4); }};
     }
   });
   const script = fs.readFileSync(path.join(__dirname,"../game/soundscape.js"),"utf8");
   const audio = vm.runInContext(script+"\nSoundscape",sandbox);
   await Promise.all([audio.preload(ctx),audio.preload(ctx)]);
-  assert.deepEqual(fetched,["audio/near.wav","audio/missing.wav"]);
+  assert.deepEqual(fetched.sort(),["audio/missing.wav","audio/near.wav","catalogo/eventos.json"]);
   assert.deepEqual(decoded.sort(),[3,4]);
   const play = kind => {
     audio.play(ctx,{kind,x:1,y:0},{x:0,y:0});
@@ -41,7 +45,35 @@ async function run() {
   assert.equal(typeof play("wings").getChannelData,"function");
   audio.stop(ctx);
   assert.ok(sources.every(source => source.stopped));
-  console.log("Recorded cues, offline decoding, fallback and mute OK");
+  const zombie = (role,options) => audio.play(ctx,{
+    kind:"zombie.common."+role,entity:"town:1",x:3,y:0,muffled:true,...options
+  },{x:0,y:0});
+  for (const role of ["idle","notice","chase","attack","hit","death"]) {
+    await zombie(role);
+    const clip = sources.at(-1);
+    assert.ok(events["zombie.common."+role].files_mp3.some(file => clip.buffer.recorded === Number(/_(\d+)\.mp3$/.exec(file)[1])+100));
+    assert.equal(clip.next.frequency.value,850);
+    assert.ok(clip.next.next.next.pan.value > 0);
+    assert.ok(clip.playbackRate.value >= .96 && clip.playbackRate.value <= 1.04);
+    clip.onended();
+  }
+  await zombie("idle");
+  const first = sources.at(-1).buffer;
+  await zombie("idle");
+  assert.notEqual(sources.at(-1).buffer,first);
+  const beforeRange = sources.length;
+  await zombie("attack",{x:21});
+  assert.equal(sources.length,beforeRange);
+  for (let index = 0; index < 10; index++) await zombie("idle");
+  assert.equal(sources.length,beforeRange+5);
+  for (let index = 0; index < 5; index++) await zombie("attack");
+  assert.equal(sources.length,beforeRange+8);
+  audio.stop(ctx);
+  const pending = zombie("hit");
+  audio.stop(ctx);
+  await pending;
+  assert.equal(sources.length,beforeRange+8);
+  console.log("Recorded cues, offline decoding, codec fallback, event mapping, spatial mix, voice limits and mute OK");
 }
 
 run().catch(error => { console.error(error); process.exitCode = 1; });

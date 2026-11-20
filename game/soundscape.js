@@ -2,7 +2,9 @@
 
 const Soundscape = (() => {
   const buffers = new WeakMap(), playing = new WeakMap(), sampleRate = 16000, tau = 2 * Math.PI;
-  const recordings = new WeakMap();
+  const recordings = new WeakMap(), zombieBanks = new WeakMap();
+  const maxVoices = 10;
+  const zombieGains = {idle:.19,notice:.29,chase:.22,attack:.37,hit:.33,death:.40};
   const configs = {
     distant:{seconds:2.4,gain:.27,cut:560}, near:{seconds:1.28,gain:.34,cut:1800},
     horde:{seconds:3.2,gain:.43,cut:990}, twig:{seconds:.57,gain:.37,cut:2500},
@@ -78,6 +80,7 @@ const Soundscape = (() => {
 
   async function preload(ctx) {
     if (!ctx) return;
+    bankFor(ctx);
     if (!recordings.has(ctx)) {
       const clips = new Map();
       const ready = Promise.all(Object.entries(Recordings).filter(([id]) => Object.hasOwn(configs,id)).map(async ([id,path]) => {
@@ -88,36 +91,100 @@ const Soundscape = (() => {
     await recordings.get(ctx).ready;
   }
 
+  function bankFor(ctx) {
+    if (!zombieBanks.has(ctx)) {
+      const embedded = typeof ZombieEventFiles === "undefined" ? null : ZombieEventFiles;
+      const events = embedded ? Promise.resolve(embedded) : Promise.resolve().then(async () => {
+        const response = await fetch("catalogo/eventos.json");
+        if (!response.ok) return {};
+        return (await response.json()).events ?? {};
+      }).catch(() => ({}));
+      zombieBanks.set(ctx,{events,clips:new Map(),picks:new Map(),pending:0,generation:0});
+    }
+    return zombieBanks.get(ctx);
+  }
+
+  function zombieClip(ctx,bank,paths) {
+    const key = paths[0];
+    if (!bank.clips.has(key)) bank.clips.set(key,(async () => {
+      for (const path of paths) {
+        try { return await decodeRecording(ctx,path); } catch { /* Try the next codec. */ }
+      }
+      return null;
+    })());
+    return bank.clips.get(key);
+  }
+
+  async function playZombie(ctx,cue,listener,role) {
+    const range = Math.hypot(cue.x-listener.x,cue.y-listener.y);
+    const limit = role === "idle" || role === "chase" ? maxVoices-3 : maxVoices;
+    if (range > 20 || (playing.get(ctx)?.size ?? 0) >= limit) return;
+    const bank = bankFor(ctx), generation = bank.generation;
+    if (bank.pending >= (limit === maxVoices ? 3 : 2)) return;
+    bank.pending++;
+    const started = performance.now();
+    try {
+      const entry = (await bank.events)[cue.kind];
+      if (!entry?.files_ogg?.length || generation !== bank.generation) return;
+      const previous = bank.picks.get(cue.entity);
+      const candidates = entry.files_ogg.map((path,index) => ({path,index})).filter(option => option.path !== previous);
+      const pool = candidates.length ? candidates : [{path:entry.files_ogg[0],index:0}];
+      const {path,index} = pool[Math.floor(Math.random()*pool.length)];
+      bank.picks.delete(cue.entity);
+      if (bank.picks.size >= 256) bank.picks.delete(bank.picks.keys().next().value);
+      bank.picks.set(cue.entity,path);
+      const sample = await zombieClip(ctx,bank,[path,entry.files_mp3?.[index]].filter(Boolean));
+      if (sample && generation === bank.generation && performance.now()-started < 900 &&
+          ctx.state === "running" && (playing.get(ctx)?.size ?? 0) < limit) {
+        output(ctx,cue,listener,sample,{cut:6800,gain:zombieGains[role]},.96+Math.random()*.08,true);
+      }
+    } catch { /* Audio is optional. */ }
+    finally { bank.pending--; }
+  }
+
   function play(ctx, cue, listener) {
+    if (!ctx || ctx.state !== "running") return;
+    if (cue.kind.startsWith("zombie.common.")) {
+      const role = cue.kind.slice(14);
+      if (Object.hasOwn(zombieGains,role)) return playZombie(ctx,cue,listener,role);
+      return;
+    }
     const config = Object.hasOwn(configs,cue.kind) ? configs[cue.kind] : null;
-    if (!config || !ctx || ctx.state !== "running") return;
+    if (!config || (playing.get(ctx)?.size ?? 0) >= maxVoices) return;
     try {
       let library = buffers.get(ctx);
       if (!library) { library = new Map(); buffers.set(ctx,library); }
       const recording = recordings.get(ctx)?.clips.get(cue.kind);
       if (!recording && !library.has(cue.kind)) library.set(cue.kind,makeBuffer(ctx,cue.kind));
-      const source = ctx.createBufferSource(), volume = ctx.createGain(), filter = ctx.createBiquadFilter();
-      const dx = cue.x-listener.x, dy = cue.y-listener.y, distance = Math.hypot(dx,dy);
-      source.buffer = recording ?? library.get(cue.kind);
-      filter.type = "lowpass";
-      filter.frequency.value = config.cut * (cue.muffled ? .52 : 1);
-      const attenuation = cue.kind === "horde" ? .8 : 1 / (1 + distance*.06);
-      volume.gain.value = config.gain * attenuation;
-      source.connect(filter).connect(volume);
-      if (ctx.createStereoPanner) {
-        const pan = ctx.createStereoPanner();
-        pan.pan.value = Math.min(.88,Math.max(-.88,(dx-dy)/Math.max(5,distance*1.3)));
-        volume.connect(pan).connect(ctx.destination);
-      } else volume.connect(ctx.destination);
-      let sources = playing.get(ctx);
-      if (!sources) { sources = new Set(); playing.set(ctx,sources); }
-      sources.add(source);
-      source.onended = () => sources.delete(source);
-      source.start();
+      output(ctx,cue,listener,recording ?? library.get(cue.kind),config);
     } catch { /* The on-screen cue remains available without audio. */ }
   }
 
+  function output(ctx,cue,listener,buffer,config,pitch = 1,zombie = false) {
+    const source = ctx.createBufferSource(), volume = ctx.createGain(), filter = ctx.createBiquadFilter();
+    const dx = cue.x-listener.x, dy = cue.y-listener.y, distance = Math.hypot(dx,dy);
+    source.buffer = buffer;
+    if (source.playbackRate) source.playbackRate.value = pitch;
+    filter.type = "lowpass";
+    filter.frequency.value = cue.muffled ? zombie ? 850 : config.cut*.52 : config.cut;
+    const attenuation = cue.kind === "horde" ? .8 : 1 / (1 + distance*(zombie ? .20 : .06));
+    volume.gain.value = config.gain * attenuation;
+    source.connect(filter).connect(volume);
+    if (ctx.createStereoPanner) {
+      const pan = ctx.createStereoPanner();
+      pan.pan.value = Math.min(.88,Math.max(-.88,(dx-dy)/Math.max(5,distance*1.3)));
+      volume.connect(pan).connect(ctx.destination);
+    } else volume.connect(ctx.destination);
+    let sources = playing.get(ctx);
+    if (!sources) { sources = new Set(); playing.set(ctx,sources); }
+    sources.add(source);
+    source.onended = () => sources.delete(source);
+    source.start();
+  }
+
   function stop(ctx) {
+    const bank = zombieBanks.get(ctx);
+    if (bank) bank.generation++;
     const sources = playing.get(ctx);
     if (!sources) return;
     for (const source of sources) {

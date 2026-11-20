@@ -221,12 +221,19 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("roupa: peso do arranque cabe na mochila", Sim.weight(p.bag) < Sim.capacity(s), Sim.weight(p.bag).toFixed(1) + " / " + Sim.capacity(s)); }
 { const temps = [];
   for (const coat of [false, true]) { const s = fresh("survival"), p = s.player; for (const z of s.world.enemies) z.hp = 0;
-    const spot = findTile(s, t => !t.building && t.solid === false); Object.assign(p, {x: spot.x, y: spot.y}); if (coat) { p.gear.body = "wintercoat"; p.gear.head = "beanie"; }
+    const spot = findTile(s, t => !t.building && t.solid === false); Object.assign(p, {x: spot.x, y: spot.y}); if (coat) for (const id of ["wintercoat","beanie"]) {
+      p.bag.push({id,qty:1,condition:100});
+      Sim.use(s,p.bag.length-1);
+    }
     for (let i = 0; i < 800; i++) { s.minutes = 21 * 1440 + 12 * 60; Sim.tick(s, .25, idle); } temps.push(p.temperature); }
   check("roupa: casaco e gorro aquecem no inverno", temps[1] > temps[0] + .8, temps.map(t => t.toFixed(2)).join(" → ")); }
 { const absorbed = {}; 
   for (const kit of ["bare", "heavy"]) { const s = fresh("survival"), p = s.player; s.rules.damage = 10; p.fracture = 0;
-    p.gear = kit === "bare" ? {head: null, hands: null, wrist: null, arms: null, body: null, legs: null, feet: null} : {head: null, hands: "gloves", wrist: null, arms: "armguards", body: "wintercoat", legs: "jeans", feet: "boots"};
+    if (kit === "bare") for (const slot of Object.keys(p.gear)) p.gear[slot] = null;
+    else for (const id of ["gloves","armguards","wintercoat"]) {
+      p.bag.push({id,qty:1,condition:100});
+      Sim.use(s,p.bag.length-1);
+    }
     s.world.enemies.filter(e => e.hp > 0).slice(0, 4).forEach((z, i) => Object.assign(z, {x: p.x + .6 + i * .1, y: p.y + .4, alert: 30, chaseX: p.x, chaseY: p.y}));
     const seen = new Set(); let n = 0;
     for (let i = 0; i < 4000 && s.mode === "play"; i++) { p.hp = 100; Sim.tick(s, .033, idle); for (const m of s.messages) if (!seen.has(m)) { seen.add(m); if (/absorbs/.test(m.text)) n++; } }

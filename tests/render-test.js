@@ -231,5 +231,14 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   const under = per(() => View.render(cave,12,.016));
   check("Cinder Grotto: lanterna presente sem chuva ou neblina", under.warmBeam === 1 && !under.mist);
 }
+{
+  const run = Sim.createControl("training","carer","shelter");
+  run.player.bag.push({id:"spear",qty:1,condition:100,uid:"portrait-spear"});
+  Sim.use(run,run.player.bag.length-1);
+  const portrait = mkCanvas();
+  portrait.width = portrait.height = 48;
+  const equipped = per(() => View.equipmentPortrait(portrait,run));
+  check("equipamento: retrato apresenta jogador e arma equipada", equipped.drawImage >= 2);
+}
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

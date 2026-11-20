@@ -1347,6 +1347,19 @@ const View = (() => {
     }
   }
 
+  function equipmentPortrait(canvas, state) {
+    const previous = ctx;
+    ctx = canvas.getContext("2d");
+    try {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.imageSmoothingEnabled = false;
+      const player = {...state.player, moving:false, flash:0, swing:0, headingX:1, headingY:1};
+      microActor(player,true,{...state,quiet:false},true,canvas.width/2,canvas.height-8,1);
+    } finally {
+      ctx = previous;
+    }
+  }
+
   function actor(a, isPlayer, state, clock, inReach) {
     const alive = isPlayer || a.hp > 0;
     const [x, y] = p(a.x, a.y);
@@ -2314,5 +2327,5 @@ const View = (() => {
     c.font="700 10px monospace";c.fillStyle="#d6d7ba";c.textAlign="center";
     if(world.base)c.fillText("SHELTER",ox+10*unit,oy+40*unit+15);
   }
-  return {prepare,render,renderAfterlife,locate,minimap,mapPoint,visible,weaponIcon};
+  return {prepare,render,renderAfterlife,locate,minimap,mapPoint,visible,weaponIcon,equipmentPortrait};
 })();

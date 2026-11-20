@@ -752,6 +752,33 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     Object.values(Data.items).filter(item => item.damage).every(item => Data.combatStyles[item.combat]));
 }
 
+{
+  const run = Sim.createControl("training","carer","shelter",undefined,{seed:17});
+  const player = run.player;
+  const bat = {id:"bat",qty:1,condition:.2,born:0,uid:"repair-test-bat"};
+  const axe = {id:"axe",qty:1,condition:92,born:0,uid:"repair-test-axe"};
+  player.bag.push(bat, axe);
+  Sim.use(run,player.bag.indexOf(bat));
+  const z = {...World.infected(run.world,"repair-test",player.x,player.y,"walkers",context.Level.seeded(17))};
+  run.world.enemies.push(z);
+  check("desgaste: golpe parte arma no limite e bloqueia novo ataque",
+    Sim.attack(run,z) && bat.condition === 0 && Sim.weaponProblem(run) === "Weapon broken" &&
+    run.messages.some(message => message.text.includes("Wooden bat broke")));
+  const snap = Sim.snapshot(run);
+  const restored = Sim.restore(JSON.parse(JSON.stringify(snap)));
+  check("desgaste: a condição zero mantém-se na gravação", Sim.weapon(restored).condition === 0);
+  const supply = id => Sim.available(run,id);
+  player.bag.push({id:"scrap",qty:2,condition:100,born:0},{id:"tape",qty:2,condition:100,born:0});
+  const scrap = supply("scrap"), tape = supply("tape");
+  const failed = !Sim.craft(run,"repair",{...axe}) && supply("scrap") === scrap && supply("tape") === tape;
+  check("reparação: escolhe arma no inventário, sem mudar arma equipada, e respeita o limite",
+    failed && Sim.craft(run,"repair",axe) && axe.condition === 100 && Sim.weapon(run) === bat &&
+    supply("scrap") === scrap-1 && supply("tape") === tape-1);
+  check("reparação: receita antiga recupera uma arma partida e não gasta material numa arma nova",
+    !Sim.craft(run,"repair",axe) && Sim.craft(run,"repair") && bat.condition === 35 &&
+    supply("scrap") === scrap-2 && supply("tape") === tape-2);
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

@@ -446,7 +446,7 @@
     if (dialogView !== view) dialog.scrollTop = 0;
     dialogView = view;
     $("close-dialog").hidden = view === "crossing";
-    dialog.classList.toggle("wide", ["bag", "craft", "research", "rules", "map"].includes(view));
+    dialog.classList.toggle("wide", ["bag", "gear", "craft", "research", "rules", "map"].includes(view));
     if (!dialog.open) dialog.showModal();
   }
 
@@ -671,7 +671,7 @@
     const w = Sim.weaponData(state), item = Sim.weapon(state);
     $("weapon").textContent = car ? "Vehicle" : !active() ? "Gear" : w.name;
     $("condition").textContent = !active() ? "" : car ? Math.round(car.fuel) + "% fuel · " + Math.round(car.hp/1.4) + "% condition" :
-      item.id === "fists" ? "Unarmed" : Math.round(item.condition) + "% condition" + (w.firearm ? " · " + itemCount("ammo") + " rounds" : "");
+      item.id === "fists" ? "Unarmed" : weaponCondition(item) + (w.firearm ? " · " + itemCount("ammo") + " rounds" : "");
     $("shove-label").textContent = car ? "Brake" : "Shove";
     $("destination-btn").hidden = !active() || state.hideNavigation;
     $("world-tools").hidden = !active();
@@ -810,6 +810,12 @@
     return sprite ? '<img class="weapon-item-icon" src="' + sprite + '" alt="">' : icon(Data.items[id].icon);
   }
 
+  function weaponCondition(item) {
+    const condition = item.condition ?? 100;
+    if (condition <= 0) return "Broken";
+    return Math.max(.1, Math.floor(condition * 10) / 10) + "% condition";
+  }
+
   function itemDescription(item) {
     const d = Data.items[item.id], parts = [];
     parts.push(formatWeight(d.weight * item.qty) + " kg");
@@ -817,7 +823,7 @@
     if (d.damage) {
       const style = Data.combatStyles[d.combat];
       parts.push(style.name + " · " + d.damage + " base damage · reach " + d.range +
-        " · " + d.delay + "s recovery · " + d.effort + " stamina · " + Math.round(item.condition ?? 100) + "% condition");
+        " · " + d.delay + "s recovery · " + d.effort + " stamina · " + weaponCondition(item));
       parts.push(d.noise >= 10 ? "Very loud" : d.noise >= 4 ? "Loud" : "Quieter");
       parts.push(d.wear >= 1 ? "Wears quickly" : d.wear <= .4 ? "Durable" : "Moderate wear");
       for (const [kind, multiplier] of Object.entries(style.damage)) {
@@ -944,6 +950,7 @@
     if (source && Sim.canStore(source)) storeSource = source.id;
     show("Inventory", '<div class="bag-controls"><div class="bag-header"><div class="bag-panes" aria-label="Inventory view">' +
       '<button type="button" id="bag-nearby" data-action="bag-nearby">Nearby</button><button type="button" id="bag-carried" data-action="bag-carried">Backpack</button>' +
+      '<button type="button" data-action="equipment">Equipment</button>' +
       '</div><b id="bag-weight"></b></div><input class="input-search" type="search" id="bag-search" placeholder="Search items" aria-label="Search items">' +
       '<div class="tabs bag-filters" aria-label="Item category">' + categories.map(([id, label]) => '<button type="button" data-filter="' + id +
         '" aria-pressed="' + (id === bagTab) + '">' + label + "</button>").join("") +
@@ -1006,6 +1013,7 @@
   function gear() {
     if (!active()) return;
     const p = state.player, current = Sim.weapon(state), lamp = Sim.activeLight(state), weapons = [], equipment = [], lighting = [];
+    const repair = Data.recipes.find(recipe => recipe.repair);
     p.bag.forEach((item, index) => {
       const d = Data.items[item.id], backpack = d.use === "backpack";
       if (item.id === "flashlight") {
@@ -1020,20 +1028,32 @@
       const worn = d.slot && p.gear[d.slot] === item.id;
       const details = itemDescription(item) + (d.firearm ? " · " + itemCount("ammo") + " rounds" : "") +
         (backpack ? " · Adds 10 kg of capacity" : "");
+      const needsRepair = d.damage && item.condition < 100;
+      const repairProblem = needsRepair ? Sim.recipeProblem(state,repair,item) : "";
       const row = '<div class="item-row' + (equipped || worn ? " equipped-item" : "") + '"><div><div class="item-top">' +
         itemIcon(item.id) + "<b>" + esc(d.name) + '</b></div><div class="item-meta">' + details + '</div></div>' +
-        button(equipped ? "Equipped" : worn ? "Remove" : "Equip", "equip-" + index, equipped, worn ? "" : "primary") + "</div>";
+        '<div class="item-actions">' +
+        button(equipped ? "Equipped" : worn ? "Remove" : "Equip", "equip-" + index, equipped, worn ? "" : "primary") +
+        (needsRepair ? button("Repair", "repairweapon-" + index, Boolean(repairProblem)) +
+          '<div class="item-meta">' + (repairProblem ? "Need " + esc(repairProblem) : "+35 condition max · 1 scrap · 1 tape") + '</div>' : "") + "</div></div>";
       (d.damage ? weapons : equipment).push(row);
     });
-    show("Gear", '<p class="survivor-summary"><b>' + esc(p.name) + "</b> · " + Data.roles[state.role].name +
-      '</p><div class="stats-summary"><span>IN HAND · ' + esc(Sim.weaponData(state).name) + "</span><span>LOAD · " +
-      formatWeight(Sim.weight(p.bag)) + " / " + Sim.capacity(state) + " kg</span>" + (p.backpack ? "<span>BACKPACK EQUIPPED</span>" : "") + '</div>' +
-      '<div class="item-actions">' + button("Edit survivor", "edit-survivor") + button("Customize quick belt", "belt-edit", false, "primary") +
+    const slots = [["In hand",current.id === "fists" ? "Fists" : Data.items[current.id].name],
+      ["Head",Data.items[p.gear.head]?.name],["Body",Data.items[p.gear.body]?.name],["Arms",Data.items[p.gear.arms]?.name],
+      ["Hands",Data.items[p.gear.hands]?.name],["Wrist",Data.items[p.gear.wrist]?.name],["Legs",Data.items[p.gear.legs]?.name],
+      ["Feet",Data.items[p.gear.feet]?.name],["Back",p.backpack ? "Backpack" : null]];
+    show("Equipment", '<p class="survivor-summary"><b>' + esc(p.name) + "</b> · " + Data.roles[state.role].name +
+      '</p><div class="equipment-overview"><canvas id="equipment-portrait" width="48" height="48" aria-hidden="true"></canvas>' +
+      '<dl class="equipment-slots">' + slots.map(([label,name]) => '<div><dt>' + label + '</dt><dd>' +
+        esc(name || "Empty") + '</dd></div>').join("") + '</dl></div>' +
+      '<div class="stats-summary"><span>LOAD · ' + formatWeight(Sim.weight(p.bag)) + " / " + Sim.capacity(state) + " kg</span></div>" +
+      '<div class="item-actions">' + button("Backpack", "equipment-backpack") + button("Edit survivor", "edit-survivor") + button("Customize quick belt", "belt-edit", false, "primary") +
       (itemCount("watch") ? button("Place watch alarm · 10 s", "arm-watch", Boolean(p.vehicle || state.atmosphere.alarm)) : "") + "</div>" +
       (lighting.length ? '<section class="inventory-section"><h3>LIGHTING</h3><div class="inventory-items">' + lighting.join("") + "</div></section>" : "") +
       '<section class="inventory-section"><h3>WEAPONS</h3><p class="item-meta">Blunt hits work well on walkers. Quick and long-reach weapons help against runners. Heavy hits can interrupt brutes.</p><div class="gear-list">' + (weapons.join("") || '<div class="empty">No weapons carried.</div>') +
       '</div></section><section class="inventory-section"><h3>WEARABLE GEAR</h3><div class="gear-list">' +
       (equipment.join("") || '<div class="empty">No wearable gear carried.</div>') + '</div></section>', "gear");
+    View.equipmentPortrait($("equipment-portrait"),state);
   }
 
   const appearanceOptions = selected => Object.entries(Data.appearances).map(([id,label]) =>
@@ -1860,6 +1880,8 @@
     else if (action.startsWith("pindestination-") && active()) { if (Sim.markPin(state, action.slice(15))) close(); updateHud(); }
     else if (action.startsWith("pinremove-") && active()) { if (Sim.removePin(state, action.slice(10))) save(); map(); }
     else if (action === "bag-open") bag("nearby");
+    else if (action === "equipment") gear();
+    else if (action === "equipment-backpack") bag("carried");
     else if (action === "bag-nearby" || action === "bag-carried") { bagPane = action.slice(4); updateInventoryLists(); }
     else if (action === "reset-rules") worldRulesEditor(true);
     else if (action === "interactions") interactions();
@@ -1997,9 +2019,21 @@
         updateHud();
         return;
       }
+      if (kind === "repairweapon" && dialogView === "gear") {
+        const item = state.player.bag[index];
+        if (item && Sim.craft(state,"repair",item)) save();
+        gear();
+        updateHud();
+        return;
+      }
       if (kind === "equip" && dialogView === "gear") {
         const data = Data.items[state.player.bag[index]?.id];
-        if ((data?.damage || data?.slot || data?.use === "backpack") && Sim.use(state, index)) close();
+        if ((data?.damage || data?.slot || data?.use === "backpack") && Sim.use(state, index)) {
+          save();
+          gear();
+          updateHud();
+        }
+        return;
       } else if (kind === "treat" && dialogView === "health") {
         if (quickUse(second, index)) save();
       } else if (kind === "board") Sim.barricade(state, o);

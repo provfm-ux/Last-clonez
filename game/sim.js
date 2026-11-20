@@ -645,8 +645,9 @@ const Sim = (() => {
     return true;
   }
 
-  function recipeProblem(s, recipe) {
-    if (recipe.repair && (weapon(s).id === "fists" || weapon(s).condition >= 99)) return "Equip a damaged weapon first.";
+  function recipeProblem(s, recipe, repairItem = weapon(s)) {
+    if (recipe.repair && (!s.player.bag.includes(repairItem) || !Data.items[repairItem.id]?.damage ||
+        repairItem.condition >= 100)) return "Choose a damaged weapon you carry.";
     const missing = Object.entries(recipe.inputs).filter(([id, n]) => available(s, id) < n);
     if (missing.length) return missing.map(([id, n]) => (n - available(s, id)) + " " + Data.items[id].name).join(" · ");
     if (recipe.out) {
@@ -656,17 +657,17 @@ const Sim = (() => {
     return "";
   }
 
-  function craft(s, id) {
+  function craft(s, id, repairItem = weapon(s)) {
     const recipe = Data.recipes.find(r => r.id === id);
     if (!recipe) return false;
-    const problem = recipeProblem(s, recipe);
+    const problem = recipeProblem(s, recipe, repairItem);
     if (problem) { notify(s, problem, true); return false; }
     if (recipe.build) { s.blueprint = id; notify(s, "Tap a clear spot within reach to build."); return true; }
     if (!consume(s, recipe.inputs)) return false;
-    if (recipe.repair) weapon(s).condition = Math.min(100, weapon(s).condition + 35);
+    if (recipe.repair) repairItem.condition = Math.min(100, repairItem.condition + 35);
     else add(s.player.bag, recipe.out, recipe.qty, {born: s.minutes});
     addXp(s, "crafting", 4);
-    notify(s, recipe.name + " completed.");
+    notify(s, recipe.repair ? Data.items[repairItem.id].name + " repaired." : recipe.name + " completed.");
     return true;
   }
 
@@ -1976,7 +1977,8 @@ const Sim = (() => {
     if (w.firearm) remove(p.bag, "ammo", 1);
     const conditionBefore = item.condition;
     item.condition = Math.max(0, item.condition - w.wear);
-    if (conditionBefore >= 20 && item.condition < 20) notify(s, "Your " + Data.items[item.id].name + " is nearly worn out. Repair it or switch weapons.", true);
+    if (conditionBefore > 0 && item.condition === 0) notify(s, w.name + " broke. Repair it in Equipment or switch weapons.", true);
+    else if (conditionBefore >= 20 && item.condition < 20) notify(s, "Your " + Data.items[item.id].name + " is nearly worn out. Repair it or switch weapons.", true);
     noise(s, p.x, p.y, w.noise);
     const hit = !w.firearm || s.world.rng() < aimChance(s, z);
     const matchup = Data.combatStyles[w.combat].damage[z.kind] ?? 1;

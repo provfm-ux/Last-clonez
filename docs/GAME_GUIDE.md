@@ -24,6 +24,9 @@ Jogo de sobrevivência isométrica para teclado, rato e toque. Escolhe uma apar�
 - Brutes resistem a golpes leves e a empurrões. Um machado ou uma catana pode interromper o seu ataque. Empurrar ainda permite escapar a um agarrão.
 - **Inventory** e **Gear** mostram o alcance, a recuperação entre ataques, o custo de resistência, o ruído, o desgaste e os tipos de infetado contra os quais cada arma é mais eficaz.
 
+- Abre **Inventory → Equipment**, toca em **Gear** no HUD ou prime **G** para veres a personagem, os espaços de equipamento e as armas que transportas. Podes equipar ou retirar roupa nesta vista.
+- Atacar desgasta a arma. A zero, deixa de funcionar até ser reparada. Em **Equipment**, **Repair** recupera até 35 pontos da arma escolhida por uma sucata e uma fita, mesmo que a arma não esteja equipada.
+
 ## Bairros e exploração
 
 - **Casas compactas.** Explora cozinhas, quartos e quintais em Cold Vale e nos quatro mapas exteriores. Procura no frigorífico, no armário do quarto e nos móveis do corredor. Nos trilhos e quintais há amoras, maçãs e isco.

@@ -115,6 +115,25 @@ const Data = (() => {
     afterlifeChance:{label:"Continue after infected death (%)", min:0, max:100, step:1},
     waterDays:{label:"Days before water cuts", min:-1, max:14, step:1}
   };
+  const modeAdvice = {
+    relaxed:"For learning controls and exploring.",
+    survival:"For a first full survival run.",
+    harsh:"For players comfortable fleeing fast infected.",
+    training:"For practising routes, looting and building.",
+    homestead:"For gardening and managing utilities.",
+    scavenger:"For planning supply trips with little margin.",
+    blackout:"For managing light, water and fuel from day one.",
+    nightshift:"For players comfortable navigating in darkness and rain.",
+    laststand:"For experienced players seeking sustained pressure."
+  };
+  const assistFields = {
+    windup:"Longer warning before infected attacks",
+    grabs:"Shorter grabs",
+    bleed:"Less damage from bleeding",
+    reminder:"Bandage reminder",
+    stamina:"Lower stamina costs"
+  };
+  const pressureLevels = {low:.8, standard:1, high:1.2};
   function worldRules(mode, values) {
     const rules = {};
     for (const [id, field] of Object.entries(ruleFields)) {
@@ -258,6 +277,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,modes,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,seasons,seasonDays,fracture,
+  return {items,recipes,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,garden,crops,supplyCache,story,saveVersion:1};
 })();

@@ -2,6 +2,22 @@
 
 Jogo de sobrevivência isométrica para teclado, rato e toque. Escolhe uma aparência, um percurso e um ponto de partida em Cold Vale. **Customize** permite ajustar as regras de cada preset.
 
+## Primeira partida
+
+- **Recommended start** começa no abrigo com o preset Survival e o mapa com marcadores. Até dormires pelo menos uma hora ou amanhecer, os golpes dos infetados causam 40% menos dano em Cold Vale e as hordas itinerantes e sirenes ficam suspensas. Os infetados já presentes continuam ativos.
+- Recolhe e equipa o taco, escuta à porta de uma casa e procura uma ligadura. Se te ferires, usa-a no inventário ou em **Health**. Regressa ao abrigo ao anoitecer. Podes desligar as dicas em **Advanced** ou no menu de pausa.
+- O objetivo fixo começa por encontrar a Eva. No modo sem mapa, segue os sinais para a clínica a norte. Em **Advanced** podes escolher o modo de exploração, personagem, preset, regras, ponto de partida e seed.
+- Para testar a primeira partida, ativa **Record Recommended playtest milestones locally** em **Advanced**. Os tempos ficam na gravação e em **Journal → Playtest report**. O jogo não os envia.
+
+## Dificuldade e assistências
+
+- **Advanced** mostra a pressão de combate, escassez e necessidades de cada preset. Os outros modos aparecem em **More modes**.
+- **Assists** ajusta os avisos de ataque, agarrões, hemorragia, lembrete de ligadura, custo de resistência e mira de toque. Os cinco primeiros vêm ligados em Recommended até escolheres as tuas preferências. A mira de toque começa desligada.
+- **Adaptive hordes** dá uma pausa nas hordas quando a vida desce abaixo de 30 e antecipa uma horda se ficares muito tempo parado em segurança no abrigo. Está ligado por defeito em novas partidas Relaxed e Survival.
+- Em **Pause → Difficulty and assists**, podes mudar assistências e a pressão de combate, necessidades e hordas sem gerar o mapa de novo. Aumentar a pressão pede confirmação. As mudanças aparecem no relatório de teste.
+- As travessias indicam o perigo da região. Nas novas partidas, os infetados dos Outer Districts causam 15% mais dano.
+- Para comparar presets com um bot simples, corre `node scripts/balance.js 3 game 2`. O CSV distingue mortes de partidas ainda vivas ao fim do teste.
+
 ## Bairros e exploração
 
 - **Casas compactas.** Explora cozinhas, quartos e quintais em Cold Vale e nos quatro mapas exteriores. Procura no frigorífico, no armário do quarto e nos móveis do corredor. Nos trilhos e quintais há amoras, maçãs e isco.
@@ -24,6 +40,10 @@ Jogo de sobrevivência isométrica para teclado, rato e toque. Escolhe uma apar�
 - **Armas novas.** Machete (Ironworks, Tool cage), garden shovel (Westfields, Farm tools) e golf club (armários das casas).
 
 ## Visual "Dark pixel" (0.30)
+
+- **Pausa → Atmosphere** permite escolher *Full*, *Reduced* ou *Off*. O valor automático usa *Reduced* em Fast e *Full* nos outros modos. *Off* recupera a iluminação e a chuva anteriores.
+- As janelas iluminam o chão à noite enquanto houver eletricidade. Um gerador ou uma fogueira próxima pode manter alguma luz após o corte. A lanterna tem um feixe quente que continua a ser bloqueado por paredes e portas.
+- A chuva deixa reflexos suaves no chão e a neblina é mais visível junto à costa e ao amanhecer ou anoitecer. **Reduce flicker** estabiliza a lanterna com pouca carga e a luz do fogo. As opções ficam guardadas no navegador.
 
 - **Novo visual por defeito:** o mundo é desenhado a baixa resolução (~640 px de largura) e ampliado com pixels duros, com um tom frio e dessaturado, vinheta e nevoeiro baixo. O chão ganhou micro textura (ervas, pedras, fissuras no asfalto, terra) e **sangue espalhado**: manchas, poças e rastos. Os cadáveres têm poça de sangue por baixo.
 - **Menu de pausa → Graphics:** *Dark pixel* (novo), *Fast* (visual antigo com cache) e *Classic* (visual antigo sem cache). A escolha fica guardada.

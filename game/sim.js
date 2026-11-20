@@ -282,6 +282,82 @@ const Sim = (() => {
     return s;
   }
 
+  const playtestMoments = ["tutorialSkip", "move", "pickup", "equip", "fight", "heal", "death"];
+  const firstNightEnd = 1440 + 390;
+  const assist = (s, id) => s.difficultyOptions?.assists[id] === true;
+  const pressure = s => Data.pressureLevels[s.difficultyOptions?.pressure] ?? 1;
+  const firstNight = s => s.guideStep !== undefined && !s.firstSleep && s.minutes < firstNightEnd;
+  const regionalDamage = (s, region) => s.difficultyOptions && Object.hasOwn(Expedition.districts, region) ? 1.15 : 1;
+  const infectedDamage = (s, region = s.world.region) => s.rules.damage / 100 * pressure(s) * regionalDamage(s, region) *
+    (s.difficultyOptions && firstNight(s) && region === Regions.home ? .6 : 1);
+  const staminaCost = s => assist(s, "stamina") ? .7 : 1;
+
+  function difficultyOptions(s, settings = {}, previous = s.difficultyOptions) {
+    const assists = Object.fromEntries(Object.keys(Data.assistFields).map(id => [id, settings[id] === true]));
+    const aim = ["off","light","strong"].includes(settings.aim) ? settings.aim : "off";
+    const director = typeof settings.director === "boolean" ? settings.director :
+      previous?.director ?? ["relaxed","survival"].includes(s.difficulty);
+    return {assists, aim, director,
+      pressure:Object.hasOwn(Data.pressureLevels, settings.pressure) ? settings.pressure : "standard"};
+  }
+
+  function setDifficulty(s, settings, confirmed = false) {
+    if (s.mode !== "play") return false;
+    const old = s.difficultyOptions ?? difficultyOptions(s, {director:false});
+    const next = difficultyOptions(s, settings, old);
+    if (Data.pressureLevels[next.pressure] > Data.pressureLevels[old.pressure] && !confirmed) return false;
+    const changes = [];
+    for (const id of Object.keys(Data.assistFields)) {
+      if (old.assists[id] !== next.assists[id]) changes.push(id + " " + (next.assists[id] ? "on" : "off"));
+    }
+    for (const id of ["aim","director","pressure"]) {
+      if (old[id] !== next[id]) changes.push(id + " " + next[id]);
+    }
+    if (changes.length) {
+      s.difficultyOptions = next;
+      s.difficultyChanges = [...(s.difficultyChanges ?? []).slice(-19), {minute:s.minutes, changes:changes.join(", ")}];
+    }
+    return true;
+  }
+
+  function dangerRating(s, region) {
+    const count = World.infectedCount(region, s.rules.count);
+    if (!count) return "Calm";
+    const threat = count * (region === Regions.home ? .45 : 1) * infectedDamage(s, region) *
+      (s.rules.mix === "runners" ? 1.25 : s.rules.mix === "mixed" ? 1.1 : 1) * 100 / s.rules.loot;
+    return Object.hasOwn(Expedition.districts, region) || threat >= 35 ? "Dangerous" : threat >= 12 ? "Tense" : "Calm";
+  }
+
+  function recordPlaytest(s, moment) {
+    if (s.playtest) s.playtest[moment] ??= Math.round(s.elapsed * 10) / 10;
+  }
+
+  function createRecommended(seed, track = false, skipTime = null, settings = {}) {
+    const s = createControl("survival", "carer", "shelter", undefined, {seed});
+    s.guideStep = 0;
+    s.difficultyOptions = difficultyOptions(s, {windup:true, grabs:true, bleed:true, reminder:true, stamina:true, ...settings});
+    s.waypoint = "";
+    if (track) {
+      s.playtest = {};
+      if (Number.isFinite(skipTime) && skipTime >= 0) s.playtest.tutorialSkip = Math.round(skipTime * 10) / 10;
+    }
+    const house = s.world.buildings.filter(b => b.type === "home")
+      .sort((a, b) => distance(s.world.base.door, a.door) - distance(s.world.base.door, b.door))
+      .find(b => s.world.objects.some(o => o.building === b.id && o.action === "loot"));
+    const container = house && s.world.objects.find(o => o.building === house.id && o.action === "loot");
+    if (container) add(container.loot, "bandage", 1);
+    return s;
+  }
+
+  function pinnedGoal(s) {
+    if ((!s.pinStory && s.guideStep === undefined) || s.flags.radio) return null;
+    if (s.world.region !== Regions.home) return "Return to Cold Vale.";
+    if (s.flags.rescued || s.world.npc.mode === "dead") {
+      return s.hideNavigation ? "Repair the radio inside the shelter." : "Repair the shelter radio";
+    }
+    return s.hideNavigation ? "Find Eva. Follow the clinic signs north." : "Find Eva";
+  }
+
   function nearby(s, radius = 1.85) {
     return s.world.objects.filter(o => reachableObject(s, o, radius));
   }
@@ -379,6 +455,12 @@ const Sim = (() => {
     item.qty -= amount;
     if (!item.qty) object.loot.splice(index, 1);
     object.searched = true;
+    recordPlaytest(s, "pickup");
+    if (s.guideStep === 0 && item.id === "bat") s.guideStep = 1;
+    if ((s.guideStep === 2 || s.guideStep === 3) &&
+        s.world.buildings.some(b => b.id === object.building && b.type === "home")) {
+      s.guideStep = item.id === "bandage" ? 4 : 3;
+    }
     return amount;
   }
 
@@ -451,12 +533,15 @@ const Sim = (() => {
     if (data.slot) {
       const worn = p.gear[data.slot] === item.id;
       p.gear[data.slot] = worn ? null : item.id;
+      if (!worn) recordPlaytest(s, "equip");
       notify(s, (worn ? "Removed " : "Equipped ") + data.name.toLocaleLowerCase("en") + ".");
       return true;
     }
     if (data.damage) {
       p.weapon = item.id;
       p.weaponUid = item.uid;
+      recordPlaytest(s, "equip");
+      if (s.guideStep === 1 && item.id === "bat") s.guideStep = 2;
       notify(s, data.name + " equipped.");
       return true;
     }
@@ -480,6 +565,8 @@ const Sim = (() => {
       if (wound) { wound.bandaged = true; wound.bleed = 0; }
       if (s.rules.care === "quick") p.hp = Math.min(100, p.hp + 16 * Data.roles[s.role].medical);
       addXp(s, "medical", 3);
+      recordPlaytest(s, "heal");
+      if (s.guideStep === 4) s.guideStep = 5;
     } else if (data.use === "disinfectant") {
       const wound = selectedWound === undefined ? p.wounds.find(w => !w.clean) : p.wounds[selectedWound];
       if (!wound || wound.clean) { notify(s, "No wound needs disinfecting."); return false; }
@@ -792,7 +879,8 @@ const Sim = (() => {
 
   function destination(s) {
     if (s.hideNavigation) return null;
-    const id = s.waypoint;
+    const goal = s.world.region === Regions.home && pinnedGoal(s);
+    const id = s.waypoint || (goal ? (s.flags.rescued || s.world.npc.mode === "dead" ? "base" : "clinic") : "");
     if (!id) return null;
     if (id.startsWith("pin")) return s.mapPins.find(pin => pin.id === id) || null;
     if (id.startsWith("built") || utilityIds.has(id)) return s.world.objects.find(o => o.id === id && isStation(o)) || null;
@@ -1027,7 +1115,27 @@ const Sim = (() => {
 
   function updateHordes(s) {
     const a = s.atmosphere, mode = s.rules.hordes, pending = a.pending;
-    if (s.world.cinema || s.world.underground || mode === "off" || a.time < (pending?.due ?? a.nextWave)) return;
+    if (firstNight(s)) return;
+    if (s.world.cinema || s.world.underground || mode === "off") return;
+    if (s.difficultyOptions?.director) {
+      if (s.player.hp > 45) s.recoveryUsed = false;
+      if (s.player.hp < 30 && !s.recoveryUsed) {
+        s.recoveryUsed = true;
+        a.pending = null;
+        a.nextWave = Math.max(a.nextWave, a.time + 45);
+        if (pending) notify(s, "The approaching horde moves on.");
+        return;
+      }
+      const atRest = !s.player.sleeping && !s.player.moving && !s.player.path.length && !s.player.vehicle &&
+        s.world.base && World.tileAt(s.world, s.player.x, s.player.y)?.building === s.world.base.id && s.player.panic < 8;
+      if (!atRest) s.shelterIdleSince = undefined;
+      else if (s.shelterIdleSince === undefined) s.shelterIdleSince = s.elapsed;
+      else if (!pending && s.elapsed - s.shelterIdleSince >= 90 && s.player.hp > 45) {
+        a.nextWave = Math.min(a.nextWave, a.time + 15);
+        s.shelterIdleSince = s.elapsed;
+      }
+    }
+    if (a.time < (pending?.due ?? a.nextWave)) return;
     const room = encounterSlots(s,a.awake ? 0 : 6), rng = Level.seeded(a.rng);
     const routes = Atmosphere.arrivals[s.world.region];
     if (pending) {
@@ -1042,7 +1150,7 @@ const Sim = (() => {
         entered++;
       }
       a.pending = null;
-      a.nextWave = a.time + (entered ? Atmosphere.nextWave(mode,rng) : 8);
+      a.nextWave = a.time + (entered ? Atmosphere.nextWave(mode,rng) / pressure(s) : 8);
       if (entered) notify(s,"A group entered from " + route.name + ".",true);
       else notify(s,"The shuffling drifts along the boundary.");
     } else {
@@ -1272,7 +1380,7 @@ const Sim = (() => {
     const problem = breachProblem(s, o, method);
     if (problem) { notify(s, problem, true); return false; }
     const tool = method === "pry" ? crowbar(s) : smashTool(s), p = s.player;
-    p.stamina -= 9;
+    p.stamina -= 9 * staminaCost(s);
     if (tool) tool.condition = Math.max(0, tool.condition - (method === "pry" ? 2.5 : 1.5));
     o.open = true;
     o.locked = false;
@@ -1805,6 +1913,21 @@ const Sim = (() => {
     return inAttackRange(s, s.target, range) ? s.target : closestInReach(s, range);
   }
 
+  function touchAttackTarget(s) {
+    const mode = s.difficultyOptions?.aim;
+    if (!mode || mode === "off") return attackTarget(s);
+    const p = s.player, arc = mode === "strong" ? .3 : .65;
+    if (p.vehicle) return null;
+    let target = null, reach = weaponData(s).range;
+    for (const enemy of s.world.enemies) {
+      const dx = enemy.x - p.x, dy = enemy.y - p.y, d = Math.hypot(dx,dy);
+      if (d > reach || dx*p.headingX + dy*p.headingY < d*arc || !inAttackRange(s,enemy,reach)) continue;
+      target = enemy;
+      reach = d;
+    }
+    return target;
+  }
+
   function weaponProblem(s, item = weapon(s)) {
     if (item.condition <= 0) return "Weapon broken";
     if (Data.items[item.id]?.firearm && !quantity(s.player.bag, "ammo")) return "No ammo";
@@ -1845,10 +1968,11 @@ const Sim = (() => {
       if (s.target === z) endPursuit(s);
       return false;
     }
+    recordPlaytest(s, "fight");
     faceTowards(p, z);
     s.swingVisual = {weapon:item.id, dx:z.x - p.x, dy:z.y - p.y};
     p.cooldown = w.delay; p.staminaDelay = .7; p.swing = .18;
-    p.stamina = Math.max(0, p.stamina - w.effort);
+    p.stamina = Math.max(0, p.stamina - w.effort * staminaCost(s));
     if (w.firearm) remove(p.bag, "ammo", 1);
     const conditionBefore = item.condition;
     item.condition = Math.max(0, item.condition - w.wear);
@@ -1876,13 +2000,15 @@ const Sim = (() => {
 
   function shove(s) {
     const p = s.player;
-    if (p.vehicle || p.stamina < 10 || p.cooldown > 0) return false;
+    const effort = 10 * staminaCost(s);
+    if (p.vehicle || p.stamina < effort || p.cooldown > 0) return false;
     const near = closestInReach(s, 1.65);
     if (!near) return false;
+    recordPlaytest(s, "fight");
     if (s.target) endPursuit(s);
     faceTowards(p, near);
     s.swingVisual = {weapon:"fists", dx:near.x - p.x, dy:near.y - p.y};
-    p.stamina -= 10; p.cooldown = .7; p.swing = .18;
+    p.stamina -= effort; p.cooldown = .7; p.swing = .18;
     near.stagger = 1.1; near.swing = 0;
     endWindup(near);
     const d = distance(p, near), dx = (near.x - p.x) / (d || 1), dy = (near.y - p.y) / (d || 1);
@@ -1896,15 +2022,16 @@ const Sim = (() => {
   function hurt(s, z) {
     const p = s.player;
     if (p.flash > 0) return;
+    recordPlaytest(s, "fight");
     const car = vehicle(s);
     if (car) {
-      car.hp = Math.max(0, car.hp - z.stats.damage * 1.1 * s.rules.damage / 100);
+      car.hp = Math.max(0, car.hp - z.stats.damage * 1.1 * infectedDamage(s));
       p.flash = .3;
       if (!car.hp) { exitVehicle(s, true); notify(s, "The vehicle was wrecked.", true); }
       return;
     }
     if (!(p.grabbed > 0) && !(p.grabCool > 0) && s.world.rng() < (z.kind === "brute" ? .5 : z.kind === "runner" ? .2 : .3)) {
-      p.grabbed = 2.2;
+      p.grabbed = assist(s, "grabs") ? .9 : 2.2;
       s.effects.push({x: p.x, y: p.y, text: "GRABBED", color: "#e3a289", life: 1});
       notify(s, "An infected grabs you. Shove it or struggle free!", true);
     }
@@ -1912,7 +2039,7 @@ const Sim = (() => {
     const roll = s.world.rng(), type = roll < .06 ? "bite" : roll < .46 ? "cut" : "scratch";
     const part = s.world.rng() < .5 ? "arm" : "leg";
     const guard = Math.min(.7, (part === "arm" ? ["arms", "hands", "body"] : ["legs", "feet"]).reduce((n, slot) => n + (Data.items[p.gear[slot]]?.guard ?? 0), 0));
-    const amount = z.stats.damage * s.rules.damage / 100 * (1 - guard);
+    const amount = z.stats.damage * infectedDamage(s) * (1 - guard);
     const absorbed = guard > 0 && s.world.rng() < guard * .9;
     p.hp = Math.max(0, p.hp - amount); p.flash = .75; p.resting = false;
     if (!p.hp) s.deathCause = "a " + z.stats.name.toLowerCase();
@@ -2066,6 +2193,7 @@ const Sim = (() => {
       if (s.stuck > 4 && !s.stuckHinted) { s.stuckHinted = true; notify(s, "You seem stuck. Open the menu and choose Free me.", true); }
     } else { s.stuck = 0; s.stuckHinted = false; }
     if (p.moving) {
+      recordPlaytest(s, "move");
       p.footstep -= dt;
       s.aim = Math.max(0, s.aim - dt * 2);
       if (p.footstep <= 0) {
@@ -2080,7 +2208,7 @@ const Sim = (() => {
     }
     const fit = 1 + level(s, "fitness") * .05;
     if (s.running && p.moving) {
-      p.stamina = Math.max(0, p.stamina - 13 * dt / (Data.roles[s.role].fitness * fit));
+      p.stamina = Math.max(0, p.stamina - 13 * dt * staminaCost(s) / (Data.roles[s.role].fitness * fit));
       p.staminaDelay = .4;
       addXp(s, "fitness", dt * .5);
     } else if (!p.staminaDelay) p.stamina = Math.min(100, p.stamina + dt * (p.moving ? 5 : 12) * fit * (p.fatigue > 70 || cold ? .6 : 1));
@@ -2133,7 +2261,7 @@ const Sim = (() => {
           if ((pending === p || canTargetEva(npc)) && distance(z, pending) < 1.15 && lineOfSight(s, z, pending)) {
             if (pending === p) hurt(s, z);
             else {
-              npc.hp = Math.max(0, npc.hp - z.stats.damage * s.rules.damage / 100);
+              npc.hp = Math.max(0, npc.hp - z.stats.damage * infectedDamage(s));
               npc.flash = .5;
               if (!npc.hp) { npc.mode = "dead"; notify(s, "Eva died from her injuries.", true); }
             }
@@ -2144,7 +2272,7 @@ const Sim = (() => {
       if (distance(z, victim) < 1 && (seen || npcSeen)) {
         z.moving = false;
         if (z.cooldown <= 0) {
-          z.windup = windupTime;
+          z.windup = windupTime + (assist(s, "windup") && victim === p ? .35 : 0);
           z.windupTarget = victim === npc ? "eva" : "player";
           z.cooldown = 1.5;
           faceTowards(z, victim);
@@ -2229,7 +2357,7 @@ const Sim = (() => {
   }
 
   function updateNeeds(s, dt) {
-    const p = s.player, rate = s.rules.needs / 100, gradual = s.rules.care === "gradual";
+    const p = s.player, rate = s.rules.needs / 100 * pressure(s), gradual = s.rules.care === "gradual";
     const inDanger = threats(s).length > 0;
     const floor = Data.modes[s.difficulty]?.noStarve ? 8 : 0;
     p.hunger = Math.max(floor, p.hunger - dt * .07 * rate * (p.sleeping ? .5 : 1));
@@ -2245,7 +2373,7 @@ const Sim = (() => {
     let pain = 0;
     for (const w of p.wounds) {
       w.age += dt;
-      if (!w.bandaged) { p.hp -= w.bleed * dt; s.harm = "blood loss"; }
+      if (!w.bandaged) { p.hp -= w.bleed * dt * (assist(s, "bleed") ? .55 : 1); s.harm = "blood loss"; }
       if (!w.clean) w.infection = Math.min(100, w.infection + dt * (gradual ? w.bandaged ? .04 : .24 : .018));
       if (gradual && w.infection >= 40) { p.hp -= dt * .08; s.harm = "a wound infection"; }
       if (gradual && w.bandaged) {
@@ -2280,6 +2408,9 @@ const Sim = (() => {
     updateNeeds(s, dt);
     updateSickness(s, dt);
     updateExposure(s, dt);
+    if (s.guideStep === 4 && (isNight(s) || s.minutes >= 1440) && !s.player.wounds.some(w => !w.bandaged)) s.guideStep = 5;
+    if (s.guideStep === 5 && (isNight(s) || s.minutes >= 1440 || s.firstSleep) && s.world.base &&
+        World.tileAt(s.world, s.player.x, s.player.y)?.building === s.world.base.id) s.guideStep = 6;
     updateUtilities(s, previousMinutes, minutes);
     const raining = s.weather === "Rain";
     updateOutdoor(s, minutes, raining);
@@ -2291,13 +2422,14 @@ const Sim = (() => {
     if (s.exploredAt <= 0) { explore(s); s.exploredAt = .4; }
     if (s.world.region === Regions.home && s.elapsed >= s.nextEvent) {
       s.nextEvent = s.elapsed + 180;
-      if (s.rules.count > 0 && s.rules.hordes !== "off") {
-      const x = s.world.rng() < .5 ? 29.5 : 47.5, y = 29.5;
-      noise(s, x, y, 32);
-      notify(s, x > 30 ? "A siren to the east is drawing the horde." : "A crash in the centre of town is drawing the infected.");
+      if (s.rules.count > 0 && s.rules.hordes !== "off" && !(s.difficultyOptions && firstNight(s))) {
+        const x = s.world.rng() < .5 ? 29.5 : 47.5, y = 29.5;
+        noise(s, x, y, 32);
+        notify(s, x > 30 ? "A siren to the east is drawing the horde." : "A crash in the centre of town is drawing the infected.");
       }
     }
     if (s.player.hp <= 0) {
+      recordPlaytest(s, "death");
       s.deathCause ??= s.harm || "unknown causes";
       s.afterlifePending = s.player.exposure > 0 && Afterlife.eligible(s,Math.random());
       s.mode = "dead";
@@ -2428,6 +2560,7 @@ const Sim = (() => {
       if (p.fatigue <= 4 || s.minutes - start >= 600) break;
     }
     p.sleeping = false; p.resting = false;
+    if (s.guideStep !== undefined && s.mode === "play" && s.minutes - start >= 60) s.firstSleep = true;
     if (s.mode === "play") { const h = Math.round((s.minutes - start) / 6) / 10; notify(s, cause + "You slept " + h + (h === 1 ? " hour." : " hours.")); }
   }
 
@@ -2479,6 +2612,9 @@ const Sim = (() => {
       schema: Data.saveVersion, generator: s.world.generator, seed: s.seed, difficulty: s.difficulty, role: s.role, rules:{...s.rules},
       region:s.world.region, regionStates:s.regionStates,
       elapsed: s.elapsed, minutes: s.minutes, mode: s.mode, quiet: s.quiet, kills: s.kills, serial: s.serial, controlStart: s.controlStart,
+      guideStep:s.guideStep, firstSleep:s.firstSleep, pinStory:s.pinStory, playtest:s.playtest,
+      difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
+      recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
       ledger:{found:{...s.ledger.found},dispatch:s.ledger.dispatch ? {...s.ledger.dispatch} : null},
       zoom: s.zoom, lookahead: s.lookahead, roofsHidden: s.roofsHidden, player:snapshotPlayer(s)
@@ -2691,7 +2827,7 @@ const Sim = (() => {
     if (s.player.vehicle && !s.world.objects.some(o => o.id === s.player.vehicle && o.kind === "car" && o.active &&
         o.hp > 0 && !o.solid && Math.hypot(o.x - p.x, o.y - p.y) < .1)) throw new Error("Invalid vehicle position.");
     s.world.enemies = data.enemies.map(z => {
-      const windup = Number.isFinite(z.windup) ? clamp(z.windup, 0, windupTime) : 0;
+      const windup = Number.isFinite(z.windup) ? clamp(z.windup, 0, windupTime + .35) : 0;
       // In older saves the first tick resolves the target of an unfinished attack.
       const windupTarget = windup && ["player", "eva"].includes(z.windupTarget) ? z.windupTarget : null;
       const outfit = Object.hasOwn(Data.outfits, z.outfit) ? z.outfit : World.infectedOutfit(s.world, z);
@@ -2706,6 +2842,42 @@ const Sim = (() => {
     else s.world.explored = known;
     s.world.rng.restore(data.rng);
     for (const key of ["elapsed", "minutes", "kills", "serial", "nextEvent"]) s[key] = data[key];
+    if (data.difficultyOptions !== undefined) {
+      const options = data.difficultyOptions;
+      if (!options || !options.assists || Object.keys(Data.assistFields).some(id => typeof options.assists[id] !== "boolean") ||
+          !["off","light","strong"].includes(options.aim) || typeof options.director !== "boolean" ||
+          !Object.hasOwn(Data.pressureLevels, options.pressure)) throw new Error("Invalid difficulty options.");
+      s.difficultyOptions = difficultyOptions(s, {...options.assists, aim:options.aim, director:options.director, pressure:options.pressure});
+    }
+    if (data.difficultyChanges !== undefined) {
+      if (!Array.isArray(data.difficultyChanges) || data.difficultyChanges.length > 20 ||
+          data.difficultyChanges.some(entry => !entry || !Number.isFinite(entry.minute) || entry.minute < 0 || entry.minute > s.minutes ||
+            typeof entry.changes !== "string" || entry.changes.length > 180)) throw new Error("Invalid difficulty history.");
+      s.difficultyChanges = data.difficultyChanges.map(entry => ({minute:entry.minute, changes:entry.changes}));
+    }
+    if (data.recoveryUsed !== undefined && typeof data.recoveryUsed !== "boolean") throw new Error("Invalid recovery state.");
+    if (data.shelterIdleSince !== undefined && (!Number.isFinite(data.shelterIdleSince) || data.shelterIdleSince < 0 ||
+        data.shelterIdleSince > s.elapsed)) throw new Error("Invalid shelter idle time.");
+    s.recoveryUsed = data.recoveryUsed;
+    s.shelterIdleSince = crossing ? undefined : data.shelterIdleSince;
+    if (data.guideStep !== undefined) {
+      if (!Number.isInteger(data.guideStep) || data.guideStep < 0 || data.guideStep > 6) throw new Error("Invalid beginner guide step.");
+      s.guideStep = data.guideStep;
+    }
+    if (data.firstSleep !== undefined) {
+      if (s.guideStep === undefined || typeof data.firstSleep !== "boolean") throw new Error("Invalid first sleep state.");
+      s.firstSleep = data.firstSleep;
+    }
+    if (data.pinStory !== undefined) {
+      if (typeof data.pinStory !== "boolean") throw new Error("Invalid pinned story state.");
+      s.pinStory = data.pinStory;
+    }
+    if (data.playtest !== undefined) {
+      if (!data.playtest || typeof data.playtest !== "object" || Array.isArray(data.playtest) ||
+          Object.entries(data.playtest).some(([key, value]) => !playtestMoments.includes(key) ||
+            !Number.isFinite(value) || value < 0 || (key !== "tutorialSkip" && value > s.elapsed + .051))) throw new Error("Invalid playtest timestamps.");
+      s.playtest = {...data.playtest};
+    }
     s.weather = localWeather(s);
     s.flags = {...s.flags, ...data.flags, gardenSeeded: data.flags?.gardenSeeded === true,
       harvested: data.flags?.harvested === true, gardenMeal: data.flags?.gardenMeal === true,
@@ -2741,11 +2913,11 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, createControl, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, createControl, createRecommended, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,
-    weapon, weaponData, weaponProblem, damageFactor, aimChance, attackTarget, inAttackRange,
+    weapon, weaponData, weaponProblem, damageFactor, aimChance, attackTarget, touchAttackTarget, inAttackRange,
     threats, notify, level, addXp, moodles, sleep, unstick, season, snapshot, restore, distance, lineOfSight,
     vehicle, enterVehicle, exitVehicle, refuel, repairVehicle, vehicleRepairProblem, vehicleRepairAmount, brake, canListen, listenAtDoor,
     destination, markDestination, markStation, exploredTile, saveMapPin, markPin, removePin,

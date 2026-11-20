@@ -1,5 +1,14 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
+## Em desenvolvimento
+- Added a Recommended start with optional in-run hints and first-night protection from wandering hordes.
+- Moved presets, seed and other setup choices under Advanced and pinned the current story objective in the HUD.
+- Added opt-in local playtest milestones to the run report.
+- Added preset ratings, regional danger labels, and independent assists with saved mid-run pressure changes.
+- Added adaptive hordes to new Survival and Relaxed runs, first-night damage relief in Recommended, and a seeded balance CSV tool.
+- Added warm flashlight falloff, powered window glow, firelight, rain sheen and coastal mist.
+- Added Full, Reduced and Off atmosphere effects and a saved Reduce flicker option.
+
 ## 0.33 — The Outer Districts
 - Expanded Cold Vale and its surrounding regions with five connected districts and 50 explorable sites.
 - Added local witness stories, 300 hidden curios, and a five-district follow-up to The Second All-Clear.

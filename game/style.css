@@ -258,6 +258,19 @@ dialog::backdrop { background: #080d0abf; backdrop-filter: blur(3px); }
 .hero h1 i { margin-left:0; }
 .hero p { margin:21px 0 19px; }
 .hero-foot { font-size:8px; }
+.hero .recommended-detail { margin:5px 0 12px; font-size:12px; }
+.advanced-start { margin-bottom:10px; }
+.advanced-start summary { cursor:pointer; color:#dfc38f; font-weight:600; padding:8px 0; }
+.advanced-start[open] summary { margin-bottom:6px; }
+.onboarding-option { display:flex; align-items:center; gap:8px; color:#d2dbc7; font-size:12px; min-height:32px; }
+.onboarding-option input { accent-color:#dfc38f; }
+.hud-stack { grid-row:2; min-width:0; }
+.onboarding {
+  display:flex; flex-wrap:wrap; column-gap:12px; row-gap:2px; padding:6px 10px;
+  color:#d2dbc7; background:#1d261b; border-bottom:1px solid #414d39; font-size:12px;
+}
+.onboarding strong { color:#dfc38f; }
+.onboarding :empty { display:none; }
 .new-world-options { display:flex; gap:8px; max-width:325px; margin-bottom:11px; }
 .new-world-options label { flex:1; min-width:0; font:600 8px var(--mono); color:#a4b29a; letter-spacing:.08em; }
 .new-world-options input { width:100%; display:block; margin-top:5px; padding:7px 8px; background:#222c21; border:1px solid #4a5740; border-radius:4px; color:#e5dfca; font:600 11px var(--sans); }
@@ -273,7 +286,9 @@ dialog::backdrop { background: #080d0abf; backdrop-filter: blur(3px); }
 select { width:100%; display:block; margin-top:5px; padding:7px 24px 7px 8px; background:#222c21; border:1px solid #4a5740; border-radius:4px; color:#e5dfca; font:600 11px var(--sans); }
 .start-button { max-width:325px; width:100%; background:#dfb579; border-color:#edca93; box-shadow:0 7px 24px #a9853214; }
 .start-button:hover { background:#edca93; }
-#continue-btn:not([hidden]) + #start-btn { background:#273326; color:#d7dec8; border-color:#52634a; min-height:36px; margin-top:7px; font-size:12px; }
+#continue-btn:not([hidden]) + #recommended-btn, #advanced-start #start-btn {
+  background:#273326; color:#d7dec8; border-color:#52634a; min-height:44px; margin-top:7px; font-size:13px;
+}
 @media (min-width:1100px) {
   .hero-inner { max-width:740px; display:grid; grid-template-columns:minmax(0,1.13fr) minmax(0,1fr); align-items:center; gap:24px; }
   .hero h1 { font-size:clamp(71px,6.75vw,108px); }
@@ -704,7 +719,7 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 .weapon-item-icon { width:34px; height:20px; object-fit:contain; image-rendering:pixelated; }
 
 
-.hud-strip { grid-row:2; display:grid; grid-template-columns:minmax(0,auto) minmax(0,1fr); min-width:0;
+.hud-strip { display:grid; grid-template-columns:minmax(0,auto) minmax(0,1fr); min-width:0;
   height:34px; overflow:hidden; background:#1b211b; border-bottom:1px solid var(--border); }
 .hud-strip[hidden] { display:none; }
 .condition-bar { display:flex; align-items:center; min-width:0; max-width:clamp(8.3rem,37vw,13rem); gap:6px;

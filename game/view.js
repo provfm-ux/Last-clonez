@@ -10,6 +10,9 @@ const View = (() => {
   const camera = {x: 0, y: 0, zoom: 1, ready: false};
   const size = {width: 0, height: 0, dpr: 1};
   const objectLabels = [];
+  const windowLights = new WeakMap();
+  const wetGround = [];
+  const nearbyFires = [];
   let labelledWorld = null;
   const p = (x, y, z = 0) => [(x - y) * halfW, (x + y) * halfH - z];
   const unproject = (x, y) => ({x:(x / halfW + y / halfH) / 2, y:(y / halfH - x / halfW) / 2});
@@ -94,6 +97,13 @@ const View = (() => {
   function prepare(world) {
     camera.ready = false;
     const buildings = new Map(world.buildings.map(b => [b.id, b]));
+    windowLights.set(world, world.objects.filter(o => o.kind === "window" && buildings.has(o.building)).map(window => {
+      const building = buildings.get(window.building);
+      const acrossX = World.tileAt(world, window.x, window.y)?.wallAxis !== "x";
+      const x = acrossX ? window.x + (window.x < building.x + building.w / 2 ? -1 : 1) : window.x;
+      const y = acrossX ? window.y : window.y + (window.y < building.y + building.h / 2 ? -1 : 1);
+      return {window, x, y};
+    }));
     world.roofTiles = new Map(world.buildings.map(b => [b.id, []]));
     for (const home of world.buildings.filter(b => b.type === "home")) {
       for (let y = Math.max(0, home.y - 2); y < Math.min(world.height, home.y + home.h + 2); y++) {
@@ -295,9 +305,8 @@ const View = (() => {
   }
 
   function glow(x, y, color, radius, opacity) {
-    const [sx, sy] = p(x, y);
     ctx.save();
-    ctx.translate(sx, sy);
+    ctx.translate((x-y)*halfW, (x+y)*halfH);
     ctx.scale(1, .58);
     ctx.globalAlpha = opacity;
     ctx.drawImage(glowSprite(color, radius), -radius, -radius, radius * 2, radius * 2);
@@ -1021,7 +1030,8 @@ const View = (() => {
       f(-.35,-.15,0,.7,.3,4,wood);
       f(-.15,-.35,3,.3,.7,4,wood);
       const [xx,yy]=p(x,y,8);
-      poly([[xx-8,yy],[xx-4,yy-13-Math.sin(clock*11)*3],[xx+2,yy-8],[xx+6,yy-18],[xx+9,yy]],"#efb16a");
+      const sway = state.reduceFlicker ? 0 : Math.sin(clock*11)*3;
+      poly([[xx-8,yy],[xx-4,yy-13-sway],[xx+2,yy-8],[xx+6,yy-18],[xx+9,yy]],"#efb16a");
       const batch = Sim.fireBatch(state, o);
       if (batch) {
         f(-.22,-.22,14,.44,.44,6,iron);
@@ -1491,6 +1501,16 @@ const View = (() => {
     }
   }
 
+  function beamReach(world, x, y, dx, dy) {
+    let reach = 0;
+    for (let distance = .25; distance <= Data.flashlight.range; distance += .25) {
+      const tile = World.tileAt(world,x+dx*distance,y+dy*distance);
+      if (!tile || tile.kind === "wall" || tile.kind === "door" || tile.surface === "rock") break;
+      reach = distance;
+    }
+    return reach;
+  }
+
   function flashlightBeam(state) {
     const player = state.player;
     const bearing = Math.atan2(player.headingY, player.headingX);
@@ -1499,12 +1519,7 @@ const View = (() => {
     for (let i = 0; i <= 14; i++) {
       const angle = bearing + Data.flashlight.angle * (i / 7 - 1);
       const dx = Math.cos(angle), dy = Math.sin(angle);
-      let reach = 0;
-      for (let distance = .25; distance <= Data.flashlight.range; distance += .25) {
-        const tile = World.tileAt(state.world, player.x + dx * distance, player.y + dy * distance);
-        if (!tile || tile.kind === "wall" || tile.kind === "door" || tile.surface === "rock") break;
-        reach = distance;
-      }
+      const reach = beamReach(state.world,player.x,player.y,dx,dy);
       points.push(p(player.x + dx * reach, player.y + dy * reach));
     }
     const light = ctx.createRadialGradient(...origin, 1, ...origin, Data.flashlight.range * halfW * 1.25);
@@ -1512,6 +1527,137 @@ const View = (() => {
     light.addColorStop(.6, "#e9d59b48");
     light.addColorStop(1, "#e9d59b00");
     poly(points, light);
+  }
+
+  // Bake the radial falloff and soft angular edges in world-space coordinates.
+  let beamSprite;
+  function warmBeamSprite() {
+    if (beamSprite) return beamSprite;
+    const sprite = document.createElement("canvas");
+    const extent = 256, center = extent / 2, edge = Data.flashlight.angle;
+    sprite.width = sprite.height = extent;
+    const paint = sprite.getContext("2d");
+    const image = paint.createImageData(extent, extent);
+    for (let y = 0; y < extent; y++) for (let x = center; x < extent; x++) {
+      const dx = x + .5 - center, dy = y + .5 - center;
+      const reach = Math.hypot(dx,dy) / center, angle = Math.abs(Math.atan2(dy,dx));
+      if (reach >= 1 || angle >= edge) continue;
+      const rim = Math.min(1, (edge-angle) / .17);
+      const core = Math.max(0, 1-angle/.22);
+      const pixel = (y*extent+x)*4;
+      image.data[pixel] = 255;
+      image.data[pixel+1] = 200 + 30*core;
+      image.data[pixel+2] = 122 + 48*core;
+      image.data[pixel+3] = 255 * rim * (1-reach) ** 1.35 * (.36 + .24*core);
+    }
+    paint.putImageData(image,0,0);
+    return beamSprite = sprite;
+  }
+
+  function warmFlashlight(state, lamp, clock) {
+    const {x,y,headingX,headingY} = state.player, range = Data.flashlight.range;
+    const bearing = Math.atan2(headingY,headingX);
+    const ox = (x-y)*halfW, oy = (x+y)*halfH;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(ox,oy);
+    for (let i = 0; i <= 14; i++) {
+      const angle = bearing + Data.flashlight.angle * (i/7-1);
+      const dx = Math.cos(angle), dy = Math.sin(angle);
+      const reach = beamReach(state.world,x,y,dx,dy);
+      ctx.lineTo(ox+(dx-dy)*reach*halfW,oy+(dx+dy)*reach*halfH);
+    }
+    ctx.closePath();
+    ctx.clip();
+    ctx.translate(ox,oy);
+    ctx.transform(halfW,halfH,-halfW,halfH,0,0);
+    ctx.rotate(bearing);
+    if (!state.reduceFlicker && lamp.charge <= 12) {
+      const weakness = 1-lamp.charge/12;
+      ctx.globalAlpha = 1 - weakness * (.16 + .13*Math.sin(clock*11 + Math.sin(clock*6)));
+    }
+    ctx.drawImage(warmBeamSprite(),-range,-range,2*range,2*range);
+    ctx.restore();
+  }
+
+  function windowGlow(state, full, clock, onScreen, known) {
+    const grid = Sim.gridPower(state);
+    const {player} = state;
+    let budget = full ? 12 : 5;
+    const lights = windowLights.get(state.world);
+    if (!lights) return;
+    for (const light of lights) {
+      const {window,x,y} = light;
+      if (!window.active || window.boards || !sq(x-player.x,y-player.y,10) ||
+          !onScreen(x,y) || !(known(window.x,window.y) || known(x,y))) continue;
+      const generated = !grid && Sim.hasPower(state,window);
+      let fire = false;
+      if (!grid && !generated) for (const o of nearbyFires) {
+        if (!sq(o.x-x,o.y-y,3)) continue;
+        fire = true;
+        break;
+      }
+      if (!grid && !generated && !fire) continue;
+      const flicker = !grid && !state.reduceFlicker ? .88 + .12*Math.sin(clock*5+x) : 1;
+      glow(x,y,fire ? "#ffad64" : "#ffd599",fire ? 34 : 52,(fire ? .23 : .54)*flicker);
+      if (--budget === 0) break;
+    }
+  }
+
+  function weatherEffects(state, clock, width, height, full, currentBuilding) {
+    const hour = (state.minutes % 1440)/60;
+    const twilight = Math.max(0,1-Math.min(Math.abs(hour-6),Math.abs(hour-19))/2);
+    ctx.fillStyle = hour < 5 || hour >= 21 ? "#395a80" : hour < 8 ? "#dcb182" : hour >= 17 ? "#cc8d62" : "#d2cb96";
+    ctx.globalAlpha = (.035 + twilight*.065) * (full ? 1 : .7);
+    ctx.fillRect(0,0,width,height);
+    ctx.globalAlpha = 1;
+    const coastal = state.world.region === "lowtide" || state.world.region === "coast" || state.world.region === "lighthouse";
+    const haze = Math.min(.16,(coastal ? .07 : 0) + twilight*.09);
+    if (!currentBuilding && haze > 0) {
+      const mist = glowSprite("#a5b9b7",72);
+      ctx.globalAlpha = haze;
+      for (let i = 0; i < (full ? 3 : 1); i++) {
+        const x = (i*width*.53 + clock*(8+3*i)) % (width*1.8) - width*.65;
+        ctx.drawImage(mist,x,height*(.32+i*.15),width*.9,height*.5);
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (state.weather !== "Rain") return;
+    const intensity = state.rules.weather === "rain" ? 1 : state.rules.weather === "showers" ? .76 : .58;
+    const streaks = Math.round((full ? 72 : 24) * intensity);
+    ctx.strokeStyle = full ? "#bdcdd848" : "#bdcdd838";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < streaks; i++) {
+      const x = ((i*97-clock*106)%width+width)%width, y = (i*137+clock*273)%height;
+      if (currentBuilding) {
+        const a = (x-camera.x)/(camera.zoom*halfW), b = (y-camera.y)/(camera.zoom*halfH);
+        if (World.tileAt(state.world,(a+b)/2,(b-a)/2)?.building === currentBuilding) continue;
+      }
+      ctx.moveTo(x,y);
+      ctx.lineTo(x-5,y+(full ? 15 : 11));
+    }
+    ctx.stroke();
+  }
+
+  function drawDestination(state, width, height, zoom) {
+    if (state.mode === "menu") return;
+    const destination = Sim.destination(state);
+    if (!destination || Sim.distance(state.player,destination)<=2.5) return;
+    const [rawX,rawY]=p(destination.x,destination.y);
+    const targetX=rawX*zoom+camera.x,targetY=rawY*zoom+camera.y;
+    const centerX=width*.5,centerY=height*.54;
+    const dx=targetX-centerX,dy=targetY-centerY;
+    const ratio=Math.max(Math.abs(dx)/(width*.5-30),Math.abs(dy)/(height*.45-30));
+    if(ratio>1) {
+      const x=centerX+dx/ratio,y=centerY+dy/ratio;
+      ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(dy,dx));
+      poly([[10,0],[-6,-7],[-3,0],[-6,7]],"#f0ca87","#3a3a26");
+      ctx.restore();
+    } else {
+      const y = targetY - 9;
+      poly([[targetX,y-7],[targetX+6,y],[targetX,y+7],[targetX-6,y]],"#e7bc76","#3a3a26");
+    }
   }
 
   const visible = (state, x, y, optics) => Sim.canSee(state, x, y, optics);
@@ -1805,6 +1951,12 @@ const View = (() => {
     updateCamera(state,dt);
     const {width,height,dpr}=size,{zoom}=camera;
     const world=state.world,player=state.player,menu=state.mode==="menu",cave=world.underground;
+    const atmosphere = state.visualAtmosphere ?? "off";
+    const effects = !menu && atmosphere !== "off", full = atmosphere === "full";
+    const wet = effects && !cave && state.weather === "Rain";
+    const night = Sim.isNight(state);
+    wetGround.length = 0;
+    nearbyFires.length = 0;
     ctx = mainCtx;
     darkLook = state.look === "dark";
     // Retain individual sprite pixels on phones and ordinary desktop viewports.
@@ -1848,6 +2000,9 @@ const View = (() => {
         if (!onScreen(x, y)) continue;
         const index = y * world.width + x, t = world.tiles[index];
         if (t.kind === "void") continue;
+        if (wet && wetGround.length < (full ? 32 : 10) && !t.building && world.explored[index] &&
+            (x*17+y*31)%7 === 0 && (t.surface === "asphalt" || t.surface === "concrete" || t.surface === "path" ||
+              t.surface === "rail" || t.surface === "bridge")) wetGround.push(t);
         if (cave) {
           if (!shown(x+.5,y+.5)) continue;
           ctx.globalAlpha=optics.lamp || optics.fires?.length ? 1 : .29;
@@ -1879,6 +2034,15 @@ const View = (() => {
       for (const t of tendrils) tendril(t, state.atmosphere.awake);
       if (!menu) dimAround(player);
     }
+    if (wetGround.length) {
+      for (const t of wetGround) {
+        const sx = (t.x-t.y)*halfW, sy = (t.x+t.y+1)*halfH;
+        ctx.fillStyle = "#14263828";
+        ctx.fillRect(sx-13,sy-3,26,7);
+        ctx.fillStyle = "#a8c4d02a";
+        ctx.fillRect(sx-8,sy-2,16+(t.x%5),2);
+      }
+    }
     if (menu || !state.roofsHidden) for (const b of world.buildings) {
       if (b.id === currentBuilding || menu && b.base) continue;
       const left = (b.x-b.y-b.h)*xScale+camera.x, right = (b.x+b.w-b.y)*xScale+camera.x;
@@ -1888,17 +2052,32 @@ const View = (() => {
       if (discovered) stack.push({kind:"roof",obj:b,depth:b.x+b.y+b.w+b.h-.5,fade:!menu && roofCoversPlayer(b, player)});
     }
     if(!menu) {
-      if (optics.lamp) flashlightBeam(state);
+      if (optics.lamp) {
+        if (effects) warmFlashlight(state,optics.lamp,clock);
+        else flashlightBeam(state);
+      }
       for(const [i,step] of player.path.slice(0,15).entries()) {
         if (!cave || shown(step.x,step.y)) shadow(step.x,step.y,i===0?5:3,i===0?2.5:1.6,"#dbc48b75");
       }
     }
+    let fireBudget = full ? 8 : 4;
     for(const o of world.objects) {
       if(o.active&&onScreen(o.x,o.y)&&shown(o.x,o.y)&&(!covered(o)||o.action==="door"))stack.push({kind:"prop",obj:o,depth:o.x+o.y});
-      if(o.active&&o.kind==="campfire"&&onScreen(o.x,o.y)&&(!cave||shown(o.x,o.y)))glow(o.x,o.y,"#efb36c",125,.45);
-      if(o.active&&o.kind==="lamp"&&onScreen(o.x,o.y)&&Sim.gridPower(state)&&Sim.isNight(state))glow(o.x+.5,o.y,"#efdc9d",170,.28);
+      if (o.active && o.kind === "campfire" && onScreen(o.x,o.y) && (!cave || shown(o.x,o.y))) {
+        if (!effects) glow(o.x,o.y,"#efb36c",125,.45);
+        else if (sq(o.x-player.x,o.y-player.y,13) && (cave || known(o.x,o.y))) {
+          nearbyFires.push(o);
+          if (fireBudget > 0) {
+            const intensity = state.reduceFlicker ? 1 : .94+.06*Math.sin(clock*6+o.x);
+            glow(o.x,o.y,"#ffb46d",cave ? 100 : 103,(night || cave ? .56 : .35)*intensity);
+            fireBudget--;
+          }
+        }
+      }
+      if(o.active&&o.kind==="lamp"&&onScreen(o.x,o.y)&&Sim.gridPower(state)&&night)glow(o.x+.5,o.y,"#efdc9d",170,.28);
     }
-    if (lit && Sim.isNight(state)) glow(player.x, player.y, "#efdc9d", 190, .28);
+    if (lit && night) glow(player.x, player.y, "#efdc9d", 190, .28);
+    if (effects && night && !cave) windowGlow(state,full,clock,onScreen,known);
     for(const z of world.enemies) {
       if(!z.dormant&&onScreen(z.x,z.y)&&(menu&&!cave||visible(state,z.x,z.y,optics)))stack.push({kind:"enemy",obj:z,depth:z.x+z.y});
     }
@@ -2004,23 +2183,7 @@ const View = (() => {
       ctx.drawImage(lowCanvas,0,0,lw * pixCss * dpr,lh * pixCss * dpr);
     }
     ctx.setTransform(dpr,0,0,dpr,0,0);
-    const destination = Sim.destination(state);
-    if (!menu && destination && Sim.distance(player,destination)>2.5) {
-      const [rawX,rawY]=p(destination.x,destination.y);
-      const targetX=rawX*zoom+camera.x,targetY=rawY*zoom+camera.y;
-      const centerX=width*.5,centerY=height*.54;
-      const dx=targetX-centerX,dy=targetY-centerY;
-      const ratio=Math.max(Math.abs(dx)/(width*.5-30),Math.abs(dy)/(height*.45-30));
-      if(ratio>1) {
-        const x=centerX+dx/ratio,y=centerY+dy/ratio;
-        ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(dy,dx));
-        poly([[10,0],[-6,-7],[-3,0],[-6,7]],"#f0ca87","#3a3a26");
-        ctx.restore();
-      } else {
-        const y = targetY - 9;
-        poly([[targetX,y-7],[targetX+6,y],[targetX,y+7],[targetX-6,y]],"#e7bc76","#3a3a26");
-      }
-    }
+    if (!effects) drawDestination(state,width,height,zoom);
     const hour=(state.minutes%1440)/60;
     const darkness=clamp((Math.abs(hour-12)-5)/7,0,.67);
     if(!menu&&!cave&&darkness>0){
@@ -2028,7 +2191,10 @@ const View = (() => {
       shade.addColorStop(0,"rgba(10,20,29,"+darkness*(lit ? .15 : .46)+")");shade.addColorStop(1,"rgba(5,13,24,"+darkness+")");
       ctx.fillStyle=shade;ctx.fillRect(0,0,width,height);
     }
-    if(state.weather==="Rain") {
+    if (effects) {
+      if (!cave) weatherEffects(state,clock,width,height,full,currentBuilding);
+      drawDestination(state,width,height,zoom);
+    } else if(state.weather==="Rain") {
       ctx.strokeStyle="#a0b6c42d";ctx.lineWidth=1;
       for(let i=0;i<40;i++){
         const x=(i*97+clock*95)%width,y=(i*137+clock*240)%height;

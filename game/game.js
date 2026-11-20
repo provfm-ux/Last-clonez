@@ -13,7 +13,25 @@
   const codeKeys = {KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright"};
   let state = Sim.createControl("survival", "carer", "shelter"), lastFrame = performance.now(), nextHud = 0, nextMap = 0, nextSave = 10, lastRender = 0, noiseRings = false, look = (() => { try { const v = localStorage.getItem("clonez-gfx"); return v === "classic" || v === "fast" ? v : "dark"; } catch { return "dark"; } })();
   const navigationKey = "clonez-navigation";
-  const openingKey = "clonez-opening-seen-v4";
+  const startChoiceKey = "clonez-start-choice";
+  const guideKey = "clonez-beginner-hints";
+  const playtestKey = "clonez-playtest-milestones";
+  const assistsKey = "clonez-new-run-assists";
+  const atmosphereKey = "clonez-visual-atmosphere";
+  const flickerKey = "clonez-reduce-flicker";
+  const atmosphereLabels = {full:"Full", reduced:"Reduced", off:"Off"};
+  let atmosphereChoice = read(atmosphereKey);
+  const storedFlicker = read(flickerKey);
+  let reduceFlicker = storedFlicker === null ? Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) : storedFlicker === "1";
+  const skipKey = "clonez-tutorial-skip-time";
+  const guideHints = [
+    "Pick up the wooden bat nearby.",
+    "Open Inventory and equip the bat.",
+    "Search a nearby house. Listen at the door before entering.",
+    "Check house cupboards and drawers for a bandage.",
+    "If you get a cut or scratch, use a bandage from Inventory or Health. Otherwise, head home at dusk.",
+    "Return to the shelter for the night. Close the door and sleep when it’s safe."
+  ];
   let navigation = read(navigationKey) === "discover" ? "discover" : "locations";
   const mapAction = /^(mark-|station-|pindestination-|pinedit-|pinremove-|pinhere$|pincancel$)/;
   const introKey = "clonez-introduction-complete";
@@ -23,8 +41,7 @@
   let expandedView = false, changingView = false, pinDraft = null, craftIngredient = null;
   let customRules = null, customBase = "survival", ruleBase = "survival";
   let validatedSave = null, touchRun = false;
-  let crossing = null, deathOfferUntil = null;
-  const afterlifeOfferMs = 12000;
+  let crossing = null;
   let audio, muted = read(soundKey) === "1";
   state.mode = "menu";
   View.prepare(state.world);
@@ -149,7 +166,6 @@
     $("close-dialog").hidden = false;
     dialogView = null;
     deathShown = false;
-    deathOfferUntil = null;
     $("hero").hidden = true;
     canvas.setAttribute("aria-label", "Isometric view of " + Regions.definitions[state.world.region].name);
     $("start-btn").blur();
@@ -177,7 +193,6 @@
       button("Play with marked locations","opening-locations") +
       "<p>Use the map, landmarks, and destination markers.</p></div></div>",
       "opening");
-    $("close-dialog").hidden = true;
   }
 
   function startLesson() {
@@ -194,6 +209,7 @@
 
   function endLesson() {
     if (!lesson) return;
+    if (lesson.stage < 6 && $("playtest-enabled").checked) write(skipKey, String(state.elapsed));
     write(introKey,"1");
     const {previous,setup} = lesson;
     state = previous;
@@ -233,16 +249,15 @@
     state.afterlifePending = false;
     save();
     close(false);
-    deathOfferUntil = null;
     afterlife = Afterlife.start(state);
     updateHud();
   }
 
   function deathSummary() {
-    deathOfferUntil = null;
     show("Your story ends here", "<p>" + esc(state.player.name) + " survived until day " + day() + " at " + time(state.minutes) +
       " and killed " + state.kills + " infected.</p>" +
       "<p>Cause of death: " + esc(state.deathCause || "unknown causes") + ".</p>" +
+      (assistsOn() ? "<p>Assists on</p>" : "") +
       '<div class="item-actions death-actions">' + button("Back to main menu", "new", false, "primary") +
       button("Playtest report", "playtest") + button("Export save", "export") + "</div>", "dead");
     body.querySelector('[data-action="new"]').focus();
@@ -272,8 +287,26 @@
     const seedInput = $("world-seed"), enteredSeed = seedInput.value.trim();
     if (enteredSeed && !/^\d{1,9}$/.test(enteredSeed)) { seedInput.reportValidity(); return; }
     const seed = enteredSeed ? Number(enteredSeed) : Math.floor(Math.random()*1000000000);
-    activate(Sim.createControl(preset, role, startPoint, preset === "custom" ? customRules : undefined, {...profile,seed}));
+    const run = Sim.createControl(preset, role, startPoint, preset === "custom" ? customRules : undefined, {...profile,seed});
+    run.difficultyOptions = Sim.difficultyOptions(run, savedAssists());
+    run.pinStory = true;
+    run.waypoint = "";
+    activate(run);
     rememberSetup();
+    write(startChoiceKey, "advanced");
+    save();
+    cue(170, 86, .3, .07);
+  }
+
+  function startRecommended() {
+    const skip = read(skipKey);
+    wakeSound();
+    setNavigation("locations");
+    activate(Sim.createRecommended(Math.floor(Math.random() * 1000000000), $("playtest-enabled").checked,
+      skip ? Number(skip) : null, savedAssists()));
+    write(skipKey, "");
+    write(startChoiceKey, "recommended");
+    $("advanced-start").open = false;
     save();
     cue(170, 86, .3, .07);
   }
@@ -283,8 +316,66 @@
     $("background-detail").textContent = Data.roles[$("role").value]?.desc || "";
     const preset = $("difficulty").value;
     const rules = Data.worldRules(preset, preset === "custom" ? customRules : null);
+    const pip = n => Math.max(1, Math.min(5, Math.round(n)));
+    const combat = pip(rules.count * rules.damage / 2100);
+    const scarcity = pip((180 - rules.loot) / 27);
+    const needs = pip(rules.needs / 33 + (rules.weather === "rain" ? .6 : 0) + (rules.powerDays === 0 ? .4 : 0));
     $("preset-summary").textContent = (Data.modes[preset]?.desc ?? "Your saved world rules.") + " " +
-      rules.count + " infected · " + rules.loot + "% loot.";
+      (Data.modeAdvice[preset] ?? "") + " Combat " + combat + "/5 · Scarcity " + scarcity + "/5 · Needs " + needs + "/5.";
+  }
+
+  function savedAssists() {
+    try {
+      const value = JSON.parse(read(assistsKey));
+      return value && typeof value === "object" ? value : {};
+    } catch { return {}; }
+  }
+
+  function assistsOn() {
+    const options = state.difficultyOptions;
+    return Boolean(options && (options.aim !== "off" || Object.values(options.assists).some(Boolean)));
+  }
+
+  function difficultyPanel(inRun = false) {
+    const chosen = inRun ? state : {difficulty:$("difficulty").value};
+    const options = inRun ? state.difficultyOptions ?? Sim.difficultyOptions(state,{director:false}) :
+      Sim.difficultyOptions(chosen,savedAssists());
+    const checks = Object.entries(Data.assistFields).map(([id,label]) =>
+      '<label class="onboarding-option"><input type="checkbox" name="' + id + '"' +
+      (options.assists[id] ? " checked" : "") + '> ' + label + '</label>').join("");
+    const select = (name, label, values, selected) => '<label>' + label + '<select name="' + name + '">' +
+      Object.entries(values).map(([id,text]) => '<option value="' + id + '"' +
+      (selected === id ? " selected" : "") + '>' + text + '</option>').join("") + '</select></label>';
+    show(inRun ? "Difficulty and assists" : "New run assists",
+      "<p>Assists work with any preset and leave story progress available.</p>" +
+      '<form id="difficulty-form" data-run="' + inRun + '">' + checks + '<div class="rules-grid">' +
+      select("aim","Touch aim assist",{off:"Off",light:"Light",strong:"Strong"},options.aim) +
+      select("director","Adaptive hordes",inRun ? {on:"On",off:"Off"} : {default:"Preset default",on:"On",off:"Off"},
+        !inRun && typeof savedAssists().director !== "boolean" ? "default" : options.director ? "on" : "off") +
+      (inRun ? select("pressure","Damage, needs and horde pressure",{low:"Lower",standard:"Standard",high:"Higher"},options.pressure) : "") +
+      '</div><div class="item-actions"><button type="submit" class="small-button primary">Apply</button></div></form>',
+      "difficulty-options");
+  }
+
+  function applyDifficulty(event) {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    const settings = Object.fromEntries(Object.keys(Data.assistFields).map(id => [id, form.has(id)]));
+    settings.aim = form.get("aim");
+    if (form.get("director") !== "default") settings.director = form.get("director") === "on";
+    if (event.target.dataset.run === "true") {
+      settings.pressure = form.get("pressure");
+      if (!Sim.setDifficulty(state, settings)) {
+        if (!window.confirm("Increase damage, needs drain, and horde pressure for this run?")) return;
+        if (!Sim.setDifficulty(state, settings, true)) return;
+      }
+      close();
+      updateHud();
+    } else {
+      write(assistsKey, JSON.stringify(settings));
+      close(false);
+      $("setup-assists").focus();
+    }
   }
 
   function rememberSetup() {
@@ -387,6 +478,7 @@
     close(false);
     state.mode = "menu";
     $("hero").hidden = false;
+    $("advanced-start").open = read(startChoiceKey) === "advanced";
     $("intro-btn").textContent = read(introKey) ? "Replay introduction" : "Beginner introduction";
     $("continue-btn").hidden = !savedText && !read(backupKey);
     if (state.controlStart) $("start-point").value = state.controlStart;
@@ -513,6 +605,12 @@
     document.body.classList.toggle("in-afterlife",Boolean(afterlife));
     $("afterlife-tools").hidden = !afterlife;
     $("lesson").hidden = !lesson;
+    const inRun = active() && !lesson;
+    const goal = inRun ? Sim.pinnedGoal(state) ?? "" : "";
+    const hint = inRun && $("guide-enabled").checked ? guideHints[state.guideStep] ?? "" : "";
+    $("onboarding").hidden = !goal && !hint;
+    if ($("pinned-goal").textContent !== goal) $("pinned-goal").textContent = goal;
+    if ($("guide-hint").textContent !== hint) $("guide-hint").textContent = hint;
     if (afterlife) {
       $("move-stick").hidden = false;
       $("touch-controls").hidden = false;
@@ -598,7 +696,9 @@
     const targetInReach = active() && Boolean(Sim.attackTarget(state));
     const attackReady = targetInReach && p.cooldown <= 0 && !Sim.weaponProblem(state);
     $("attack-btn").classList.toggle("ready", attackReady);
-    $("touch-attack").classList.toggle("ready", attackReady);
+    const touchReady = state.difficultyOptions?.aim && state.difficultyOptions.aim !== "off" ?
+      active() && p.cooldown <= 0 && Boolean(Sim.touchAttackTarget(state)) && !Sim.weaponProblem(state) : attackReady;
+    $("touch-attack").classList.toggle("ready", touchReady);
     $("sneak-btn").disabled = !active() || Boolean(car);
     const choices = active() && !car ? nearbyObjects() : [];
     const o = choices[0], talk = !car && canTalk();
@@ -617,7 +717,10 @@
       state.messages.findLast(m => m?.lang === "en" && typeof m.text === "string");
     $("event-status").hidden = !active();
     $("event-status").classList.toggle("warn", Boolean(event?.danger));
-    const eventText = $("event-text"), text = event?.text ?? "";
+    const bandageReminder = active() && state.difficultyOptions?.assists.reminder &&
+      p.wounds.some(wound => !wound.bandaged) && itemCount("bandage") > 0;
+    const eventText = $("event-text"), text = bandageReminder && !(event?.danger && event === notice) ?
+      "Apply a bandage in Health or press R." : event?.text ?? "";
     if (eventText.textContent !== text) eventText.textContent = text;
   }
 
@@ -656,7 +759,7 @@
       const crossingType = descending || ascending ? "Rope descent" : annex.vehicles && !deepBack ? "Road crossing" : "Foot trail";
       const visited = returning || ascending || deepBack || Boolean(state.regionStates[id]);
       return '<article class="region-route"><div><b>' + direction + ' · ' + exit.name + '</b><p>' + detail +
-        '</p><div class="item-meta">' + crossingType + (visited ? " · Visited" : "") + '</div></div>' +
+        '</p><div class="item-meta">' + crossingType + " · " + Sim.dangerRating(state,id) + (visited ? " · Visited" : "") + '</div></div>' +
         button(selected?.id === exit.id ? "Marked" : "Mark", "mark-" + exit.id, !editable || selected?.id === exit.id,
           selected?.id === exit.id ? "" : "primary") + '</article>';
     }).join("");
@@ -1126,10 +1229,24 @@
       "Start " + startingPoint,
       "Preset " + (Data.modes[state.difficulty]?.name ?? "Custom") + " · Background " + Data.roles[state.role].name,
       "Rules " + Object.entries(state.rules).map(([key, value]) => key + "=" + value).join(", "),
+      ...(state.difficultyOptions ? [
+        (assistsOn() ? "Assists on" : "Assists off") + " · " + Object.entries(state.difficultyOptions.assists)
+          .filter(([, enabled]) => enabled).map(([id]) => Data.assistFields[id]).join(", ") +
+          " · Touch aim " + state.difficultyOptions.aim + " · Adaptive hordes " + (state.difficultyOptions.director ? "on" : "off") +
+          " · Pressure " + state.difficultyOptions.pressure,
+        ...(state.difficultyChanges ?? []).map(entry => "Day " + (Math.floor(entry.minute / 1440) + 1) +
+          " " + time(entry.minute) + " — " + entry.changes)
+      ] : []),
       "Day " + day() + " at " + time(state.minutes) + " · " + World.zoneAt(state.world, p.x, p.y).name +
         " · Game tile " + Math.floor(p.x) + ", " + Math.floor(p.y),
       "Health " + Math.round(p.hp) + "/100 · Infected defeated " + state.kills,
       "Weather " + state.weather + " · " + p.temperature.toFixed(1) + " °C · " + Math.round(p.wetness) + "% wet",
+      ...(state.playtest ? [
+        "Playtest milestones (elapsed seconds)",
+        ...Object.entries({tutorialSkip:"Introduction skipped (introduction time)", move:"First move", pickup:"First pickup",
+          equip:"First equip", fight:"First fight", heal:"First heal", death:"First death"})
+          .map(([id, label]) => label + " — " + (state.playtest[id] === undefined ? "—" : state.playtest[id].toFixed(1) + " s"))
+      ] : []),
       "Device and controls — [add your phone or computer and touch, mouse or keyboard]",
       "Steps to reproduce — [add what you did]",
       "Expected behaviour — [add what you expected]",
@@ -1449,7 +1566,7 @@
       const details = to === Regions.cavern ? "Descend the rope on foot. Use L or the flashlight slot to see beyond the landing." :
         state.world.underground ? "Climb the rope to the firewatch trail." :
         Regions.connection(from, to).vehicles ? "Road crossing. Vehicles can use this route." : "Forest trail. Cross on foot.";
-      show("Cross to " + o.name, "<p>" + details + "</p>" + result +
+      show("Cross to " + o.name, "<p>" + details + " Regional danger: " + Sim.dangerRating(state,to) + ".</p>" + result +
         (problem && problem !== feedback ? '<p class="item-meta">' + esc(problem) + '</p>' : "") +
         '<div class="item-actions">' + button("Cross to " + o.name, "cross-" + id, Boolean(problem), "primary") +
         (state.player.vehicle ? button("Get out", "exit-car") : "") + '</div>', "object-" + id);
@@ -1570,7 +1687,35 @@
     if (!active()) return;
     if (dialog.open) { close(); return; }
     show("Paused", "<p>The game is paused.</p>" + button("Resume", "resume", false, "primary") +
-      '<div class="item-actions">' + button("Save", "save") + button("Export", "export") + button("Import", "import") + button("Save and exit", "menu") + button("Stuck? Free me", "unstick") + button(noiseRings ? "Noise rings: on" : "Noise rings: off", "noise-toggle") + button("Graphics: " + {dark: "Dark pixel", fast: "Fast", classic: "Classic"}[look], "gfx-toggle") + button(state.lookahead === false ? "Driving camera · fixed" : "Driving camera · look ahead", "lookahead") + "</div>", "pause");
+      '<div class="item-actions">' + button("Save", "save") + button("Export", "export") + button("Import", "import") + button("Save and exit", "menu") + button("Stuck? Free me", "unstick") + button(noiseRings ? "Noise rings: on" : "Noise rings: off", "noise-toggle") + button("Graphics: " + {dark: "Dark pixel", fast: "Fast", classic: "Classic"}[look], "gfx-toggle") + button(state.lookahead === false ? "Driving camera · fixed" : "Driving camera · look ahead", "lookahead") +
+      (state.guideStep === undefined || lesson ? "" : button("Beginner hints: " + ($("guide-enabled").checked ? "on" : "off"), "guide-toggle")) +
+      button("Atmosphere: " + atmosphereLabels[visualAtmosphere()], "atmosphere-options") +
+      (lesson ? "" : button("Difficulty and assists", "difficulty-options")) + "</div>", "pause");
+  }
+
+  function visualAtmosphere() {
+    return Object.hasOwn(atmosphereLabels, atmosphereChoice) ? atmosphereChoice : look === "fast" ? "reduced" : "full";
+  }
+
+  function atmospherePanel() {
+    const selected = Object.hasOwn(atmosphereLabels, atmosphereChoice) ? atmosphereChoice : "default";
+    const options = Object.entries({default:"Graphics default (" + (look === "fast" ? "Reduced" : "Full") + ")", ...atmosphereLabels})
+      .map(([id,label]) => '<option value="' + id + '"' + (id === selected ? " selected" : "") + '>' + label + '</option>').join("");
+    show("Atmosphere effects", '<form id="atmosphere-form"><div class="rules-grid"><label>Effects<select name="effects">' +
+      options + '</select></label></div><label class="onboarding-option"><input type="checkbox" name="reduce-flicker"' +
+      (reduceFlicker ? " checked" : "") + '> Reduce flicker</label><div class="item-actions">' +
+      '<button type="submit" class="small-button primary">Apply</button></div></form>', "atmosphere-options");
+  }
+
+  function applyAtmosphere(event) {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    const choice = form.get("effects");
+    atmosphereChoice = Object.hasOwn(atmosphereLabels, choice) ? choice : "";
+    reduceFlicker = form.has("reduce-flicker");
+    write(atmosphereKey, atmosphereChoice);
+    write(flickerKey, reduceFlicker ? "1" : "0");
+    close();
   }
 
   function exportSave() {
@@ -1630,6 +1775,8 @@
 
   body.addEventListener("submit", event => {
     if (event.target.id === "pin-form") { event.preventDefault(); savePinForm(); }
+    else if (event.target.id === "difficulty-form") applyDifficulty(event);
+    else if (event.target.id === "atmosphere-form") applyAtmosphere(event);
     else if (event.target.id === "profile-form" && dialogView === "edit-survivor" && active()) {
       event.preventDefault();
       Object.assign(state.player,Data.character({name:$("profile-name").value,appearance:$("profile-appearance").value}));
@@ -1658,13 +1805,22 @@
     if (!action || navigation === "discover" && mapAction.test(action)) return;
     if (action === "opening-discover" || action === "opening-locations") {
       setNavigation(action.slice(8));
-      write(openingKey,"1");
       close(false);
+      $("advanced-start").open = true;
       $("start-btn").focus();
       return;
     }
     if (action === "bag-carried" && lesson?.stage === 3) lesson.stage = 4;
     if (action === "resume") close();
+    else if (action === "difficulty-options" && active() && !lesson) difficultyPanel(true);
+    else if (action === "atmosphere-options" && active()) atmospherePanel();
+    else if (action === "guide-toggle") {
+      const setting = $("guide-enabled");
+      setting.checked = !setting.checked;
+      write(guideKey, setting.checked ? "1" : "0");
+      close();
+      updateHud();
+    }
     else if (action === "noise-toggle") { noiseRings = !noiseRings; close(); }
     else if (action === "gfx-toggle") { look = look === "dark" ? "fast" : look === "fast" ? "classic" : "dark"; try { localStorage.setItem("clonez-gfx", look); } catch {} close(); }
     else if (action === "unstick") { close(); Sim.unstick(state); updateHud(); }
@@ -1981,7 +2137,7 @@
   }
 
   bindTap($("touch-use"), () => afterlife ? afterlifeAction("grab") : nearbyAction(true));
-  bindTap($("touch-attack"), () => afterlife ? afterlifeAction("bite") : strike());
+  bindTap($("touch-attack"), () => afterlife ? afterlifeAction("bite") : strike(Sim.touchAttackTarget(state)));
   bindTap($("touch-shove"), () => afterlife ? afterlifeAction("groan") : shoveOrBrake());
   bindTap($("touch-run"), () => {
     touchRun = !touchRun;
@@ -1992,7 +2148,8 @@
 
   const handlers = {
     "opening-btn":opening, "intro-btn":startLesson, "lesson-exit":endLesson, "afterlife-exit":endAfterlife,
-    "start-btn": start, "continue-btn": resumeSaved, "rules-btn": () => worldRulesEditor(), "map-btn": () => map(), "journal-btn": diary, "diary-btn": diary,
+    "start-btn": start, "recommended-btn": startRecommended, "continue-btn": resumeSaved, "rules-btn": () => worldRulesEditor(),
+    "setup-assists": () => difficultyPanel(), "map-btn": () => map(), "journal-btn": diary, "diary-btn": diary,
     "help-btn": help, "pause-btn": pause, "search-btn": nearbyAction, "attack-btn": () => strike(),
     "shove-btn": shoveOrBrake, "pack-btn": bag, "gear-btn": gear, "craft-btn": crafting,
     "sneak-btn": () => { state.quiet = !state.quiet; state.dash = false; touchRun = false; updateHud(); },
@@ -2005,11 +2162,18 @@
   for (const [id, handler] of Object.entries(handlers)) $(id).addEventListener("click", handler);
   document.querySelectorAll("[data-panel]").forEach(button => button.addEventListener("click", health));
   $("navigation-mode").value = navigation;
+  $("advanced-start").open = read(startChoiceKey) === "advanced" || !read(startChoiceKey) && Boolean(read(setupKey));
+  $("guide-enabled").checked = read(guideKey) !== "0";
+  $("playtest-enabled").checked = read(playtestKey) === "1";
+  $("guide-enabled").addEventListener("change", event => write(guideKey, event.target.checked ? "1" : "0"));
+  $("playtest-enabled").addEventListener("change", event => {
+    write(playtestKey, event.target.checked ? "1" : "0");
+    if (!event.target.checked) write(skipKey, "");
+  });
   $("navigation-mode").addEventListener("change",event => setNavigation(event.target.value));
   $("sound-btn").addEventListener("click", () => { muted = !muted; write(soundKey, muted ? "1" : "0"); syncSound(); wakeSound(); });
   dialog.addEventListener("cancel", event => {
     event.preventDefault();
-    if (dialogView === "opening") return;
     if (dialogView === "afterlife-offer") skipAfterlife();
     else close();
   });
@@ -2144,13 +2308,11 @@
       deathShown = true;
       save();
       if (state.afterlifePending) {
-        deathOfferUntil = now + afterlifeOfferMs;
-        show("Something moves", "<p>A sound reaches you. Follow it to try the afterlife, or wait for the run summary.</p>" +
+        show("Something moves", "<p>A sound reaches you. Follow it to try the afterlife, or skip to the run summary.</p>" +
           '<div class="item-actions death-actions">' + button("Follow the sound","afterlife",false,"primary") +
           button("Skip to summary","afterlife-skip") + "</div>","afterlife-offer");
       } else deathSummary();
     }
-    if (dialogView === "afterlife-offer" && deathOfferUntil !== null && now >= deathOfferUntil) skipAfterlife();
     if (state.sounds.length) for (const sound of state.sounds.splice(0)) if (!muted) Soundscape.play(audio,sound,state.player);
     if (now >= nextHud) { updateHud(); nextHud = now + 150; }
     if (now >= nextMap) {
@@ -2162,6 +2324,8 @@
       state.showNoise = noiseRings;
       state.fastGround = look !== "classic";
       state.look = look;
+      state.visualAtmosphere = visualAtmosphere();
+      state.reduceFlicker = reduceFlicker;
       if (afterlife) View.renderAfterlife(afterlife);
       else View.render(state, now / 1000, Math.min(.2, (now - lastRender) / 1000));
       lastRender = now;
@@ -2177,8 +2341,11 @@
   startPoint.value = "shelter";
   startPoint.addEventListener("change", showStartDetail);
   const presets = $("difficulty");
-  presets.innerHTML = Object.entries(Data.modes).map(([id, preset]) => '<option value="' + id + '">' + preset.name + "</option>").join("") +
-    '<option value="custom">Custom</option>';
+  const headline = ["relaxed","survival","harsh"];
+  const presetOption = id => '<option value="' + id + '">' + Data.modes[id].name + '</option>';
+  presets.innerHTML = headline.map(presetOption).join("") + '<optgroup label="More modes">' +
+    Object.keys(Data.modes).filter(id => !headline.includes(id)).map(presetOption).join("") +
+    '<option value="custom">Custom</option></optgroup>';
   presets.value = "survival";
   $("role").innerHTML = Object.entries(Data.roles).map(([id,role]) => '<option value="' + id + '">' + role.name + "</option>").join("");
   $("role").value = "carer";
@@ -2207,6 +2374,5 @@
   syncSound();
   updateDisplayMode();
   updateHud();
-  if (!read(openingKey)) opening();
   requestAnimationFrame(frame);
 })();

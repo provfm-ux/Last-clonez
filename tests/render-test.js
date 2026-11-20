@@ -9,11 +9,25 @@ const files = [...html.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).f
 const pascal = f => f.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join("");
 const counts = {};
 let heldWeapon = null;
-const mk = () => new Proxy({}, {
+let beamOpacity = 1;
+const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
   get(t, k) { if (k in t) return t[k]; if (k === "canvas") return {width: 1280, height: 720}; if (k === "measureText") return () => ({width: 10});
+    if (k === "createImageData") return (width,height) => ({data:new Uint8ClampedArray(width*height*4)});
     if (k === "createRadialGradient" || k === "createLinearGradient") return () => { counts[k] = (counts[k] || 0) + 1; return {addColorStop() {}}; };
     return (...args) => {
       counts[k] = (counts[k] || 0) + 1;
+      if (k === "save") t.savedAlpha.push(t.globalAlpha);
+      if (k === "restore") t.globalAlpha = t.savedAlpha.pop() ?? 1;
+      if (k === "drawImage" && args.length === 5) {
+        if (args[0]?.width === 104 && args[0]?.height === 104) counts.windowGlow = (counts.windowGlow ?? 0) + 1;
+        if (args[0]?.width === 68 && args[0]?.height === 68) counts.fireWindow = (counts.fireWindow ?? 0) + 1;
+        if (args[0]?.width === 206 && args[0]?.height === 206) counts.fireGlow = (counts.fireGlow ?? 0) + 1;
+        if (args[0]?.width === 144 && args[0]?.height === 144) counts.mist = (counts.mist ?? 0) + 1;
+        if (args[0]?.width === 256 && args[0]?.height === 256 && args[1] === -10) {
+          counts.warmBeam = (counts.warmBeam ?? 0) + 1;
+          beamOpacity = t.globalAlpha;
+        }
+      }
       if (k === "drawImage" && args.length === 3 && args[0]?.width === 72 && args[0]?.height === 64) {
         counts.furnitureBlit = (counts.furnitureBlit || 0) + 1;
       }
@@ -152,5 +166,70 @@ const borough = Sim.create(17,"training","carer",7,undefined,"southbank");
 View.prepare(borough.world);
 const districtDraw = per(() => View.render(borough,0,.016));
 check("outer district shares the isometric renderer",districtDraw.fill > 0);
+{
+  const run = Sim.createControl("survival","carer","shelter",undefined,{seed:17});
+  const window = run.world.objects.find(o => o.active && o.kind === "window" && o.building);
+  const {player} = run;
+  Object.assign(player,{x:window.x+1,y:window.y+1,headingX:0,headingY:1});
+  run.world.explored.fill(1);
+  run.minutes = 1260;
+  run.weather = "Rain";
+  run.visualAtmosphere = "full";
+  View.prepare(run.world);
+  const lamp = player.bag.findIndex(item => item.id === "flashlight");
+  player.bag[lamp].charge = 4;
+  Sim.use(run,lamp);
+  const powered = per(() => View.render(run,.2,.016));
+  const dim = beamOpacity;
+  View.render(run,.6,.016);
+  check("lanterna quente: sprite recortado pela geometria e cintila com bateria fraca",
+    powered.warmBeam === 1 && powered.clip >= 1 && beamOpacity !== dim && beamOpacity < 1);
+  run.reduceFlicker = true;
+  View.render(run,.8,.016);
+  check("reduzir cintilação estabiliza a lanterna", beamOpacity === 1);
+  run.minutes += 1440*run.rules.powerDays;
+  const unpowered = per(() => View.render(run,1,.016));
+  check("janelas: brilho com rede e desaparece após corte", powered.windowGlow > 0 && !unpowered.windowGlow);
+  const power = run.world.objects.find(o => o.id === "shelter-generator");
+  Object.assign(power,{x:window.x,y:window.y,running:true,fuel:25});
+  const generator = per(() => View.render(run,1,.016));
+  check("janelas: gerador em funcionamento volta a iluminar janelas próximas", generator.windowGlow > 0);
+  power.running = false;
+  run.world.objects.push({kind:"campfire",x:player.x,y:player.y,active:true});
+  const fire = per(() => View.render(run,1,.016));
+  check("fogueira no exterior: luz no chão e brilho fraco perto da janela após corte", fire.fireGlow > 0 && fire.fireWindow > 0);
+
+  run.minutes = 19*60;
+  for (const look of ["dark","fast","classic"]) {
+    run.look = look;
+    run.fastGround = look !== "classic";
+    run.visualAtmosphere = "full";
+    View.render(run,1,.016);
+    const full = per(n => { for (let i = 0; i < n; i++) View.render(run,1+i/60,.016); }, 8);
+    run.visualAtmosphere = "reduced";
+    const reduced = per(() => View.render(run,1,.016));
+    run.visualAtmosphere = "off";
+    const off = per(() => View.render(run,1,.016));
+    check(look + ": Full, Reduced e Off desenham, com menos chuva em Reduced e ambiente original em Off",
+      full.warmBeam === 1 && reduced.warmBeam === 1 && !off.warmBeam && !off.windowGlow && !off.mist &&
+      reduced.lineTo < full.lineTo && full.createRadialGradient <= off.createRadialGradient);
+  }
+}
+{
+  const marsh = Sim.create(17,"training","carer",7,undefined,"lowtide");
+  marsh.minutes = 6*60;
+  marsh.visualAtmosphere = "full";
+  View.prepare(marsh.world);
+  const dawn = per(() => View.render(marsh,12,.016));
+  check("Lowtide Marsh: neblina leve ao amanhecer", dawn.mist > 0);
+  const cave = Sim.create(17,"training","carer",7,undefined,"cavern");
+  cave.visualAtmosphere = "full";
+  cave.weather = "Rain";
+  View.prepare(cave.world);
+  const lamp = cave.player.bag.findIndex(item => item.id === "flashlight");
+  Sim.use(cave,lamp);
+  const under = per(() => View.render(cave,12,.016));
+  check("Cinder Grotto: lanterna presente sem chuva ou neblina", under.warmBeam === 1 && !under.mist);
+}
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

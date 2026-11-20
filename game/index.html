@@ -8,8 +8,8 @@
 <title>Last CloneZ</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link id="micro-zombie-atlas" rel="preload" as="image" href="micro-zombies.png">
-<link rel="stylesheet" href="style.css?v=compact-hud">
-<script src="data.js?v=0.33-weapon-preview" defer></script>
+<link rel="stylesheet" href="style.css?v=onboarding">
+<script src="data.js?v=difficulty" defer></script>
 <script src="research.js?v=0.33" defer></script>
 <script src="legacy-level.js?v=0.33" defer></script>
 <script src="level.js?v=0.33" defer></script>
@@ -17,13 +17,13 @@
 <script src="regions.js?v=0.33" defer></script>
 <script src="homes.js?v=0.33" defer></script>
 <script src="chronicle.js?v=0.33-first-names" defer></script>
-<script src="world.js?v=0.33" defer></script>
+<script src="world.js?v=difficulty" defer></script>
 <script src="atmosphere.js?v=0.33" defer></script>
 <script src="soundscape.js?v=0.33-sprites" defer></script>
 <script src="afterlife.js?v=0.33-sprites" defer></script>
-<script src="sim.js?v=0.33-weapon-preview" defer></script>
-<script src="view.js?v=0.33-weapon-preview" defer></script>
-<script src="game.js?v=compact-hud" defer></script>
+<script src="sim.js?v=difficulty" defer></script>
+<script src="view.js?v=atmosphere" defer></script>
+<script src="game.js?v=atmosphere" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -79,11 +79,17 @@
 <main class="console">
   <section class="stage" aria-label="Survival world">
     <div class="stage-top"><div class="camera"><span class="camera-dot"></span><span id="location">COLD VALE</span></div><div class="world-clock"><span id="day">DAY 01</span><span class="divider">/</span><b id="timer">08:00</b><span class="weather" id="weather">Overcast</span></div></div>
-    <div class="hud-strip" id="hud-strip" hidden>
-      <button class="condition-bar" id="condition-bar" type="button" aria-label="View conditions and injuries">
-        <span class="condition-meter" aria-hidden="true"></span><span id="condition-summary">Stable</span><span id="condition-count"></span>
-      </button>
-      <div class="event-status" id="event-status" role="status" hidden><span id="event-text"></span></div>
+    <div class="hud-stack">
+      <div class="hud-strip" id="hud-strip" hidden>
+        <button class="condition-bar" id="condition-bar" type="button" aria-label="View conditions and injuries">
+          <span class="condition-meter" aria-hidden="true"></span><span id="condition-summary">Stable</span><span id="condition-count"></span>
+        </button>
+        <div class="event-status" id="event-status" role="status" hidden><span id="event-text"></span></div>
+      </div>
+      <div class="onboarding" id="onboarding" hidden>
+        <strong id="pinned-goal" role="status"></strong>
+        <span id="guide-hint" role="status"></span>
+      </div>
     </div>
     <div class="viewport">
       <canvas id="world" aria-label="Isometric view of Cold Vale"></canvas>
@@ -110,18 +116,26 @@
             <p>Search abandoned towns, scavenge supplies and stay alive. Every building might contain something useful, something terrible, or something deeply stupid.</p>
           </div>
           <div class="hero-setup">
-            <div class="new-world-options"><label>NAME<input id="survivor-name" type="text" maxlength="56" placeholder="Survivor" autocomplete="off"></label><label>APPEARANCE<select id="appearance"></select></label></div>
-            <div class="new-world-options"><label>BACKGROUND<select id="role" aria-describedby="background-detail"></select></label><label>WORLD PRESET<select id="difficulty" aria-describedby="preset-summary"></select></label></div>
-            <p id="background-detail" class="background-detail"></p>
-            <div class="preset-line"><p id="preset-summary" class="preset-summary"></p><button type="button" class="small-button" id="rules-btn">Customize</button></div>
-            <div class="new-world-options start-options"><label>STARTING POINT<select id="start-point" aria-describedby="start-detail"></select></label><label>MAP SEED<input id="world-seed" type="text" inputmode="numeric" pattern="[0-9]{1,9}" maxlength="9" placeholder="Random" autocomplete="off"></label></div>
-            <p class="start-detail" id="start-detail" aria-live="polite"></p>
             <button class="start-button" id="continue-btn" hidden><svg class="icon"><use href="#play"/></svg> Continue <svg class="icon end-icon"><use href="#arrow"/></svg></button>
-            <label class="navigation-choice">Exploration<select id="navigation-mode">
-              <option value="locations">Map with marked locations</option>
-              <option value="discover">Discover without a map</option>
-            </select></label>
-            <button class="start-button" id="start-btn"><svg class="icon"><use href="#play"/></svg> Start new run <svg class="icon end-icon"><use href="#arrow"/></svg></button>
+            <button class="start-button" id="recommended-btn" type="button"><svg class="icon"><use href="#play"/></svg> Recommended start <svg class="icon end-icon"><use href="#arrow"/></svg></button>
+            <p class="recommended-detail">Survival · Shelter · Marked map</p>
+            <details id="advanced-start" class="advanced-start">
+              <summary>Advanced</summary>
+              <div class="new-world-options"><label>NAME<input id="survivor-name" type="text" maxlength="56" placeholder="Survivor" autocomplete="off"></label><label>APPEARANCE<select id="appearance"></select></label></div>
+              <div class="new-world-options"><label>BACKGROUND<select id="role" aria-describedby="background-detail"></select></label><label>WORLD PRESET<select id="difficulty" aria-describedby="preset-summary"></select></label></div>
+              <p id="background-detail" class="background-detail"></p>
+              <div class="preset-line"><p id="preset-summary" class="preset-summary"></p><button type="button" class="small-button" id="rules-btn">Customize</button></div>
+              <button type="button" class="small-button" id="setup-assists">Assists</button>
+              <div class="new-world-options start-options"><label>STARTING POINT<select id="start-point" aria-describedby="start-detail"></select></label><label>MAP SEED<input id="world-seed" type="text" inputmode="numeric" pattern="[0-9]{1,9}" maxlength="9" placeholder="Random" autocomplete="off"></label></div>
+              <p class="start-detail" id="start-detail" aria-live="polite"></p>
+              <label class="navigation-choice">Exploration<select id="navigation-mode">
+                <option value="locations">Map with marked locations</option>
+                <option value="discover">Discover without a map</option>
+              </select></label>
+              <label class="onboarding-option"><input id="guide-enabled" type="checkbox" checked> Show beginner hints in Recommended</label>
+              <label class="onboarding-option"><input id="playtest-enabled" type="checkbox"> Record Recommended playtest milestones locally</label>
+              <button class="start-button" id="start-btn"><svg class="icon"><use href="#play"/></svg> Start new run <svg class="icon end-icon"><use href="#arrow"/></svg></button>
+            </details>
             <button class="small-button" id="opening-btn" type="button">Replay opening</button>
             <button class="small-button" id="intro-btn" type="button">Beginner introduction</button>
             <div class="hero-foot"><span><svg class="icon"><use href="#save"/></svg> AUTOSAVE</span></div>

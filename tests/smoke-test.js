@@ -598,6 +598,125 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     check("district progress persists after returning: "+id,returned?.world.region === district.host && Chronicle.has(returned.ledger,packet.record));
   }
 }
+{
+  const seed = 17, s = Sim.createRecommended(seed, true, 2.3), p = s.player;
+  const standard = Sim.createControl("survival", "carer", "shelter", undefined, {seed});
+  const homeIds = new Set(s.world.buildings.filter(b => b.type === "home").map(b => b.id));
+  const stash = s.world.objects.find(o => homeIds.has(o.building) && Sim.quantity(o.loot ?? [], "bandage") >
+    Sim.quantity(standard.world.objects.find(other => other.id === o.id)?.loot ?? [], "bandage"));
+  const bat = s.world.objects.find(o => o.kind === "drop" && o.loot?.some(item => item.id === "bat"));
+  const originalPosition = {x:p.x,y:p.y};
+  const steps = [s.guideStep];
+  for (const input of [{x:1,y:0}, {x:-1,y:0}, {x:0,y:1}, {x:0,y:-1}]) {
+    Sim.tick(s, .033, input);
+    if (s.playtest.move !== undefined) break;
+  }
+  Object.assign(p, originalPosition);
+  Sim.collect(s, bat, bat.loot.findIndex(item => item.id === "bat"));
+  steps.push(s.guideStep);
+  Sim.use(s, p.bag.findIndex(item => item.id === "bat"));
+  steps.push(s.guideStep);
+  const houseSpot = findTile(s, t => t.building === stash?.building && !t.solid &&
+    Sim.distance({x:t.x+.5,y:t.y+.5},stash) <= 1.85 &&
+    World.sees(s.world,t.x+.5,t.y+.5,stash.x,stash.y));
+  if (houseSpot) {
+    Object.assign(p, houseSpot);
+    const house = s.world.buildings.find(b => b.id === stash.building);
+    const cupboard = s.world.objects.find(o => o.building === house.id && Sim.reachableObject(s,o) &&
+      o.loot?.some(item => item.id !== "bandage"));
+    if (cupboard) {
+      Sim.collect(s, cupboard, cupboard.loot.findIndex(item => item.id !== "bandage"));
+      steps.push(s.guideStep);
+    }
+    Sim.collect(s, stash, stash.loot.findIndex(item => item.id === "bandage"));
+  }
+  steps.push(s.guideStep);
+  p.wounds.push({part:"arm", type:"scratch", bleed:.07, bandaged:false, clean:false, infection:0, age:0});
+  Sim.use(s, p.bag.findIndex(item => item.id === "bandage"));
+  steps.push(s.guideStep);
+  const shelter = findTile(s, t => t.building === s.world.base.id && !t.solid &&
+    World.clear(s.world,t.x+.5,t.y+.5));
+  Object.assign(p, shelter);
+  s.minutes = 1200;
+  s.atmosphere.nextWave = 0;
+  s.nextEvent = 0;
+  Sim.tick(s, .033);
+  steps.push(s.guideStep);
+  check("início recomendado: recolher, equipar, explorar, tratar e regressar sem repetir passos",
+    steps.join(",") === "0,1,2,3,4,5,6", steps.join(","));
+  check("início recomendado: mesmas regras Survival, primeira noite sem horda itinerante",
+    JSON.stringify(s.rules) === JSON.stringify(standard.rules) && !s.atmosphere.pending && s.atmosphere.nextWave === 0 &&
+    !s.messages.some(message => /siren|crash in the centre/.test(message.text)));
+  s.minutes = 1440 + 390;
+  Sim.tick(s, .033);
+  check("início recomendado: hordas itinerantes regressam após o amanhecer", s.atmosphere.pending || s.atmosphere.nextWave > 0);
+  check("objetivo: clínica marcada e modo sem mapa usa sinais",
+    Sim.pinnedGoal(s) === "Find Eva" && Sim.destination(s)?.id === s.world.buildings.find(b => b.type === "clinic").id);
+  s.hideNavigation = true;
+  check("sem mapa: pista física sem destino", /signs north/.test(Sim.pinnedGoal(s)) && Sim.destination(s) === null);
+  s.flags.rescued = true;
+  check("objetivo: avança para o rádio", /radio/.test(Sim.pinnedGoal(s)));
+  const z = s.world.enemies.find(e => e.hp > 0 && !e.dormant);
+  Object.assign(z, {x:p.x,y:p.y,hp:1});
+  Sim.attack(s, z);
+  p.hp = 0;
+  Sim.tick(s, .033);
+  const saved = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  check("marcos locais: guardam os primeiros tempos e só existem com adesão",
+    saved.guideStep === 6 && saved.playtest.tutorialSkip === 2.3 &&
+    ["move","pickup","equip","fight","heal","death"].every(id => Number.isFinite(saved.playtest[id])) &&
+    !Sim.createRecommended(seed).playtest && !standard.playtest, JSON.stringify(saved.playtest));
+}
+
+{
+  const make = () => Sim.createControl("survival", "carer", "shelter", undefined, {seed:1014});
+  const a = make(), b = make(), old = make();
+  for (const s of [a,b]) {
+    s.difficultyOptions = Sim.difficultyOptions(s);
+    s.player.hp = 25;
+    s.atmosphere.nextWave = 0;
+    for (const z of s.world.enemies) z.hp = 0;
+    Sim.tick(s, .2);
+  }
+  check("hordas adaptativas: mesma seed e ações dão a mesma pausa",
+    a.recoveryUsed && b.recoveryUsed && a.atmosphere.nextWave === 45.2 &&
+    JSON.stringify(a.atmosphere) === JSON.stringify(b.atmosphere));
+  const original = JSON.stringify(a.rules);
+  const decreased = Sim.setDifficulty(a, {pressure:"low", bleed:true, aim:"light"});
+  const rejected = !Sim.setDifficulty(a, {pressure:"high"}) && a.difficultyOptions.pressure === "low";
+  const restored = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(a))));
+  check("dificuldade: baixar guarda o historial, subir exige confirmação, regras de geração intactas",
+    decreased && rejected && restored.difficultyOptions.assists.bleed && restored.difficultyOptions.aim === "light" &&
+    restored.difficultyChanges.length === 1 && JSON.stringify(restored.rules) === original &&
+    Sim.setDifficulty(restored, {pressure:"high"}, true));
+  check("dificuldade: gravação anterior conserva as regras sem assistências nem diretor",
+    Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(old)))).difficultyOptions === undefined);
+  check("dificuldade: só Relaxed e Survival ativam o diretor por defeito",
+    Object.keys(Data.modes).every(id => Sim.difficultyOptions({difficulty:id}).director === ["relaxed","survival"].includes(id)));
+  check("travessias: distritos exteriores perigosos e Training calmo",
+    Object.keys(context.Expedition.districts).every(region => Sim.dangerRating(a,region) === "Dangerous" &&
+      Sim.dangerRating(fresh("training"),region) === "Calm"));
+  check("mira assistida desligada mantém o alvo original",
+    Sim.touchAttackTarget(old) === Sim.attackTarget(old));
+  const open = findTile(old, t => [-1,0,1].every(dx => World.clear(old.world,t.x+.5+dx,t.y+.5)));
+  const [front,back] = old.world.enemies.filter(z => z.hp > 0 && !z.dormant);
+  Object.assign(old.player, open, {headingX:1,headingY:0});
+  Object.assign(front, {x:open.x+.7,y:open.y});
+  Object.assign(back, {x:open.x-.3,y:open.y});
+  old.world.enemies = [front,back];
+  old.difficultyOptions = Sim.difficultyOptions(old, {aim:"light"});
+  check("mira assistida: favorece um alvo visível à frente, mas nunca fora de alcance",
+    Sim.attackTarget(old) === back && Sim.touchAttackTarget(old) === front &&
+    (front.x += 4, Sim.touchAttackTarget(old) === null));
+  const withBleed = make(), withoutBleed = make();
+  withBleed.difficultyOptions = Sim.difficultyOptions(withBleed, {bleed:true});
+  for (const s of [withBleed,withoutBleed]) {
+    s.player.wounds.push({part:"arm",type:"cut",bleed:.18,bandaged:false,clean:false,infection:0,age:0});
+    Sim.tick(s,.2);
+  }
+  check("assistência: reduz a perda de vida por hemorragia", withBleed.player.hp > withoutBleed.player.hp);
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

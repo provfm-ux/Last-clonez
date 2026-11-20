@@ -1,9 +1,0 @@
-{
-  // Load this file explicitly from the Workers Builds Preview command.
-  "name": "last-clonez",
-  "compatibility_date": "2026-11-20",
-  "assets": {
-    "directory": "./game"
-  },
-  "previews": {}
-}

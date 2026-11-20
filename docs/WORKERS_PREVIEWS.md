@@ -5,11 +5,11 @@ Preview under `last-clonez`. The branch URL follows the latest successful
 deployment. For a GitHub PR from that branch, Cloudflare posts the URL in its
 build comment. Each successful build also has an immutable deployment URL.
 
-The preview command explicitly loads `wrangler.preview.jsonc` and serves
-`game/` directly, including the existing `_headers`. The preview uses no
-bindings, variables, or secrets. The existing production command can continue
-to use its current configuration and
-[production URL](https://last-clonez.pro-vfm.workers.dev).
+Wrangler automatically loads the root `wrangler.jsonc` and serves
+`game/` directly, including the existing `_headers`. The Preview configuration declares no
+bindings, variables, or secrets. The top-level Worker name, asset directory,
+and compatibility date match the existing deployment of the
+[production Worker](https://last-clonez.pro-vfm.workers.dev).
 
 ## One-time dashboard setup
 
@@ -31,21 +31,23 @@ to use its current configuration and
    under **Branch control**.
 3. In **Settings → Builds → Build configuration**, set **Preview command** to
    the command below. It expects the root directory to be the repository root
-   and uses Wrangler 4.165.0, which requires Node.js 22.12 or newer. The current
-   Workers Builds image supplies Node.js 24 by default. If the Worker already
+   and requires Wrangler 4.135.0 or newer. Wrangler 4.165.0 requires Node.js
+   22.12 or newer. The current Workers Builds image supplies Node.js 24 by
+   default. If the Worker already
    pins an older Node version, keep the production pin and use the alternate
    Preview command below. No new shared build command, GitHub Actions secret,
-   or Cloudflare resource binding is required. Keep the existing **Deploy
-   command**, **Build command**, and production settings.
+   or Cloudflare resource binding is required. Keep **Previews Base** empty for
+   this static game. Keep the existing **Deploy command**, **Build command**,
+   and production settings.
 
    ```sh
-   npx --yes wrangler@4.165.0 preview --config wrangler.preview.jsonc --ignore-base-config
+   npx wrangler preview
    ```
 
    For builds pinned to an older Node version:
 
    ```sh
-   npx --yes --package=node@24.22.1 --package=wrangler@4.165.0 -- wrangler preview --config wrangler.preview.jsonc --ignore-base-config
+   npx --yes --package=node@24.22.1 --package=wrangler@4.165.0 -- wrangler preview --ignore-base-config
    ```
 
 4. In **Domains**, under **Worker URL**, turn on **Preview** for the
@@ -54,7 +56,7 @@ to use its current configuration and
    Cloudflare Access, sign in on Android with an account allowed by its preview
    policy.
 5. After saving the settings, push to a feature branch in
-   `provfm-ux/Last-clonez` that contains `wrangler.preview.jsonc`. For the setup
+   `provfm-ux/Last-clonez` that contains `wrangler.jsonc`. For the setup
    PR itself, retry its build if one exists, or trigger it with a new push to
    its branch. Older branches need to pick up the preview config before they
    can build with this command. Branches created from `main` after this PR is
@@ -71,7 +73,7 @@ The game’s browser saves belong to each preview hostname. Export a save and
 import it on the preview if you need an existing run.
 
 For a local check that does not publish anything, run
-`npx --yes wrangler@4.165.0 dev --config wrangler.preview.jsonc --local`.
+`npx --yes wrangler@4.165.0 dev --local`.
 
 [Workers Builds branch settings](https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/) ·
 [GitHub integration](https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/github-integration/) ·

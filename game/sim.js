@@ -683,7 +683,7 @@ const Sim = (() => {
       p.moving = false;
     } else if (manual) {
       p.path = [];
-      const target = Math.atan2(input.y - input.x * .53, input.x * .53 + input.y);
+      const target = Math.atan2(input.y - input.x * .5, input.x * .5 + input.y);
       const heading = car.heading ?? (car.axis === "x" ? Math.PI : -Math.PI / 2);
       const delta = Math.atan2(Math.sin(target - heading), Math.cos(target - heading));
       const backing = Math.abs(delta) > Math.PI * .55;
@@ -1874,7 +1874,7 @@ const Sim = (() => {
     const screenX = actor.x - beforeX - actor.y + beforeY;
     if (!(actor.swing > 0) && Math.abs(screenX) > .008) actor.face = Math.sign(screenX);
     const length = Math.hypot(actor.x - beforeX, actor.y - beforeY);
-    if (actor === s.player && !driving && length > .0001) {
+    if (length > .0001) {
       actor.headingX = (actor.x - beforeX) / length;
       actor.headingY = (actor.y - beforeY) / length;
     }
@@ -1970,7 +1970,7 @@ const Sim = (() => {
     const footing = surface === "sand" ? .78 : surface === "field" ? .88 : 1;
     const speed = (s.running ? 4 : s.quiet ? 1.6 : 2.55) * (injury ? .8 : 1) * (load > .9 ? .9 : 1) * (p.fatigue > 85 || cold ? .8 : 1) * (p.grabbed > 0 ? .4 : 1) * (p.fracture > 0 ? (p.splinted ? Data.fracture.splintSpeed : Data.fracture.brokenSpeed) : 1) * footing;
     if (manual) {
-      const dx = input.x * .53 + input.y, dy = input.y - input.x * .53, mag = Math.hypot(dx, dy);
+      const dx = input.x * .5 + input.y, dy = input.y - input.x * .5, mag = Math.hypot(dx, dy);
       const strength = Math.min(1, Math.hypot(input.x, input.y));
       p.moving = move(s, p, dx / mag * speed * dt * strength, dy / mag * speed * dt * strength);
     } else p.moving = follow(s, p, speed * dt);

@@ -11,9 +11,12 @@ const counts = {};
 const mk = () => new Proxy({}, {
   get(t, k) { if (k in t) return t[k]; if (k === "canvas") return {width: 1280, height: 720}; if (k === "measureText") return () => ({width: 10});
     if (k === "createRadialGradient" || k === "createLinearGradient") return () => { counts[k] = (counts[k] || 0) + 1; return {addColorStop() {}}; };
-    return () => { counts[k] = (counts[k] || 0) + 1; }; },
+    return (...args) => {
+      counts[k] = (counts[k] || 0) + 1;
+      if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 32) counts.actorBlit = (counts.actorBlit || 0) + 1;
+    }; },
   set(t, k, v) { t[k] = v; return true; }});
-const mkCanvas = () => ({width: 0, height: 0, getContext: () => mk(), getBoundingClientRect: () => ({width: 1280, height: 720}), style: {}, clientWidth: 160});
+const mkCanvas = () => ({width: 0, height: 0, getContext: () => mk(), getBoundingClientRect: () => ({left: 0, top: 0, width: 1280, height: 720}), style: {}, clientWidth: 160});
 const worldCanvas = mkCanvas();
 const context = {console, Math: Object.assign(Object.create(Math), {random: (() => { let s = 3; return () => (s = s * 16807 % 2147483647) / 2147483647; })()}), Date, JSON, structuredClone, devicePixelRatio: 1,
   ResizeObserver: class { observe() {} }, document: {getElementById: id => id === "world" ? worldCanvas : mkCanvas(), createElement: () => mkCanvas()}};
@@ -40,6 +43,11 @@ check("paredes: o canto liga as duas paredes sem sobressair",
   corner.wallOutline.some(([, y]) => y === 1) &&
   corner.wallOutline.every(([x, y]) => x > 0 && y > 0));
 const first = per(() => View.render(s, 0, 1 / 60));
+s.blueprint = "test";
+const point = View.locate(640 + 32 * 1.12, 720 * .54 + 16 * 1.12, s);
+delete s.blueprint;
+check("projeção isométrica 2:1: o centro do tile vizinho converte para o mundo",
+  Math.abs(point.x - s.player.x - 1) < 1e-6 && Math.abs(point.y - s.player.y) < 1e-6);
 const steady = per(n => { for (let i = 0; i < n; i++) View.render(s, i / 60, 1 / 60); }, 10);
 s.fastGround = false; const classic = per(n => { for (let i = 0; i < n; i++) View.render(s, i / 60, 1 / 60); }, 10); s.fastGround = true;
 check("chão em cache: frames estáveis não reconstroem blocos", (steady.setTransform || 0) <= 3, "setTransform/frame " + (steady.setTransform || 0).toFixed(1));
@@ -64,6 +72,7 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   try { for (let i = 0; i < 6; i++) View.render(d, i / 60, 1 / 60); } catch (x) { e = x.stack.split("\n").slice(0, 2).join(" | "); }
   check("dark pixel: desenha sem erros", e === null, e ?? "");
   const dsteady = per(n => { for (let i = 0; i < n; i++) View.render(d, i / 60, 1 / 60); }, 10);
+  check("dark pixel: personagens usam os sprites do atlas", (dsteady.actorBlit || 0) > 0);
   check("dark pixel: frame estável não reconstrói blocos", (dsteady.setTransform || 0) < 12, (dsteady.setTransform || 0).toFixed(1) + " setTransform/frame");
   check("dark pixel: usa um buffer de baixa resolução (drawImage do buffer)", (dsteady.drawImage || 0) >= 1, (dsteady.drawImage || 0) + " drawImage/frame");
   const ww = d.world, cx = Math.floor(d.player.x), cy = Math.floor(d.player.y);

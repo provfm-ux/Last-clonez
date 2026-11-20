@@ -5,13 +5,14 @@ const View = (() => {
   let ctx = canvas.getContext("2d", {alpha: false});
   const mainCtx = ctx;
   let lowCanvas = null, lowCtx = null, darkLook = false;
-  const halfW = 32, halfH = 17;
+  const halfW = 32, halfH = 16;
   const wallWidth = .14, wallInset = (1 - wallWidth) / 2;
   const camera = {x: 0, y: 0, zoom: 1, ready: false};
   const size = {width: 0, height: 0, dpr: 1};
   const objectLabels = [];
   let labelledWorld = null;
   const p = (x, y, z = 0) => [(x - y) * halfW, (x + y) * halfH - z];
+  const unproject = (x, y) => ({x:(x / halfW + y / halfH) / 2, y:(y / halfH - x / halfW) / 2});
   const sq = (x, y, radius) => x * x + y * y <= radius * radius;
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -131,6 +132,7 @@ const View = (() => {
             [lo, hi], ...(left ? [[0, hi], [0, lo]] : [])
           ];
         }
+        t.wallShape = t.wallOutline.map(point => point.join(",")).join(";");
       }
       const floors = {home: t.room ? "#80735f" : "#787d69", clinic: "#708078", market: "#7d8071", workshop: "#6b6354", police: "#6d7669", fuel: "#747566"};
       if (building?.compact) floors.home = t.room === "Bedroom" ? "#6c665b" : building.color;
@@ -203,8 +205,18 @@ const View = (() => {
       }
     } else if (t.surface === "sand" && t.marks > .65) {
       line(p(x+.2,y+.5),p(x+.65,y+.5),"#d8c89c65");
+    } else if (darkLook && t.nearHome && t.surface === "path") {
+      line(p(x, y + .5), p(x + 1, y + .5), "#30353250");
+      for (const offset of [.25, .75]) line(p(x + offset, y), p(x + offset, y + .5), "#30353255");
+      line(p(x + .5, y + .5), p(x + .5, y + 1), "#30353255");
     } else if (t.surface === "tile") {
-      if (t.room) {
+      if (darkLook && t.nearHome && t.room) {
+        for (const row of [.24, .49, .74]) {
+          line(p(x, y + row), p(x + 1, y + row), "#322b2549");
+          const seam = (y + Math.round(row * 4)) % 2 ? .32 : .68;
+          line(p(x + seam, y + row), p(x + seam, y + row + .24), "#332d2770");
+        }
+      } else if (t.room) {
         line(p(x+.25,y),p(x+.25,y+1),"#423c2e4a");
         line(p(x+.62,y),p(x+.62,y+1),"#b9a48130");
       }
@@ -273,19 +285,52 @@ const View = (() => {
     ctx.restore();
   }
 
+  const brickWalls = new Map();
   function wall(t, player, menu) {
     const {x, y, wallOutline: outline} = t;
     const fullHeight = t.outside ? 34 : 26;
     const dx = x + .5 - player.x, dy = y + .5 - player.y;
     const cutaway = !menu && dx + dy > 0 && sq(dx, dy, 3.3);
     const height = cutaway ? 10 : fullHeight;
-    const [cap, south, east] = t.outside ? ["#667369", "#454e44", "#343f35"] : ["#727b6c", "#475248", "#39463e"];
+    if (!darkLook || !t.outside || !t.nearHome) {
+      paintWall(x, y, outline, height, t.outside ? ["#667369", "#454e44", "#343f35"] : ["#727b6c", "#475248", "#39463e"]);
+      return;
+    }
+    const key = t.wallShape + ":" + height;
+    let sprite = brickWalls.get(key);
+    if (!sprite) {
+      sprite = document.createElement("canvas");
+      sprite.width = 2 * halfW + 2; sprite.height = height + 2 * halfH + 2;
+      const previous = ctx;
+      try {
+        ctx = sprite.getContext("2d");
+        ctx.translate(halfW + 1, height + 1);
+        paintWall(0, 0, outline, height, ["#81665a", "#705147", "#513f3a"], true);
+      } finally { ctx = previous; }
+      brickWalls.set(key, sprite);
+    }
+    const [sx, sy] = p(x, y);
+    ctx.drawImage(sprite, sx - halfW - 1, sy - height - 1);
+  }
+
+  function paintWall(x, y, outline, height, [cap, south, east], brick = false) {
     const top = outline.map(([u, v]) => p(x + u, y + v, height));
     for (let i = 0; i < outline.length; i++) {
       const j = (i + 1) % outline.length;
       const [u, v] = outline[i], [nextU, nextV] = outline[j];
       if (nextU < u || nextV > v) {
-        poly([top[i], top[j], p(x + nextU, y + nextV), p(x + u, y + v)], nextU < u ? south : east);
+        const bottom = p(x + u, y + v), end = p(x + nextU, y + nextV);
+        poly([top[i], top[j], end, bottom], nextU < u ? south : east);
+        if (brick && Math.abs(nextU - u) + Math.abs(nextV - v) > .4) {
+          const mortar = "#2c25233d";
+          for (let level = 5; level < height; level += 6) {
+            line([bottom[0], bottom[1] - level], [end[0], end[1] - level], mortar);
+            const offset = level % 12 === 5 ? .32 : .68;
+            const seamX = bottom[0] + (end[0] - bottom[0]) * offset;
+            const seamY = bottom[1] + (end[1] - bottom[1]) * offset - level;
+            line([seamX, seamY], [seamX, seamY + 3], mortar);
+          }
+        }
       }
     }
     poly(top, cap);
@@ -299,6 +344,40 @@ const View = (() => {
   const red = ["#b86751", "#794538", "#633b32"];
   const teal = ["#779e91", "#466f64", "#355952"];
   const cream = ["#bfc1a9", "#8f927e", "#747c6d"];
+
+  const gardenTrees = [];
+  function gardenTree(x, y, tintValue) {
+    const variant = Number.isFinite(tintValue) ? clamp(Math.floor(tintValue * 4), 0, 3) : 0;
+    let sprite = gardenTrees[variant];
+    if (!sprite) {
+      sprite = document.createElement("canvas");
+      sprite.width = 54; sprite.height = 61;
+      const c = sprite.getContext("2d");
+      c.fillStyle = "#41382c"; c.fillRect(25, 29, 5, 31);
+      c.fillStyle = "#786653"; c.fillRect(25, 34, 2, 24);
+      const crown = [[16, 29, 12], [38, 30, 12], [27, 35, 14], [13, 20, 9],
+        [36, 16, 12], [23, 13, 12], [28, 22, 15]];
+      const leaves = [["#344334", "#43533b", "#566649", "#687652"],
+        ["#3e4834", "#50583d", "#656b48", "#7b7e55"],
+        ["#35463b", "#455a48", "#58705a", "#6f8062"],
+        ["#444838", "#555b40", "#696d4a", "#7a7c54"]][variant];
+      for (const [cx, cy, radius] of crown) {
+        for (let py = cy - radius; py <= cy + radius; py += 2) {
+          for (let px = cx - radius; px <= cx + radius; px += 2) {
+            const noise = ((px * 73856093 ^ py * 19349663 ^ variant * 83492791) >>> 0) % 7;
+            const dx = px - cx, dy = (py - cy) * 1.25;
+            if (dx * dx + dy * dy > (radius - noise * .65) ** 2) continue;
+            const shade = clamp(Math.floor(1.3 - (dx + dy) / radius + noise * .22), 0, 3);
+            c.fillStyle = leaves[shade]; c.fillRect(px, py, 2, 2);
+          }
+        }
+      }
+      gardenTrees[variant] = sprite;
+    }
+    const [sx, sy] = p(x, y);
+    shadow(x, y, 24, 9, "#10171090");
+    ctx.drawImage(sprite, Math.round(sx) - 27, Math.round(sy) - 60);
+  }
 
   function prop(o, state, clock) {
     const {x, y, kind, tint: tone} = o;
@@ -603,6 +682,7 @@ const View = (() => {
       return;
     }
     if(kind==="tree") {
+      if (darkLook && o.treeType !== "pine") { gardenTree(x, y, tone); return; }
       shadow(x,y,30,11);
       f(-.1,-.1,0,.2,.2,24,wood);
       if (o.treeType === "pine") {
@@ -733,19 +813,60 @@ const View = (() => {
     }
   }
 
+  const roofSprites = new WeakMap();
+
   function roof(building) {
+    if (!darkLook) { roofArt(building); return; }
+    let sprite = roofSprites.get(building);
+    if (!sprite) {
+      const {x, y, w, h} = building;
+      const left = Math.floor((x - y - h) * halfW - 16);
+      const top = Math.floor((x + y) * halfH - 72);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil((w + h) * halfW + 32);
+      canvas.height = Math.ceil((w + h) * halfH + 100);
+      const previous = ctx;
+      try {
+        ctx = canvas.getContext("2d");
+        ctx.translate(-left, -top);
+        roofArt(building);
+      } finally { ctx = previous; }
+      sprite = {canvas, left, top};
+      roofSprites.set(building, sprite);
+    }
+    ctx.drawImage(sprite.canvas, sprite.left, sprite.top);
+  }
+
+  function roofArt(building) {
     const {x,y,w,h}=building;
     const z=41, peak=building.compact ? 52 : 58;
     shadow(x+w*.5,y+h*.5,w*24,h*10,"#080c0980");
     const a=p(x-.1,y-.1,z), b=p(x+w+.1,y-.1,z);
     const c=p(x+w+.1,y+h+.1,z), d=p(x-.1,y+h+.1,z);
     const ridgeA=p(x+w*.5,y-.1,peak), ridgeB=p(x+w*.5,y+h+.1,peak);
-    poly([a,ridgeA,ridgeB,d],building.roof,"#343d32");
-    poly([ridgeA,b,c,ridgeB],tint(building.roof,-10),"#343d32");
+    const slate = darkLook && building.type === "home" ? (building.compact ? "#56575a" : "#655653") : building.roof;
+    poly([a,ridgeA,ridgeB,d],slate,"#343d32");
+    poly([ridgeA,b,c,ridgeB],tint(slate,-10),"#343d32");
     poly([d,ridgeB,c,p(x+w+.1,y+h+.1,33),p(x-.1,y+h+.1,33)],"#696852");
     for(let i=1;i<h;i++) {
       line(p(x-.1,y+i,z),p(x+w*.5,y+i,peak),"#a8a48c22");
       line(p(x+w*.5,y+i,peak),p(x+w+.1,y+i,z),"#a8a48c1a");
+    }
+    if (darkLook) {
+      for (const side of [-1, 1]) {
+        const slope = w / 2 + .1;
+        const rows = Math.ceil(slope / .38);
+        for (let row = 1; row < rows; row++) {
+          const t = row / rows, xx = x + w / 2 + side * slope * t;
+          const zz = peak + (z - peak) * t;
+          line(p(xx, y, zz), p(xx, y + h, zz), "#24262966");
+          for (let yy = y + .22 + (row % 2) * .22; yy < y + h; yy += .49) {
+            const next = (row + 1) / rows;
+            line(p(xx, yy, zz), p(x + w / 2 + side * slope * next, yy, peak + (z - peak) * next), "#22252950");
+          }
+        }
+      }
+      line(ridgeA, ridgeB, "#9b8c7e", 2);
     }
     if (!building.compact || (x+y) % 2 === 0) box(x+w*.72,y+h*.2,42,.55,.55,21,["#866b58","#5b493d","#493d32"]);
   }
@@ -779,6 +900,98 @@ const View = (() => {
     return {x:sx, y:sy, width:w};
   }
 
+  // Original 1px sprite art packed into fixed-size atlas pages. A pose is drawn only on first use.
+  const actorFrames = new Map(), actorAtlases = [];
+  const spriteWidth = 24, spriteHeight = 32;
+
+  function actorFrame(shirt, trousers, skin, hair, direction, pose, step, pack) {
+    const key = [shirt, trousers, skin, hair, direction, pose, step, pack].join("|");
+    if (actorFrames.has(key)) return actorFrames.get(key);
+    const index = actorFrames.size, slot = index % 128, page = Math.floor(index / 128);
+    if (!actorAtlases[page]) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 16 * spriteWidth;
+      canvas.height = 8 * spriteHeight;
+      actorAtlases[page] = canvas;
+    }
+    const canvas = actorAtlases[page], c = canvas.getContext("2d");
+    const left = slot % 16 * spriteWidth, top = Math.floor(slot / 16) * spriteHeight;
+    const ink = "#151a19", boots = "#2b2c29";
+    const back = direction >= 2, side = direction % 2 === 0 ? 1 : -1;
+    const rect = (x, y, w, h, color) => {
+      c.fillStyle = color;
+      c.fillRect(left + (side > 0 ? x : spriteWidth - x - w), top + y, w, h);
+    };
+    if (pose === "dead") {
+      rect(2, 26, 20, 5, ink); rect(3, 27, 7, 3, trousers);
+      rect(10, 25, 7, 5, shirt); rect(17, 26, 4, 4, skin); rect(20, 26, 2, 3, hair);
+    } else {
+      const low = pose === "sneak" ? 3 : 0;
+      const leap = pose === "run" ? 2 : 0;
+      const lean = pose === "hurt" ? -1 : pose === "chase" || pose === "strike" ? 1 : 0;
+      const shoulder = 9 + low - leap, hip = 19 + low - leap;
+      rect(8, hip - 1, 8, 3, ink);
+      for (const [x, y] of [[8, 28 + step], [13, 28 - step]]) {
+        rect(x - 1, hip, 4, y - hip + 3, ink);
+        rect(x, hip, 2, y - hip, trousers);
+        rect(x - 1, y, 4, 2, boots);
+      }
+      rect(7 + lean, shoulder, 10, hip - shoulder + 1, ink);
+      rect(8 + lean, shoulder + 1, 8, hip - shoulder - 1, shirt);
+      rect(9 + lean, shoulder + 1, 2, 7, "#ffffff18");
+      rect(15 + lean, shoulder + 2, 1, 8, "#151a194f");
+      if (pack) {
+        const px = back ? 9 + lean : 6 + lean;
+        rect(px, shoulder + 2, back ? 6 : 3, 7, "#3d4836");
+        rect(px + 1, shoulder + 3, 2, 3, "#73785a");
+      }
+      const reaches = pose === "strike" || pose === "chase";
+      const arm = reaches ? 2 : step;
+      rect(5 + lean, shoulder + 2 + step, 3, 7, ink);
+      rect(6 + lean, shoulder + 3 + step, 2, 4, shirt);
+      rect(6 + lean, shoulder + 7 + step, 2, 2, skin);
+      rect(16 + lean, shoulder + 2 - arm, reaches ? 6 : 3, reaches ? 4 : 7, ink);
+      rect(16 + lean, shoulder + 3 - arm, reaches ? 4 : 2, reaches ? 2 : 4, shirt);
+      rect(reaches ? 21 : 17 + lean, shoulder + (reaches ? 3 : 7) - arm, 2, 2, skin);
+      const head = shoulder - 7 + (step ? 1 : 0);
+      rect(9 + lean, head, 6, 7, ink);
+      rect(10 + lean, head + 1, 5, 5, back ? hair : skin);
+      rect(9 + lean, head, 6, 2, hair);
+      if (!back) {
+        rect(14 + lean, head + 3, 2, 2, skin);
+        rect(14 + lean, head + 3, 1, 1, ink);
+      }
+      if (pose === "hurt") rect(13 + lean, head + 4, 2, 1, "#a35749");
+    }
+    const frame = {canvas, left, top};
+    actorFrames.set(key, frame);
+    return frame;
+  }
+
+  function microActor(a, isPlayer, state, clock, alive, x, y, scale) {
+    const moving = alive && a.moving;
+    const running = moving && (isPlayer ? state.running : a.kind === "runner" && a.alert > 0);
+    const step = moving ? [-1, 0, 1, 0][Math.floor(clock * (running ? 14 : 9) + (a.phase || 0)) & 3] * (running ? 2 : 1) : 0;
+    const pose = !alive ? "dead" : a.flash > 0 ? "hurt" : a.swing > 0 || a.windup > 0 ? "strike" :
+      isPlayer && state.quiet ? "sneak" : running ? "run" : moving && a.stats && a.alert > 0 ? "chase" : "idle";
+    const dx = a.headingX ?? (a.face < 0 ? -1 : 1), dy = a.headingY ?? 0;
+    const direction = Number(dx < dy) + 2 * Number(dx + dy < 0);
+    const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : "#748d7a") :
+      Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
+    const frame = actorFrame(shirt, isPlayer ? "#465a5d" : "#56564c",
+      pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
+      isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step,
+      a.outfit === "hiker" || Boolean(isPlayer && a.backpack));
+    ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight,
+      Math.round(x - spriteWidth * scale / 2), Math.round(y - (spriteHeight - 1) * scale),
+      Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
+    if (alive && (a.windup > 0 || a.stats && a.alert > 0)) {
+      const height = Math.round(32 * scale);
+      ctx.fillStyle = a.windup > 0 ? "#ff987d" : "#cb735b";
+      ctx.fillRect(Math.round(x), Math.round(y) - height - 5, 2, a.windup > 0 ? 5 : 3);
+    }
+  }
+
   function actor(a, isPlayer, state, clock, inReach) {
     const alive = isPlayer || a.hp > 0;
     const [x, y] = p(a.x, a.y);
@@ -792,6 +1005,16 @@ const View = (() => {
       ctx.ellipse(x, y + 1, 16 * scale, 7 * scale, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
+    }
+    if (darkLook) {
+      microActor(a, isPlayer, state, clock, alive, x, y, scale);
+      if (alive && a.stats && (state.target === a || a.hp < a.stats.hp && a.alert > 0)) {
+        ctx.fillStyle = "#1d261d";
+        ctx.fillRect(x - 8, y - 42 * scale, 16, 2);
+        ctx.fillStyle = "#e27a5c";
+        ctx.fillRect(x - 8, y - 42 * scale, 16 * a.hp / a.stats.hp, 2);
+      }
+      return;
     }
     ctx.save();
     ctx.translate(x, y);
@@ -1009,13 +1232,14 @@ const View = (() => {
     const world=state.world,player=state.player,menu=state.mode==="menu",cave=world.underground;
     ctx = mainCtx;
     darkLook = state.look === "dark";
-    // Dark pixel look: the world is drawn at ~640 px wide and enlarged with hard pixels (also much cheaper to rasterise).
-    const pixCss = darkLook ? Math.max(1, Math.round(width / 640)) : 1;
+    // Retain individual sprite pixels on phones and ordinary desktop viewports.
+    const pixCss = darkLook ? Math.max(1, Math.floor(width / 840)) : 1;
     if (darkLook) {
       const lw = Math.ceil(width / pixCss), lh = Math.ceil(height / pixCss);
       if (!lowCanvas) { lowCanvas = document.createElement("canvas"); lowCtx = lowCanvas.getContext("2d"); }
       if (lowCanvas.width !== lw || lowCanvas.height !== lh) { lowCanvas.width = lw; lowCanvas.height = lh; }
       ctx = lowCtx;
+      ctx.imageSmoothingEnabled = false;
       ctx.setTransform(1 / pixCss,0,0,1 / pixCss,0,0);
       ctx.setTransform(1,0,0,1,0,0);
     } else ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1115,7 +1339,7 @@ const View = (() => {
       else if(entry.kind==="roof") {
         if (entry.fade) {
           ctx.save();
-          ctx.globalAlpha = .24;
+          ctx.globalAlpha = darkLook ? .42 : .24;
           roof(entry.obj);
           ctx.restore();
         } else roof(entry.obj);
@@ -1193,10 +1417,10 @@ const View = (() => {
       ctx.setTransform(1,0,0,1,0,0);
       if (!cave) {
         ctx.globalCompositeOperation = "saturation"; ctx.globalAlpha = .42; ctx.fillStyle = "#808080"; ctx.fillRect(0,0,lw,lh);
-        ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = 1; ctx.fillStyle = "#aab3c4"; ctx.fillRect(0,0,lw,lh);
+        ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = 1; ctx.fillStyle = "#c6ccd4"; ctx.fillRect(0,0,lw,lh);
         ctx.globalCompositeOperation = "source-over";
-        let g = ctx.createLinearGradient(0,lh * .6,0,lh); g.addColorStop(0,"rgba(120,135,150,0)"); g.addColorStop(1,"rgba(120,135,150,.13)"); ctx.fillStyle = g; ctx.fillRect(0,0,lw,lh);
-        g = ctx.createRadialGradient(lw / 2,lh * .54,lh * .3,lw / 2,lh * .54,lw * .66); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.58)"); ctx.fillStyle = g; ctx.fillRect(0,0,lw,lh);
+        let g = ctx.createLinearGradient(0,lh * .6,0,lh); g.addColorStop(0,"rgba(120,135,150,0)"); g.addColorStop(1,"rgba(120,135,150,.075)"); ctx.fillStyle = g; ctx.fillRect(0,0,lw,lh);
+        g = ctx.createRadialGradient(lw / 2,lh * .54,lh * .3,lw / 2,lh * .54,lw * .66); g.addColorStop(0,"rgba(0,0,0,0)"); g.addColorStop(1,"rgba(0,0,0,.38)"); ctx.fillStyle = g; ctx.fillRect(0,0,lw,lh);
       }
       ctx = mainCtx;
       ctx.setTransform(1,0,0,1,0,0);
@@ -1233,7 +1457,8 @@ const View = (() => {
       for(let i=0;i<40;i++){
         const x=(i*97+clock*95)%width,y=(i*137+clock*240)%height;
         const isoX=(x-camera.x)/zoom,isoY=(y-camera.y)/zoom;
-        const rainTile=World.tileAt(world,(isoX/halfW+isoY/halfH)/2,(isoY/halfH-isoX/halfW)/2);
+        const ground = unproject(isoX, isoY);
+        const rainTile = World.tileAt(world, ground.x, ground.y);
         if(currentBuilding&&rainTile?.building===currentBuilding)continue;
         ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-4,y+13);ctx.stroke();
       }
@@ -1244,7 +1469,7 @@ const View = (() => {
   function locate(clientX,clientY,state) {
     const rect=canvas.getBoundingClientRect();
     const sx=(clientX-rect.left-camera.x)/camera.zoom,sy=(clientY-rect.top-camera.y)/camera.zoom;
-    const ground = {x:(sx/halfW+sy/halfH)/2, y:(sy/halfH-sx/halfW)/2};
+    const ground = unproject(sx, sy);
     if (state.blueprint) return ground;
     const optics = Sim.sight(state);
     const hit=(o,z,rx=19,ry=25)=>{const [x,y]=p(o.x,o.y,z);return Math.abs(sx-x)<rx&&Math.abs(sy-y)<ry;};

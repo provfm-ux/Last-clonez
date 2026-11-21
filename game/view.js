@@ -1132,8 +1132,8 @@ const View = (() => {
   const actorFrames = new Map(), actorAtlases = [], strides = new WeakMap();
   const spriteWidth = 24, spriteHeight = 32;
 
-  function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack) {
-    const key = [shirt, trousers, skin, hair, direction, pose, step, lift, pack].join("|");
+  function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack, hairStyle, beard) {
+    const key = [shirt, trousers, skin, hair, direction, pose, step, lift, pack, hairStyle, beard].join("|");
     if (actorFrames.has(key)) return actorFrames.get(key);
     const index = actorFrames.size, slot = index % 128, page = Math.floor(index / 128);
     if (!actorAtlases[page]) {
@@ -1191,11 +1191,13 @@ const View = (() => {
       grip = [side > 0 ? handX + 1 : spriteWidth - handX - 1, handY + 1];
       const head = shoulder - 7 + (step ? 1 : 0);
       rect(9 + lean, head, 6, 7, ink);
-      rect(10 + lean, head + 1, 5, 5, back ? hair : skin);
-      rect(9 + lean, head, 6, 2, hair);
+      rect(10 + lean, head + 1, 5, 5, back && hairStyle !== "shaved" ? hair : skin);
+      rect(9 + lean, head, 6, hairStyle === "shaved" ? 1 : 2, hairStyle === "shaved" ? skin : hair);
+      if (hairStyle === "tied") rect(8 + lean, head + 2, 2, 6, hair);
       if (!back) {
         rect(14 + lean, head + 3, 2, 2, skin);
         rect(14 + lean, head + 3, 1, 1, ink);
+        if (beard && beard !== "none") rect(12 + lean, head + 5, 4, beard === "full" ? 2 : 1, hair);
       }
       if (pose === "hurt") rect(13 + lean, head + 4, 2, 1, "#a35749");
     }
@@ -1324,12 +1326,12 @@ const View = (() => {
     const direction = Number(dx < dy) + 2 * Number(dx + dy < 0);
     const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, lift);
     if (!imported) {
-      const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : "#748d7a") :
+      const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : a.gear.body === "wintercoat" ? "#766752" : "#748d7a") :
         Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
       const frame = actorFrame(shirt, isPlayer ? "#465a5d" : "#56564c",
-        pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
-        isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step, lift,
-        a.outfit === "hiker" || Boolean(isPlayer && a.backpack));
+        pose === "hurt" ? "#cf9179" : isPlayer ? (Data.skinTones[a.skinTone] ?? "#bca383") : "#99977f",
+        isPlayer ? (Data.hairColors[a.hairColor] ?? (a.appearance === "female" ? "#624c39" : "#413e35")) : "#413e35", direction, pose, step, lift,
+        a.outfit === "hiker" || Boolean(isPlayer && a.backpack), isPlayer ? a.hairStyle : undefined, isPlayer ? a.beard : undefined);
       const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - (spriteHeight - 1) * scale);
       ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
         Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
@@ -1476,7 +1478,7 @@ const View = (() => {
       ctx.fillStyle = "#d1b596";
       ctx.fillRect(handX - 1.5, handY - 1.6, 3, 3);
     }
-    const tiedHair = isPlayer && a.appearance === "female";
+    const tiedHair = isPlayer && a.hairStyle === "tied";
     if (tiedHair) {
       ctx.fillStyle = "#43342c";
       ctx.fillRect(-6, top - 1.5, 4, 7);
@@ -1484,10 +1486,11 @@ const View = (() => {
       ctx.fillStyle = "#a17c4d";
       ctx.fillRect(-6.4, top + 2, 2.4, 1.6);
     }
-    ctx.fillStyle = a.flash > 0 ? "#ffb096" : isPlayer ? "#c7ae84" : "#b0a078";
+    ctx.fillStyle = a.flash > 0 ? "#ffb096" : isPlayer ? (Data.skinTones[a.skinTone] ?? "#c7ae84") : "#b0a078";
     ctx.fillRect(-3.3, top - 3, 8, 8.5);
-    ctx.fillStyle = isPlayer ? (tiedHair ? "#513f32" : "#343d31") : "#575c42";
-    ctx.fillRect(tiedHair ? -4.5 : -3.9, top - 5.5, 8.6, 4.8);
+    ctx.fillStyle = isPlayer ? (Data.hairColors[a.hairColor] ?? (tiedHair ? "#513f32" : "#343d31")) : "#575c42";
+    ctx.fillRect(tiedHair ? -4.5 : -3.9, top - 5.5, 8.6, isPlayer && a.hairStyle === "shaved" ? 1.7 : 4.8);
+    if (isPlayer && a.beard && a.beard !== "none") ctx.fillRect(-.5, top + 3, 5, a.beard === "full" ? 3 : 1);
     ctx.fillStyle = isPlayer ? "#18261e" : "#df8b62";
     ctx.fillRect(2.9, top + .5, 1.7, 1.5);
     if (a.windup > 0) {

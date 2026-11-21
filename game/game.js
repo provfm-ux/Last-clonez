@@ -284,10 +284,25 @@
     if (afterlife) Afterlife.action(afterlife,kind);
   }
 
+  function setupProfile() {
+    const traits = [...$("trait-choices").querySelectorAll("input:checked")].map(input => input.value);
+    return {...Data.character({name:$("survivor-name").value,appearance:$("appearance").value,
+      skinTone:$("skin-tone").value,hairColor:$("hair-color").value,hairStyle:$("hair-style").value,beard:$("beard").value,traits}),layer:$("starting-layer").value};
+  }
+
+  function showTraitPoints() {
+    const choices = [...$("trait-choices").querySelectorAll("input")];
+    const loadout = Data.traitLoadout(choices.filter(input => input.checked).map(input => input.value));
+    for (const input of choices) input.disabled = !input.checked && Object.hasOwn(loadout.effects,Data.traits[input.value].effect);
+    $("trait-points").textContent = loadout.balance + " points remaining. Drawbacks earn points. Start with zero or more.";
+    $("start-btn").disabled = !loadout.valid;
+  }
+
   function start() {
+    if ($("start-btn").disabled) return;
     wakeSound();
     const preset = $("difficulty").value, role = $("role").value, startPoint = $("start-point").value;
-    const profile = Data.character({name:$("survivor-name").value,appearance:$("appearance").value});
+    const profile = setupProfile();
     const seedInput = $("world-seed"), enteredSeed = seedInput.value.trim();
     if (enteredSeed && !/^\d{1,9}$/.test(enteredSeed)) { seedInput.reportValidity(); return; }
     const seed = enteredSeed ? Number(enteredSeed) : Math.floor(Math.random()*1000000000);
@@ -317,7 +332,12 @@
 
   function showStartDetail() {
     $("start-detail").textContent = Data.control.starts[$("start-point").value]?.detail || "";
-    $("background-detail").textContent = Data.roles[$("role").value]?.desc || "";
+    const role = Data.roles[$("role").value];
+    $("background-detail").textContent = role?.desc || "";
+    $("background-kit").textContent = [
+      ...Object.entries(role?.levels ?? {}).map(([id,n]) => Data.skills[id].name + " Lv. " + n),
+      ...Object.entries(role?.kit ?? {}).map(([id,n]) => Data.items[id].name + " ×" + n)
+    ].join(" · ");
     const preset = $("difficulty").value;
     const rules = Data.worldRules(preset, preset === "custom" ? customRules : null);
     const pip = n => Math.max(1, Math.min(5, Math.round(n)));
@@ -383,7 +403,7 @@
   }
 
   function rememberSetup() {
-    const profile = Data.character({name:$("survivor-name").value,appearance:$("appearance").value});
+    const profile = setupProfile();
     write(setupKey, JSON.stringify({preset:$("difficulty").value, role:$("role").value, start:$("start-point").value,
       seed:$("world-seed").value, profile, customBase, customRules}));
   }
@@ -1065,7 +1085,11 @@
       '</p><div class="equipment-overview"><canvas id="equipment-portrait" width="48" height="48" aria-hidden="true"></canvas>' +
       '<dl class="equipment-slots">' + slots.map(([label,name]) => '<div><dt>' + label + '</dt><dd>' +
         esc(name || "Empty") + '</dd></div>').join("") + '</dl></div>' +
-      '<div class="stats-summary"><span>LOAD · ' + formatWeight(Sim.weight(p.bag)) + " / " + Sim.capacity(state) + " kg</span></div>" +
+      (p.traits?.length ? '<p class="item-meta">' + p.traits.map(id => {
+        const t = Data.traits[id];
+        return esc(t.name + " (" + t.description + ")");
+      }).join(" · ") + '</p>' : "") +
+      '<div class="stats-summary"><span>LOAD · '  + formatWeight(Sim.weight(p.bag)) + " / " + Sim.capacity(state) + " kg</span></div>" +
       '<div class="item-actions">' + button("Backpack", "equipment-backpack") + button("Edit survivor", "edit-survivor") + button("Customize quick belt", "belt-edit", false, "primary") +
       (itemCount("watch") ? button("Place watch alarm · 10 s", "arm-watch", Boolean(p.vehicle || state.atmosphere.alarm)) : "") + "</div>" +
       (lighting.length ? '<section class="inventory-section"><h3>LIGHTING</h3><div class="inventory-items">' + lighting.join("") + "</div></section>" : "") +
@@ -1827,7 +1851,7 @@
     else if (event.target.id === "atmosphere-form") applyAtmosphere(event);
     else if (event.target.id === "profile-form" && dialogView === "edit-survivor" && active()) {
       event.preventDefault();
-      Object.assign(state.player,Data.character({name:$("profile-name").value,appearance:$("profile-appearance").value}));
+      Object.assign(state.player,Data.character({...state.player,name:$("profile-name").value,appearance:$("profile-appearance").value}));
       save();
       gear();
     }
@@ -2426,6 +2450,20 @@
   $("role").addEventListener("change",showStartDetail);
   $("appearance").innerHTML = appearanceOptions("male");
   $("appearance").value = "male";
+  const setupOptions = (id,options) => {
+    $(id).replaceChildren(...Object.keys(options).map(key => new Option(
+      ["starting-layer","hair-style","beard"].includes(id) ? options[key] : key[0].toUpperCase() + key.slice(1),key)));
+  };
+  setupOptions("skin-tone",Data.skinTones);
+  setupOptions("hair-color",Data.hairColors);
+  setupOptions("starting-layer",Data.startingLayers);
+  setupOptions("hair-style",Data.hairStyles);
+  setupOptions("beard",Data.beards);
+  $("trait-choices").innerHTML = Object.entries(Data.traits).sort((a,b) =>
+    b[1].points - a[1].points || a[1].name.localeCompare(b[1].name)).map(([id,t]) =>
+    '<label><input type="checkbox" value="' + id + '"><span>' + t.name +
+    ' (' + (t.points > 0 ? "−" : "+") + Math.abs(t.points) + ')<small>' + t.description + '</small></span></label>').join("");
+  $("trait-choices").addEventListener("change",showTraitPoints);
   try {
     const setup = JSON.parse(read(setupKey));
     if (setup) {
@@ -2438,6 +2476,12 @@
       const profile = Data.character(setup.profile);
       $("survivor-name").value = profile.name;
       $("appearance").value = profile.appearance;
+      $("skin-tone").value = profile.skinTone;
+      $("hair-color").value = profile.hairColor;
+      $("hair-style").value = profile.hairStyle;
+      $("beard").value = profile.beard;
+      if (Object.hasOwn(Data.startingLayers,setup.profile?.layer)) $("starting-layer").value = setup.profile.layer;
+      for (const input of $("trait-choices").querySelectorAll("input")) input.checked = profile.traits.includes(input.value);
     }
   } catch { /* Ignore a damaged menu preference. */ }
   presets.addEventListener("change", () => {
@@ -2445,6 +2489,7 @@
     if (presets.value === "custom" && !customRules) worldRulesEditor();
   });
   showStartDetail();
+  showTraitPoints();
   syncSound();
   updateDisplayMode();
   updateHud();

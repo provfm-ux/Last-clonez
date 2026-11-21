@@ -24,6 +24,32 @@ const idle = {x: 0, y: 0, run: false};
 const run = (s, ticks, input = idle) => { for (let i = 0; i < ticks && s.mode === "play"; i++) Sim.tick(s, .033, input); return s; };
 const fresh = mode => Sim.createControl(mode, "carer", "shelter");
 
+{
+  const traits = ["light-eater","needs-more-sleep"];
+  const profile = {seed:17,name:"Nora",appearance:"female",skinTone:"dark",hairColor:"grey",hairStyle:"shaved",beard:"stubble",layer:"raincoat",traits};
+  const rules = {count:0,hordes:"off",speed:80,vision:75,hearing:50,memory:60,decay:50,bite:0};
+  const s = Sim.createControl("custom","doctor","shelter",rules,profile);
+  const plain = Sim.createControl("custom","doctor","shelter",rules,{seed:17});
+  check("survivor setup applies profession, profile and clothing",
+    Sim.level(s,"medical") === 3 && Sim.quantity(s.player.bag,"disinfectant") === 1 &&
+    s.player.hairStyle === "shaved" && s.player.gear.body === "raincoat");
+  check("trait budget rejects unpaid and contradictory choices", Object.keys(Data.traits).length === 30 &&
+    !Data.traitLoadout(["light-eater"]).valid && !Data.traitLoadout(["light-eater","big-appetite"]).valid);
+  run(s,120); run(plain,120);
+  check("survivor traits alter needs during play", s.player.hunger > plain.player.hunger && s.player.fatigue > plain.player.fatigue);
+  const saved = JSON.parse(JSON.stringify(Sim.snapshot(s)));
+  const again = Sim.restore(saved);
+  check("survivor and sandbox round-trip", again.player.name === "Nora" && again.player.beard === "stubble" &&
+    again.traitEffects.hunger === .8 && Object.entries(rules).every(([key,value]) => again.rules[key] === value));
+  const food = {id:"rawfish",born:s.minutes};
+  const normalFood = Sim.freshMinutes({...s,rules:{...s.rules,decay:100}},food);
+  check("sandbox changes perishable lifetime", Math.abs(Sim.freshMinutes(s,food) * 2 - normalFood) < 1e-8);
+  saved.player.traits = ["light-eater"];
+  let rejected = false;
+  try { Sim.restore(saved); } catch { rejected = true; }
+  check("invalid saved trait budget rejected", rejected);
+}
+
 for (const mode of Object.keys(Data.modes)) {
   const s = fresh(mode); let error = null; const walk = {x: 0, y: 0, run: false};
   try { for (let i = 0; i < 8000 && s.mode === "play"; i++) { if (i % 150 === 0) { walk.x = Math.round(random() * 2 - 1); walk.y = Math.round(random() * 2 - 1); } Sim.tick(s, .033, walk); } }

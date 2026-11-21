@@ -37,3 +37,19 @@ Last CloneZ — Cloudflare deployment.
 
 Os Workers Builds podem criar um URL de pré-visualização por ramo a partir de
 `game/`. Consulta a [configuração das pré-visualizações](docs/WORKERS_PREVIEWS.md).
+
+## Personagem e Sandbox
+
+Abre **Advanced** para escolher profissão, nome, aparência, equipamento inicial,
+ponto de partida e seed. Em **Appearance and traits**, as desvantagens dão pontos
+e as vantagens gastam-nos. O botão de início fica disponível com saldo igual ou
+superior a zero. **Recommended start** oferece a configuração de introdução.
+
+Escolhe um preset e abre **Customize** para ajustar a população, velocidade,
+sentidos e memória dos infetados, risco de mordida, validade dos alimentos,
+clima e cortes de água e eletricidade. As regras ficam gravadas com a partida.
+
+Usa WASD ou as setas para andar, Shift para correr, C para te esgueirares e H
+para abrir a saúde. Em ecrãs táteis, usa o joystick e os botões de corrida,
+furtividade e saúde. O [guia do jogador](docs/GAME_GUIDE.md) lista os controlos
+completos. Consulta os [sistemas](docs/SYSTEMS.md) e o [balanço da simulação](docs/BALANCE.md).

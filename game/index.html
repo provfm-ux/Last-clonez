@@ -8,23 +8,23 @@
 <title>Last CloneZ</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link id="micro-zombie-atlas" rel="preload" as="image" href="micro-zombies.png">
-<link rel="stylesheet" href="style.css?v=phone-hud">
-<script src="data.js?v=diy-books" defer></script>
+<link rel="stylesheet" href="style.css?v=0.34">
+<script src="data.js?v=0.34" defer></script>
 <script src="research.js?v=0.33" defer></script>
 <script src="legacy-level.js?v=0.33" defer></script>
 <script src="level.js?v=0.33" defer></script>
 <script src="expedition.js?v=0.33" defer></script>
 <script src="regions.js?v=0.33" defer></script>
 <script src="homes.js?v=0.33" defer></script>
-<script src="chronicle.js?v=0.33-first-names" defer></script>
+<script src="chronicle.js?v=0.34" defer></script>
 <script src="world.js?v=difficulty" defer></script>
 <script src="atmosphere.js?v=0.33" defer></script>
 <script src="recordings.js?v=zombie-bank" defer></script>
 <script src="soundscape.js?v=quiet-strides" defer></script>
 <script src="afterlife.js?v=0.33-sprites" defer></script>
-<script src="sim.js?v=quiet-strides" defer></script>
-<script src="view.js?v=equipment" defer></script>
-<script src="game.js?v=recording-ready" defer></script>
+<script src="sim.js?v=0.34" defer></script>
+<script src="view.js?v=0.34" defer></script>
+<script src="game.js?v=0.34" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -125,6 +125,15 @@
               <div class="new-world-options"><label>NAME<input id="survivor-name" type="text" maxlength="56" placeholder="Survivor" autocomplete="off"></label><label>APPEARANCE<select id="appearance"></select></label></div>
               <div class="new-world-options"><label>BACKGROUND<select id="role" aria-describedby="background-detail"></select></label><label>WORLD PRESET<select id="difficulty" aria-describedby="preset-summary"></select></label></div>
               <p id="background-detail" class="background-detail"></p>
+              <p id="background-kit" class="background-detail"></p>
+              <details class="survivor-customization">
+                <summary>Appearance and traits</summary>
+                <div class="new-world-options"><label>SKIN TONE<select id="skin-tone"></select></label><label>HAIR COLOUR<select id="hair-color"></select></label></div>
+                <div class="new-world-options"><label>HAIR STYLE<select id="hair-style"></select></label><label>FACIAL HAIR<select id="beard"></select></label></div>
+                <div class="new-world-options"><label>OUTER LAYER<select id="starting-layer"></select></label></div>
+                <p id="trait-points" class="background-detail" aria-live="polite"></p>
+                <div id="trait-choices" class="trait-choices"></div>
+              </details>
               <div class="preset-line"><p id="preset-summary" class="preset-summary"></p><button type="button" class="small-button" id="rules-btn">Customize</button></div>
               <button type="button" class="small-button" id="setup-assists">Assists</button>
               <div class="new-world-options start-options"><label>STARTING POINT<select id="start-point" aria-describedby="start-detail"></select></label><label>MAP SEED<input id="world-seed" type="text" inputmode="numeric" pattern="[0-9]{1,9}" maxlength="9" placeholder="Random" autocomplete="off"></label></div>

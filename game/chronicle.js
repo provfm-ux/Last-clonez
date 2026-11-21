@@ -193,9 +193,9 @@ const Chronicle = (() => {
     farmboards:{region:"fields",at:["Orchard farmhouse",7,3],title:"Count the nails",source:"Orchard farmhouse · Boarded window",
       text:"The house stayed dark all night. At dawn, someone had pulled the nails out of the boards and knocked them back in from the outside."},
     coldsample:{region:"ironworks",at:["Power substation",4,4],style:"sample-case",title:"Hold at minus twenty",source:"Power substation · Refrigerated specimen case",
-      text:"The sample was hard enough to rattle in its jar. At nineteen below it moved to the side furthest from the thermometer. Someone has crossed out ‘defrost before opening’."},
+      text:"The sample was hard enough to rattle in its jar. At nineteen below it moved to the side furthest from the thermometer. Someone has crossed out ‘defrost before opening’.\n\nThe freezer logger records two restarts four minutes apart. Both are labelled FIRST POWER RESTORED. The engineer put in an overtime claim for the missing four minutes. It was denied."},
     tornreel:{region:"ridge",at:["Firewatch cabin",6,4],style:"broken-recorder",title:"Recorder with a torn tape",source:"Firewatch cabin · Notebook and recorder",
-      text:"The notebook says the last recording was of the wind. The recorder has been smashed, very carefully, in the middle of a sentence."},
+      text:"The notebook says the last recording was of the wind. The recorder has been smashed, very carefully, in the middle of a sentence.\n\nThe carbon copy of the duty slip reads: 05:16, wind east. 05:12, wind east. Ellis drew an arrow between the times and wrote IS THE HILL EARLY OR ARE WE LATE?"},
     sealcar:{region:"ironworks",at:["Freight depot",8,4],style:"carriage-door",title:"Carriage end door",source:"Freight depot · Abandoned carriage",
       text:"The carriage door was tied shut with neckties from the platform side. Someone inside slid a folded ticket under it after the last train had gone."},
     rulespad:{region:"coast",at:["Weather hut",5,5],title:"The rules, revised",source:"Weather hut · Pocket notebook",
@@ -219,7 +219,7 @@ const Chronicle = (() => {
     finalpost:{at:["Oxford Night Reel",14,11],title:"Final screening update",source:"Projection booth · Fictional social post",
       text:"Well, you magnificent bastards. El Gordo has eaten half the front row. The projector is still running. Nobody can find the keys and somebody’s nicked all the popcorn.\n10/10 atmosphere. Would probably not recommend.\n#NightReel #BestNightEver #SendHelp"},
     halloffame:{at:["Oxford Night Reel",10,16],title:"El Gordo Hall of Fame",source:"Lobby wall",
-      text:"Tess — 00432 — left on the last bus with twelve saucepans.\nGareth — 00280 — donated his inflatable coffin back.\n\nEL GORDO CHAMPION\nTICKET #00666\nWinner: Unknown\nStatus: Unavailable for comment\n\nThe blurry photo shows a figure clutching the golden trophy. First winner to bite the presenter."}
+      text:"Tess — 00432 — left on the last bus with twelve saucepans.\nGareth — 00280 — donated his inflatable coffin back.\n\nEL GORDO CHAMPION\nTICKET #00666\nWinner: Unknown\nStatus: Unavailable for comment\n\nThe blurry photo shows a figure clutching the golden trophy. First winner to bite the presenter.\n\nA photo strip behind the frame shows the same figure in the queue twice. In the second print he is already holding the trophy. Tess pencilled MINUS FOUR MINUTES under the timestamp."}
   };
   for (const [id,entry] of Object.entries(cinemaNotes)) entries[id] = {...entry,region:"cinema",added:5,generator:6};
 

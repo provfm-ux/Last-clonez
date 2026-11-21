@@ -1,6 +1,6 @@
 {
   "name": "last-clonez",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "private": true,
   "description": "Last CloneZ - isometric zombie survival in the browser (no dependencies)",
   "scripts": {

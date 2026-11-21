@@ -1,5 +1,11 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
+## 0.34 — Cold Vale Survivor Origins
+- Added 13 occupations with Cold Vale backstories, starting skills, and equipment.
+- Added 30 point-budgeted traits, appearance options, and starting outerwear.
+- Added Sandbox controls for infected movement and senses, food lifetime, and bites.
+- Expanded the firewatch, substation, and Night Reel clues while preserving existing save layouts.
+
 ## Em desenvolvimento
 - Added clothing damage, DIY-scaled repairs, and ten one-time skill books.
 - Added explicit weapon unequip and kept hands empty when dropping or storing a weapon.

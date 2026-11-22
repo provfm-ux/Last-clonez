@@ -1384,7 +1384,9 @@ const View = (() => {
   const actorDetail = 1.25, spriteWidth = 30, spriteHeight = 40;
 
   function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack, gesture) {
-    const key = [shirt, trousers, skin, hair, direction, pose, step, lift, pack, gesture].join("|");
+    const back = (direction & 2) !== 0, axial = (direction & 4) !== 0;
+    const showPack = back && pack;
+    const key = [shirt, trousers, skin, hair, direction, pose, step, lift, showPack, gesture].join("|");
     if (actorFrames.has(key)) return actorFrames.get(key);
     const index = actorFrames.size, slot = index % 128, page = Math.floor(index / 128);
     if (!actorAtlases[page]) {
@@ -1396,7 +1398,6 @@ const View = (() => {
     const canvas = actorAtlases[page], c = canvas.getContext("2d");
     const left = slot % 16 * spriteWidth, top = Math.floor(slot / 16) * spriteHeight;
     const ink = "#151a19", boots = "#2b2c29";
-    const back = (direction & 2) !== 0, axial = (direction & 4) !== 0;
     const side = direction % 2 === 0 ? 1 : -1;
     const rect = (x, y, w, h, color) => {
       const x0 = Math.max(0, Math.round(x * actorDetail));
@@ -1455,9 +1456,13 @@ const View = (() => {
       shape([[sx-5,sy-1],[sx+2,sy-1],[sx+6,sy+1],[sx+5,sy+6],[sx+3,hip-1],
         [sx-4,hip],[sx-6,hip-3],[sx-6,sy+2]], shirt);
       shape([[sx-5,sy],[sx+2,sy],[sx+1,sy+2],[sx-3,sy+3],[sx-5,sy+6]], "#d9c7a65e");
-      shape([[sx+2,sy+3],[sx+5,sy+3],[sx+3,hip-1],[sx-1,hip-1],[sx+1,sy+7]], "#16282578");
+      if (axial && !back) {
+        pixel(sx+4,sy+3,1,hip-sy-5,"#27372c66");
+      } else {
+        shape([[sx+2,sy+3],[sx+5,sy+3],[sx+3,hip-1],[sx-1,hip-1],[sx+1,sy+7]], "#16282578");
+      }
       pixel(sx-4,hip-2,7,1,"#302f29");
-      if (back && pack) {
+      if (showPack) {
         shape([[sx-5,sy],[sx+1,sy],[sx+3,sy+3],[sx+2,hip-1],[sx-5,hip],[sx-7,hip-3],[sx-7,sy+3]], ink);
         shape([[sx-5,sy+1],[sx+1,sy+1],[sx+2,sy+3],[sx+1,hip-2],[sx-5,hip-1],[sx-6,hip-3],[sx-6,sy+3]], "#596249");
         pixel(sx-5,sy+3,6,2,"#818262");
@@ -1465,17 +1470,17 @@ const View = (() => {
         pixel(sx-3,sy+5,1,2,"#b7a17a");
         pixel(sx-1,sy+5,1,2,"#b7a17a");
       } else if (!back) {
-        pixel(sx-1,sy+2,1,hip-sy-4,"#38463a");
         if (axial) {
           pixel(sx-3,sy+1,2,1,"#bfa781");
           pixel(sx+1,sy+1,2,1,"#bfa781");
+          pixel(sx,sy+2,1,hip-sy-4,"#414a37");
+          pixel(sx,sy+3,1,1,"#ded0a4");
+          pixel(sx-4,sy+5,2,1,"#bdbba080");
+        } else {
+          pixel(sx-1,sy+2,1,hip-sy-4,"#38463a");
+          pixel(sx-4,sy+4,2,1,"#bdbba0");
         }
-        pixel(sx-4,sy+4,2,3,"#c2b39580");
-        pixel(sx+1,sy+5,2,2,"#a6aa8f80");
         pixel(sx-1,hip-2,2,1,"#b49a70");
-        pixel(sx-4,sy+4,2,1,"#bdbba0");
-        pixel(sx+2,sy+7,1,2,"#222c27");
-        if (pack) pixel(sx-5,sy+1,2,5,"#555b41");
       }
       const handX = strike ? Math.min(27, sx + [5,11,9][gesture]) : sx + 5 - armSwing;
       const handY = strike ? sy + [3,5,2][gesture] : sy + 10 + Math.sign(step);

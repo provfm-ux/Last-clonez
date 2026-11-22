@@ -27,8 +27,8 @@ collision, targeting and loot continue to use the same world objects.
 ## Animated infected art
 
 Dark Pixel uses an original transparent atlas at `game/micro-zombies.png`.
-Each row contains four 18×32 frames for each of seven outfits. The rows are
-idle, walk, attack and hit, with a shared (9, 30) foot pivot. The saved spawn
+Each row contains four 24×40 frames for each of seven outfits. The rows are
+idle, walk, attack and hit, with a shared (12, 38) foot pivot. The saved spawn
 phase selects the outfit, travel distance advances the walk cycle, and the
 existing combat timers select attack and hit poses. Left-facing sprites use
 the cached mirror of the atlas.

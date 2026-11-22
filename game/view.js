@@ -1491,11 +1491,12 @@ const View = (() => {
 
   const zombieAtlasLink = document.getElementById("micro-zombie-atlas");
   let zombieAtlas, mirroredZombieAtlas;
+  const zombieWidth = 24, zombieHeight = 40;
 
   function drawZombieSprite(zombie, x, y, scale, facesLeft, stride, clock) {
     if (!zombieAtlasLink?.href || typeof Image !== "function") return false;
     // Idle, walk, attack and hit rows. Each of the seven outfits has four frames.
-    const columns = 28, rows = 4, width = 18, height = 32;
+    const columns = 28, rows = 4, width = zombieWidth, height = zombieHeight;
     if (!zombieAtlas) {
       zombieAtlas = new Image();
       zombieAtlas.src = zombieAtlasLink.href;
@@ -1530,7 +1531,7 @@ const View = (() => {
     }
     const column = outfit * 4 + frame;
     ctx.drawImage(atlas, (facesLeft ? columns - 1 - column : column) * width, row * height, width, height,
-      Math.round(x - 9 * scale), Math.round(y - 30 * scale),
+      Math.round(x - width / 2 * scale), Math.round(y - (height - 2) * scale),
       Math.round(width * scale), Math.round(height * scale));
     return true;
   }
@@ -1573,7 +1574,7 @@ const View = (() => {
       }
     }
     if (alive && (a.windup > 0 || a.stats && a.alert > 0)) {
-      const height = Math.round((imported ? 32 : spriteHeight) * scale);
+      const height = Math.round((imported ? zombieHeight : spriteHeight) * scale);
       ctx.fillStyle = a.windup > 0 ? "#ff987d" : "#cb735b";
       ctx.fillRect(Math.round(x), Math.round(y) - height - 5, 2, a.windup > 0 ? 5 : 3);
     }

@@ -38,7 +38,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
         propSprites.push(args[0]);
       }
       if (k === "drawImage" && args.length === 3 && args[0]?.width === 36 && args[0]?.height === 36) heldWeapon = args[0];
-      if (k === "drawImage" && args.length === 9 && args[3] === 18 && args[4] === 32) {
+      if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 40) {
         infectedFrames.push(args.slice(1, 7));
       }
       if (k === "drawImage" && args.length === 9 && args[3] === 30 && args[4] === 40) {
@@ -50,7 +50,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
 const mkCanvas = () => ({width: 0, height: 0, getContext: () => mk(), getBoundingClientRect: () => ({left: 0, top: 0, width: 1280, height: 720}), style: {}, clientWidth: 160});
 const worldCanvas = mkCanvas();
 const context = {console, Math: Object.assign(Object.create(Math), {random: (() => { let s = 3; return () => (s = s * 16807 % 2147483647) / 2147483647; })()}), Date, JSON, structuredClone, devicePixelRatio: 1,
-  Image: class { naturalWidth = 504; naturalHeight = 128; },
+  Image: class { naturalWidth = 672; naturalHeight = 160; },
   ResizeObserver: class { observe() {} }, document: {getElementById: id => id === "world" ? worldCanvas : id === "micro-zombie-atlas" ? {href:"micro-zombies.png"} : mkCanvas(), createElement: () => mkCanvas()}};
 context.globalThis = context.window = context; vm.createContext(context);
 let source = ""; for (const f of files) source += fs.readFileSync(path.join(dir, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;
@@ -140,8 +140,8 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   z.headingX = -1;
   const hit = pose();
   check("dark pixel: infectado anima e espelha a mesma variante",
-    idle?.[1] === 0 && walk?.[1] === 32 && step?.[0] === walk[0] + 18 &&
-    attack?.[1] === 64 && hit?.[1] === 96 && hit[0] === 486 - idle[0] &&
+    idle?.[1] === 0 && walk?.[1] === 40 && step?.[0] === walk[0] + 24 &&
+    attack?.[1] === 80 && hit?.[1] === 120 && hit[0] === 648 - idle[0] &&
     idle[5] === walk[5] && step[5] === attack[5] && attack[5] === hit[5]);
 }
 {

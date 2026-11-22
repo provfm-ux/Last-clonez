@@ -1,6 +1,9 @@
 extends SceneTree
 
-const CELL := Vector2i(18, 32)
+const CELL := Vector2i(24, 40)
+const POSE_GRID := Vector2(18, 32)
+const FRAME_COUNT := 4
+const POSE_COUNT := 4
 const INK := Color("#171c1b")
 const BOOT := Color("#242927")
 const SKIN := Color("#b9b690")
@@ -9,7 +12,7 @@ const BLOOD := Color("#69292a")
 const COATS := ["#647b68", "#816f54", "#657e87", "#795355", "#777c52", "#665e74", "#899190"]
 const TROUSERS := ["#46514b", "#4c4940", "#3c4c52", "#4e4344", "#4d5140", "#41434e", "#4b5255"]
 const HAIR := ["#3e4032", "#5e503e", "#464539", "#514145", "#4f513a", "#414140", "#696b5e"]
-var atlas := Image.create_empty(504, 128, false, Image.FORMAT_RGBA8)
+var atlas := Image.create_empty(CELL.x * COATS.size() * FRAME_COUNT, CELL.y * POSE_COUNT, false, Image.FORMAT_RGBA8)
 var origin := Vector2i.ZERO
 
 func _initialize() -> void:
@@ -18,18 +21,23 @@ func _initialize() -> void:
 		printerr("Pass the output PNG path after --.")
 		quit(2)
 		return
-	for row in range(4):
+	for row in range(POSE_COUNT):
 		for variant in range(COATS.size()):
-			for frame in range(4):
-				origin = Vector2i((variant * 4 + frame) * CELL.x, row * CELL.y)
+			for frame in range(FRAME_COUNT):
+				origin = Vector2i((variant * FRAME_COUNT + frame) * CELL.x, row * CELL.y)
 				draw_infected(variant, row, frame)
 	var result := atlas.save_png(args[0])
 	if result != OK:
 		printerr("Unable to write infected atlas: ", result)
 	quit(result)
 
-func pixels(x: int, y: int, w: int, h: int, color: Color) -> void:
-	var region := Rect2i(x, y, w, h).intersection(Rect2i(Vector2i.ZERO, CELL))
+func pixels(x: float, y: float, w: float, h: float, color: Color) -> void:
+	var density := Vector2(CELL) / POSE_GRID
+	var start := Vector2i((Vector2(x, y) * density).round())
+	var end := Vector2i((Vector2(x + w, y + h) * density).round())
+	var region := Rect2i(start, end - start).intersection(Rect2i(Vector2i.ZERO, CELL))
+	if not region.has_area():
+		return
 	region.position += origin
 	atlas.fill_rect(region, color)
 
@@ -54,11 +62,15 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 		pixels(foot_x, 23, 3, foot_y - 23, pants.darkened(0.20) if leg == 0 else pants)
 		pixels(foot_x, foot_y, 4, 2, BOOT)
 		pixels(foot_x + 1, foot_y, 2, 1, pants)
+		pixels(foot_x + .75, foot_y + .8, 1.5, .8, Color("#887e68"))
+		pixels(foot_x + .75, foot_y + 1.6, 3, .8, INK)
 	# Far sleeve, ragged jacket, and forward arm.
 	pixels(3 + lean, shoulder + 4, 4, 10, INK)
 	pixels(4 + lean, shoulder + 4, 2, 6, coat.darkened(0.26))
 	pixels(4 + lean, shoulder + 10, 2, 4, SKIN_SHADE)
 	pixels(5 + lean, shoulder + 13, 2, 2, SKIN)
+	pixels(4 + lean, shoulder + 9.6, 1.5, .8, coat.lightened(.22))
+	pixels(5 + lean, shoulder + 13.6, .75, 1.6, BLOOD.darkened(.15))
 	pixels(7 + lean, shoulder - 1, 5, 2, INK)
 	pixels(5 + lean, shoulder, 8, 12, INK)
 	pixels(7 + lean, shoulder + 1, 5, 9, coat)
@@ -68,6 +80,10 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 	pixels(8 + lean, shoulder + 9, 1, 2, coat)
 	pixels(9 + lean, shoulder + 4, 1, 2, BLOOD)
 	pixels(8 + lean, shoulder + 5, 1, 1, BLOOD.darkened(0.2))
+	pixels(7.5 + lean, shoulder + 2.4, 1.5, .8, coat.lightened(.28))
+	pixels(9.75 + lean, shoulder + 6.4, .75, 3.2, coat.darkened(.36))
+	pixels(10.5 + lean, shoulder + 7.2, 1.5, .8, coat.lightened(.16))
+	pixels(7.5 + lean, shoulder + 9.6, 1.5, .8, Color("#91886d"))
 	var lunge := pose == 2 and frame >= 2
 	var reach := 2 + int(lunge) * 2
 	var arm_x := mini(11 + lean, 18 - reach - 2)
@@ -77,6 +93,11 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 	pixels(arm_x + 1, arm_y + 1, reach, 2, coat.darkened(0.11))
 	pixels(arm_x + reach, arm_y + 1, 2, 2, SKIN_SHADE)
 	pixels(arm_x + reach, arm_y + 1, 1, 1, SKIN)
+	pixels(arm_x + reach + .75, arm_y + 2.4, .75, .8, BLOOD)
+	pixels(arm_x + reach - .75, arm_y + .8, .75, 1.6, coat.lightened(.22))
+	if lunge:
+		pixels(arm_x + reach + 1.5, arm_y + .8, .75, .8, SKIN)
+		pixels(arm_x + reach + 1.5, arm_y + 2.4, .75, .8, SKIN_SHADE)
 	# Crooked skull, sunken socket and a hanging jaw.
 	pixels(head_x + 1, head_y, 4, 1, INK)
 	pixels(head_x, head_y + 1, 6, 5, INK)
@@ -89,6 +110,12 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 	pixels(head_x + 4, head_y + 5, 2, 1, BLOOD)
 	pixels(head_x + 5, head_y + 6, 2, 1, SKIN_SHADE)
 	pixels(head_x + 4, head_y + 7, 2, 1, SKIN_SHADE)
+	pixels(head_x + 3, head_y + 1.6, 1.5, .8, hair.lightened(.22))
+	pixels(head_x + 2.25, head_y + 3.2, .75, 1.6, Color("#85816a"))
+	pixels(head_x + 3.75, head_y + 4, 1.5, .8, Color("#96937a"))
+	pixels(head_x + 5.25, head_y + 5.6, .75, .8, Color("#c3b48d"))
+	if pose == 3:
+		pixels(head_x + 3, head_y + 4.8, 1.5, .8, BLOOD.lightened(.18))
 	if lunge:
 		pixels(15, head_y + 6, 2, 2, INK)
 		pixels(16, head_y + 7, 1, 1, SKIN)

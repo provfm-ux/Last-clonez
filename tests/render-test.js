@@ -41,7 +41,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
       if (k === "drawImage" && args.length === 9 && args[3] === 18 && args[4] === 32) {
         infectedFrames.push(args.slice(1, 7));
       }
-      if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 32) {
+      if (k === "drawImage" && args.length === 9 && args[3] === 30 && args[4] === 40) {
         counts.actorBlit = (counts.actorBlit || 0) + 1;
         survivorFrames.push(args.slice(1, 3).join(","));
       }
@@ -309,6 +309,18 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
     emptyProps.length === activeProps.length &&
     emptyProps.filter((sprite, index) => sprite !== activeProps[index]).length === 2 &&
     activeProps.every((sprite, index) => sprite === reusedProps[index]));
+
+  const door = {kind:"door", action:"door", x:player.x, y:player.y, active:true};
+  run.world.objects.push(door);
+  const closedProps = worldMotion(1).props;
+  door.open = true;
+  const openProps = worldMotion(1).props;
+  door.broken = true;
+  const brokenProps = worldMotion(1).props;
+  const doorIndex = closedProps.findIndex((sprite, index) => sprite !== openProps[index]);
+  check("dark pixel: porta usa sprites próprios para fechar, abrir e quebrar",
+    doorIndex >= 0 && new Set([closedProps[doorIndex], openProps[doorIndex], brokenProps[doorIndex]]).size === 3 &&
+    worldMotion(1).props[doorIndex] === brokenProps[doorIndex]);
 
   run.minutes = 19*60;
   for (const look of ["dark","fast","classic"]) {

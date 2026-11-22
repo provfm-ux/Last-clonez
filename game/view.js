@@ -422,9 +422,54 @@ const View = (() => {
       const [x, y] = p(...position);
       dot(x, y, width, height, color);
     };
-    if (kind !== "rug") shadow(0, 0, kind === "bed" || kind === "sofa" ? 28 : 23, 9, "#0d120f70");
+    if (kind !== "rug" && kind !== "door" && kind !== "window") shadow(0, 0, kind === "bed" || kind === "sofa" ? 28 : 23, 9, "#0d120f70");
 
     switch (kind) {
+      case "door":
+      case "window": {
+        const horizontal = Boolean(variant & 1);
+        const open = Boolean(variant & 2);
+        const broken = Boolean(variant & 4);
+        const glass = kind === "window";
+        const slab = (along, depth, z, length, thickness, height, colors) =>
+          horizontal ? box(along, depth, z, length, thickness, height, colors) :
+            box(depth, along, z, thickness, length, height, colors);
+        const face = (along, z, depth = .084) => horizontal ? [along, depth, z] : [depth, along, z];
+        const hardware = glass ? metal : ["#b8a790", "#8b7b69", "#5d554a"];
+        if (broken) {
+          slab(-.47, -.07, 0, .94, .16, 3, hardware);
+          for (const offset of [-.35, -.06, .26]) {
+            slab(offset, -.045, 3, .09, .08, glass ? 2 : 4, glass ? enamel : oak);
+          }
+          break;
+        }
+        if (open) {
+          box(-.43, -.31, 0, .10, .65, 29, glass ? metal : oak);
+          edge([-.321, -.29, 25], [-.321, .31, 25], hardware[0]);
+          mark([-.32, .24, 13], "#d0ba88", 2, 1);
+          break;
+        }
+        slab(-.48, -.07, 0, .96, .14, 29, glass ? metal : oak);
+        slab(-.39, .069, 3, .78, .015, 22, glass ?
+          ["#80998c", "#516c68", "#415653"] : ["#8f7355", "#765b46", "#594537"]);
+        for (const z of glass ? [4, 14, 25] : [3, 13, 25]) edge(face(-.39, z), face(.39, z), hardware[0]);
+        for (const offset of glass ? [-.38, 0, .38] : [-.38, .38]) {
+          edge(face(offset, 4), face(offset, 25), "#baa98a");
+        }
+        if (glass) {
+          edge(face(-.30, 20), face(-.10, 23), "#a6c0b4");
+          edge(face(.08, 7), face(.25, 10), "#849e93");
+          mark(face(.10, 13), "#ccbf9f", 2, 1);
+        } else {
+          for (const offset of [-.28, -.12, .06, .24]) {
+            edge(face(offset, 5), face(offset, 11), "#5c4839");
+            edge(face(offset, 15), face(offset, 23), "#654e3e");
+          }
+          mark(face(.27, 14), "#c6af7b", 2, 2);
+          mark(face(-.35, 8), "#65574b", 2, 1);
+        }
+        break;
+      }
       case "campfire": {
         box(-.35, -.15, 0, .70, .30, 4, oak);
         box(-.15, -.35, 3, .30, .70, 4, oak);
@@ -945,6 +990,20 @@ const View = (() => {
     }
     if (kind === "door" || kind === "window") {
       const t = World.tileAt(state.world,x,y), horizontal=t.wallAxis==="x";
+      if (darkLook) {
+        const open = o.open && !o.boards, broken = o.broken && !o.boards;
+        const variant = Number(horizontal) | (open ? 2 : 0) | (broken ? 4 : 0);
+        drawFurniture(kind, x, y, variant, false);
+        for (let i = 0; i < (o.boards || 0); i++) {
+          const board = 7 + i * 7;
+          f(horizontal ? -.44 : -.13, horizontal ? -.13 : -.44, board,
+            horizontal ? .88 : .26, horizontal ? .26 : .88, 3, olive);
+        }
+        if (!open && !broken && (o.locked || o.latched)) {
+          f(horizontal ? .22 : .07, horizontal ? .07 : .24, 13, .08, .08, 3, olive);
+        }
+        return;
+      }
       if (o.broken && !o.boards) {
         f(horizontal ? -.47 : -.06, horizontal ? -.06 : -.47, 0, horizontal ? .94 : .12, horizontal ? .12 : .94, 4, iron);
         if (kind === "window") for (const offset of [-.31, -.06, .22]) {
@@ -1243,7 +1302,7 @@ const View = (() => {
 
   // Original 1px sprite art packed into fixed-size atlas pages. A pose is drawn only on first use.
   const actorFrames = new Map(), actorAtlases = [], strides = new WeakMap();
-  const spriteWidth = 24, spriteHeight = 32;
+  const actorDetail = 1.25, spriteWidth = 30, spriteHeight = 40;
 
   function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack, gesture) {
     const key = [shirt, trousers, skin, hair, direction, pose, step, lift, pack, gesture].join("|");
@@ -1260,8 +1319,13 @@ const View = (() => {
     const ink = "#151a19", boots = "#2b2c29";
     const back = direction >= 2, side = direction % 2 === 0 ? 1 : -1;
     const rect = (x, y, w, h, color) => {
+      const x0 = Math.max(0, Math.round(x * actorDetail));
+      const x1 = Math.min(spriteWidth, Math.round((x + w) * actorDetail));
+      const y0 = Math.max(0, Math.round(y * actorDetail));
+      const y1 = Math.min(spriteHeight, Math.round((y + h) * actorDetail));
+      if (x1 <= x0 || y1 <= y0) return;
       c.fillStyle = color;
-      c.fillRect(left + (side > 0 ? x : spriteWidth - x - w), top + y, w, h);
+      c.fillRect(left + (side > 0 ? x0 : spriteWidth - x1), top + y0, x1 - x0, y1 - y0);
     };
     let grip = null;
     if (pose === "dead") {
@@ -1286,7 +1350,9 @@ const View = (() => {
         rect(foot - 1, y, 4, 2, boots);
         rect(foot + 1, y, 2, 1, "#6d6c58");
         rect(foot, y + 1, 3, 1, "#191e1d");
-        rect(foot, y - 2, 1, 1, "#b0a78975");
+        rect(foot, y - 2, .8, .8, "#b0a78975");
+        rect(foot + .8, y - .8, 1.6, .8, "#47473c");
+        rect(foot + .8, y, .8, .8, "#b4a384");
       }
       rect(7 + lean, shoulder, 10, hip - shoulder + 1, ink);
       rect(8 + lean, shoulder + 1, 8, hip - shoulder - 1, shirt);
@@ -1298,6 +1364,8 @@ const View = (() => {
         rect(13 + lean, shoulder + 6, 2, 1, "#29342d85");
         rect(12 + lean, shoulder + 3, 1, 1, "#bca97e");
       }
+      rect(8 + lean, shoulder + 2, .8, 3.2, "#a4a38b60");
+      rect(10 + lean, shoulder + 6.4, 1.6, .8, "#b3a38650");
       rect(8 + lean, hip - 2, 8, 1, "#2b302be0");
       if (!back) rect(12 + lean, hip - 2, 2, 1, "#bfaa78");
       rect(15 + lean, shoulder + 2, 1, 8, "#151a194f");
@@ -1309,6 +1377,9 @@ const View = (() => {
         if (back) {
           rect(px + 1, shoulder + 6, 4, 2, "#505942");
           rect(px + 2, shoulder + 6, 1, 1, "#c0ae7d");
+          rect(px - .8, shoulder + 2.4, 1.6, 3.2, "#38453a");
+          rect(px - .8, shoulder + 2.4, 1.6, .8, "#8a926f");
+          rect(px + 5, shoulder + 6.4, .8, 1.6, "#a39a76");
         }
       }
       const reaches = pose === "strike" || pose === "chase";
@@ -1320,8 +1391,13 @@ const View = (() => {
       rect(16 + lean, shoulder + 3 - arm, reaches ? 4 : 2, reaches ? 2 : 4, shirt);
       const handX = reaches ? 19 + gesture : 17 + lean, handY = shoulder + (reaches ? 3 : 7) - arm;
       rect(handX, handY, 2, 2, skin);
-      rect(handX, handY, 1, 1, "#d4b18a");
-      grip = [side > 0 ? handX + 1 : spriteWidth - handX - 1, handY + 1];
+      rect(handX, handY, .8, .8, "#d4b18a");
+      rect(handX + .8, handY + .8, .8, .8, "#735848");
+      rect(16 + lean, shoulder + 4.8 - arm, 1.6, .8, "#b1a58572");
+      const gripX = Math.round((handX + 1) * actorDetail);
+      grip = [side > 0 ? gripX : spriteWidth - gripX, Math.round((handY + 1) * actorDetail)];
+      rect(10.4 + lean, shoulder - .8, 3.2, 1.6, "#493f36");
+      rect(12 + lean, shoulder, 2.4, .8, "#af775d");
       const head = shoulder - 7 + (step ? 1 : 0);
       rect(9 + lean, head, 6, 7, ink);
       rect(10 + lean, head + 1, 5, 5, back ? hair : skin);
@@ -1334,6 +1410,9 @@ const View = (() => {
         rect(12 + lean, head + 2, 2, 1, "#e3bb8d");
         rect(13 + lean, head + 5, 1, 1, "#bd9879");
         rect(11 + lean, head + 4, 1, 1, "#97725a");
+        rect(13.6 + lean, head + 2.4, 1.6, .8, "#765947");
+        rect(14.4 + lean, head + 4.8, .8, .8, "#e0b18a");
+        rect(12 + lean, head + 4.8, .8, .8, "#8e6853");
       }
       if (pose === "hurt") rect(13 + lean, head + 4, 2, 1, "#a35749");
     }
@@ -1483,18 +1562,18 @@ const View = (() => {
         pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
         isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step, lift,
         a.outfit === "hiker" || Boolean(isPlayer && a.backpack), gesture);
-      const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - (spriteHeight - 1) * scale);
+      const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - Math.round(31 * actorDetail) * scale);
       ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
         Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
       if (isPlayer && frame.grip) {
         const id = swing?.weapon ?? Sim.weapon(state).id;
         const phase = swing ? (id === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
           a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : step > 0 ? 2 : 1;
-        drawHeldWeapon(id, left + frame.grip[0], top + frame.grip[1], dx < dy ? -1 : 1, phase);
+        drawHeldWeapon(id, left + Math.round(frame.grip[0] * scale), top + Math.round(frame.grip[1] * scale), dx < dy ? -1 : 1, phase);
       }
     }
     if (alive && (a.windup > 0 || a.stats && a.alert > 0)) {
-      const height = Math.round(32 * scale);
+      const height = Math.round((imported ? 32 : spriteHeight) * scale);
       ctx.fillStyle = a.windup > 0 ? "#ff987d" : "#cb735b";
       ctx.fillRect(Math.round(x), Math.round(y) - height - 5, 2, a.windup > 0 ? 5 : 3);
     }

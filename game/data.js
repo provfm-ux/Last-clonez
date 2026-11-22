@@ -204,6 +204,8 @@ const Data = (() => {
   const skillXp = level => 12 * level * level;
   const skills = {
     combat:{name:"Combat", desc:"More damage with every weapon."},
+    marksmanship:{name:"Marksmanship", desc:"Improves firearm accuracy. Earn XP by firing at infected, with extra XP for hits."},
+    mechanics:{name:"Mechanics", desc:"Restores more vehicle condition per patch. Earn XP by repairing damaged vehicles."},
     strength:{name:"Strength", desc:"Melee hits harder and you carry more. Grows by fighting in melee."},
     fitness:{name:"Fitness", desc:"Stamina drains slower and returns faster. Grows by running."},
     sneaking:{name:"Sneaking", desc:"Quieter footsteps. Grows by sneaking."},

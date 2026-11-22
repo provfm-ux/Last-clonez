@@ -827,7 +827,7 @@ const Sim = (() => {
   }
 
   const patchMaterials = {scrap:2,tape:1};
-  const vehicleRepairAmount = s => Data.roles[s.role].vehicleRepair ?? 28;
+  const vehicleRepairAmount = s => (Data.roles[s.role].vehicleRepair ?? 28) + 2 * level(s, "mechanics");
 
   function vehicleRepairProblem(s, car) {
     if (car?.kind !== "car" || !onFootAt(s,car)) return "Stand beside the vehicle on foot.";
@@ -841,7 +841,9 @@ const Sim = (() => {
     const problem = vehicleRepairProblem(s,car);
     if (problem) { notify(s,problem,true); return false; }
     if (!consume(s,patchMaterials)) return false;
-    car.hp = Math.min(140,car.hp + vehicleRepairAmount(s));
+    const restored = Math.min(140 - car.hp, vehicleRepairAmount(s));
+    car.hp += restored;
+    addXp(s, "mechanics", restored / 4);
     noise(s,car.x,car.y,8);
     notify(s,"Vehicle patched. Condition " + Math.round(car.hp / 1.4) + "%.");
     return true;
@@ -2003,7 +2005,7 @@ const Sim = (() => {
 
   function aimChance(s, enemy = s.target) {
     const aim = enemy && enemy === s.target ? s.aim : 0;
-    return clamp(.5 + aim * .45 - s.player.panic * .0015 - s.player.fatigue * .001, .2, .98);
+    return clamp(.5 + aim * .45 + level(s, "marksmanship") * .015 - s.player.panic * .0015 - s.player.fatigue * .001, .2, .98);
   }
 
   function inAttackRange(s, enemy, range = weaponData(s).range) {
@@ -2110,7 +2112,8 @@ const Sim = (() => {
     }
     s.effects.push({x: z.x, y: z.y, text: hit ? (matchup < 1 ? "RESISTED " : matchup > 1 ? "STRONG " : "") + "−" + amount : "MISS", color: hit ? "#efc785" : "#d2cfb6", life: .8});
     addXp(s, "combat", hit ? 1.5 : .2);
-    if (!w.firearm) addXp(s, "strength", hit ? .8 : .1);
+    if (w.firearm) addXp(s, "marksmanship", hit ? 3 : 1);
+    else addXp(s, "strength", hit ? .8 : .1);
     if (!z.hp) {
       defeat(s, z);
       if (s.target === z) endPursuit(s);

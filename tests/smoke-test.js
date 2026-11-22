@@ -25,6 +25,36 @@ const run = (s, ticks, input = idle) => { for (let i = 0; i < ticks && s.mode ==
 const fresh = mode => Sim.createControl(mode, "carer", "shelter");
 
 {
+  const s = fresh("training"), p = s.player;
+  const baseAim = Sim.aimChance(s), baseRepair = Sim.vehicleRepairAmount(s);
+  p.skills.marksmanship = Data.skillXp(2);
+  p.skills.mechanics = Data.skillXp(2);
+  check("novas perícias melhoram pontaria e reparações",
+    Sim.aimChance(s) > baseAim && Sim.vehicleRepairAmount(s) === baseRepair + 4);
+  const save = JSON.parse(JSON.stringify(Sim.snapshot(s)));
+  const reloaded = Sim.restore(JSON.parse(JSON.stringify(save)));
+  delete save.player.skills.marksmanship;
+  delete save.player.skills.mechanics;
+  const old = Sim.restore(save);
+  check("perícias novas persistem e começam a zero em saves anteriores",
+    Sim.level(reloaded,"marksmanship") === 2 && Sim.level(reloaded,"mechanics") === 2 &&
+    old.player.skills.marksmanship === 0 && old.player.skills.mechanics === 0);
+  const car = {id:"mechanics-car",kind:"car",x:p.x,y:p.y,hp:70,active:true};
+  s.world.objects.push(car);
+  p.bag.push({id:"scrap",qty:2},{id:"tape",qty:1});
+  const beforeRepair = p.skills.mechanics;
+  check("reparar carro atribui experiência de mecânica",
+    Sim.repairVehicle(s,car) && car.hp === 70 + baseRepair + 4 && p.skills.mechanics > beforeRepair);
+  p.bag.push({id:"pistol",uid:"test-pistol",condition:100,qty:1},{id:"ammo",qty:1});
+  Sim.use(s,p.bag.length - 2);
+  const enemy = World.infected(s.world,"test-target",p.x+.4,p.y,s.rules.mix,context.Level.seeded(11));
+  s.world.enemies.push(enemy);
+  const beforeShot = p.skills.marksmanship;
+  check("disparar contra um infetado atribui experiência de pontaria",
+    Sim.attack(s,enemy) && p.skills.marksmanship > beforeShot && Sim.quantity(p.bag,"ammo") === 0);
+}
+
+{
   const s = fresh("training");
   const p = s.player;
   for (const z of s.world.enemies) z.hp = 0;

@@ -1413,18 +1413,26 @@ const View = (() => {
       rect(2, 26, 20, 5, ink); rect(3, 27, 7, 3, trousers);
       rect(10, 25, 7, 5, shirt); rect(17, 26, 4, 4, skin); rect(20, 26, 2, 3, hair);
     } else {
-      const shape = (points, color) => {
-        c.beginPath();
-        for (const [i, [x, y]] of points.entries()) {
-          const px = left + (side > 0 ? x : spriteWidth - x);
-          if (i === 0) c.moveTo(px, top + y);
-          else c.lineTo(px, top + y);
-        }
-        c.closePath();
-        c.fillStyle = color;
-        c.fill();
-      };
       const pixel = (x, y, w, h, color) => rect(x / actorDetail, y / actorDetail, w / actorDetail, h / actorDetail, color);
+      // Fill whole pixels in the atlas to keep the small sprite's edges crisp at any zoom.
+      const shape = (points, color) => {
+        const rows = points.map(point => point[1]);
+        for (let y = Math.max(0, Math.floor(Math.min(...rows))); y < Math.min(spriteHeight, Math.ceil(Math.max(...rows))); y++) {
+          const cuts = [];
+          for (let i = 0; i < points.length; i++) {
+            const [x0,y0] = points[i], [x1,y1] = points[(i + 1) % points.length];
+            if ((y0 > y + .5) !== (y1 > y + .5)) cuts.push(x0 + (x1 - x0) * (y + .5 - y0) / (y1 - y0));
+          }
+          cuts.sort((a,b) => a - b);
+          for (let i = 0; i + 1 < cuts.length; i += 2) {
+            const start = Math.ceil(cuts[i] - .5), end = Math.ceil(cuts[i+1] - .5);
+            if (end > start) pixel(start,y,end-start,1,color);
+          }
+        }
+      };
+      const clothLight = tint(shirt, 30), clothShade = tint(shirt, -27);
+      const trouserLight = tint(trousers, 23), trouserShade = tint(trousers, -16);
+      const skinLight = tint(skin, 22), skinShade = tint(skin, -31);
       const strike = pose === "strike" || pose === "chase";
       const crouch = pose === "rest" ? 7 : pose === "sneak" ? 4 : 0;
       const lean = pose === "hurt" ? -3 : strike ? [-2,1,3][gesture] : pose === "run" || pose === "sneak" ? 2 : 0;
@@ -1441,10 +1449,14 @@ const View = (() => {
         shape([[x-3,hip-1],[x+3,hip-1],[knee+2,hip+5],[foot+2,sole-2],[foot+4,sole-1],
           [foot+4,sole+1],[foot-3,sole+1],[foot-3,sole-2],[knee-3,hip+5]], ink);
         shape([[x-2,hip],[x+2,hip],[knee+1,hip+5],[foot+1,sole-2],[foot-2,sole-2],[knee-2,hip+5]],
-          leg ? trousers : "#343e3e");
+          leg ? trousers : trouserShade);
         pixel(foot-1, sole-1, 4, 1, boots);
         pixel(foot+1, sole-1, 2, 1, "#77705d");
-        pixel(knee-1, Math.min(sole-3,hip+5), 2, 1, "#91978175");
+        const kneeY = Math.min(sole-4, hip+5);
+        pixel(knee-1,kneeY,2,1,trouserLight);
+        pixel(knee-1,kneeY+1,1,1,trouserShade);
+        if (leg && sole-kneeY > 6) pixel(foot-1,sole-5,1,2,trouserLight);
+        pixel(foot-2,sole,4,1,"#4c4539");
       }
       const armSwing = step * (axial ? 1 : 2);
       shape([[sx-6,sy],[sx-3,sy+1],[sx-4+armSwing,sy+8],[sx-3+armSwing,sy+11],
@@ -1455,7 +1467,9 @@ const View = (() => {
         [sx-4,hip],[sx-5,hip-3],[sx-7,sy+2]], ink);
       shape([[sx-5,sy-1],[sx+2,sy-1],[sx+5,sy+1],[sx+3,sy+6],[sx+2,hip-1],
         [sx-3,hip-1],[sx-4,hip-3],[sx-6,sy+2]], shirt);
-      shape([[sx-5,sy],[sx+2,sy],[sx+1,sy+2],[sx-3,sy+3]], "#d9c7a65e");
+      shape([[sx-5,sy],[sx+2,sy],[sx+1,sy+2],[sx-3,sy+3]], clothLight);
+      pixel(sx-4,sy+3,2,1,clothShade);
+      pixel(sx-3,hip-2,4,1,clothShade);
       pixel(sx+2,sy+5,1,Math.max(1,hip-sy-6),"#27372c66");
       if (showPack) {
         shape([[sx-5,sy],[sx+1,sy],[sx+3,sy+3],[sx+2,hip-1],[sx-5,hip],[sx-7,hip-3],[sx-7,sy+3]], ink);
@@ -1464,6 +1478,9 @@ const View = (() => {
         pixel(sx-4,sy+5,4,3,"#494e39");
         pixel(sx-3,sy+5,1,2,"#b7a17a");
         pixel(sx-1,sy+5,1,2,"#b7a17a");
+        pixel(sx-5,sy+7,1,3,"#73775a");
+        pixel(sx-4,hip-3,3,1,"#414431");
+        pixel(sx+1,sy+3,1,2,"#353d2d");
       } else if (!back) {
         if (axial) {
           pixel(sx-3,sy+1,2,1,"#bfa781");
@@ -1475,7 +1492,7 @@ const View = (() => {
           pixel(sx-1,sy+2,1,hip-sy-4,"#38463a");
           pixel(sx-4,sy+4,2,1,"#bdbba0");
         }
-
+        pixel(sx-4,sy+4,1,1,clothLight);
       }
       const handX = strike ? Math.min(27, sx + [5,11,9][gesture]) : sx + 7 + Math.sign(-armSwing);
       const handY = strike ? sy + [3,5,2][gesture] : Math.min(33,sy + 12 + Math.sign(step));
@@ -1485,7 +1502,9 @@ const View = (() => {
       shape([[sx+2,sy+1],[sx+5,sy+1],[elbow+1,sy+5],[handX,handY],[handX-2,handY+1],[elbow-1,sy+6]], shirt);
       pixel(handX-2,handY,2,1,"#4a483a");
       pixel(handX,handY,2,2,skin);
-      pixel(handX,handY,1,1,"#d7b290");
+      pixel(handX,handY,1,1,skinLight);
+      pixel(handX+1,handY+1,1,1,skinShade);
+      pixel(elbow,sy+4,1,2,clothLight);
       grip = [side > 0 ? handX + 1 : spriteWidth - handX - 1, handY + 1];
       const hx = sx + (back || axial ? 0 : 1), hy = sy - 8 + Number(pose === "rest");
       shape([[hx-4,hy+1],[hx-2,hy-1],[hx+3,hy-1],[hx+5,hy+1],[hx+5,hy+5],
@@ -1494,17 +1513,22 @@ const View = (() => {
         [hx+1,hy+7],[hx-2,hy+6],[hx-3,hy+4]], back ? hair : skin);
       shape([[hx-3,hy+1],[hx-1,hy],[hx+3,hy],[hx+4,hy+2],[hx+1,hy+2],
         [hx-1,hy+3],[hx-2,hy+5],[hx-3,hy+4]], hair);
-      pixel(hx-1,hy+1,3,1,"#9e8b6365");
+      pixel(hx-1,hy+1,3,1,tint(hair,28));
+      pixel(hx-2,hy+2,1,1,tint(hair,14));
+      if (back) pixel(hx-1,hy+6,3,1,skinShade);
       if (axial && !back) {
         shape([[hx-3,hy+2],[hx+3,hy+2],[hx+4,hy+4],[hx+2,hy+7],
           [hx-2,hy+7],[hx-4,hy+4]], skin);
         pixel(hx-2,hy+3,1,1,"#494038");
         pixel(hx+2,hy+3,1,1,"#494038");
-        pixel(hx,hy+4,1,1,"#d9ae87");
+        pixel(hx-2,hy+4,1,1,skinShade);
+        pixel(hx,hy+4,1,1,skinLight);
+        pixel(hx+2,hy+5,1,1,skinShade);
         pixel(hx-1,hy+6,3,1,pose === "hurt" ? "#a35749" : "#856c58");
       } else if (!back) {
         pixel(hx+2,hy+3,2,1,"#494038");
-        pixel(hx+3,hy+4,2,1,"#d9ae87");
+        pixel(hx+3,hy+4,2,1,skinLight);
+        pixel(hx-1,hy+4,1,2,skinShade);
         pixel(hx+1,hy+6,2,1,pose === "hurt" ? "#a35749" : "#856c58");
       }
     }

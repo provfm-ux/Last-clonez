@@ -9,8 +9,8 @@ const files = [...html.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).f
 const pascal = f => f.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join("");
 const counts = {};
 let heldWeapon = null;
-const infectedFrames = [];
-const smokeFrames = [], canopyPositions = [], rippleFrames = [];
+const infectedFrames = [], survivorFrames = [];
+const smokeFrames = [], canopyPositions = [], rippleFrames = [], propSprites = [];
 let beamOpacity = 1;
 const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
   get(t, k) { if (k in t) return t[k]; if (k === "canvas") return {width: 1280, height: 720}; if (k === "measureText") return () => ({width: 10});
@@ -35,12 +35,16 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
       if (k === "drawImage" && args.length === 3 && args[0]?.width === 54 && args[0]?.height === 61) canopyPositions.push(args[1]);
       if (k === "drawImage" && args.length === 3 && args[0]?.width === 72 && args[0]?.height === 64) {
         counts.furnitureBlit = (counts.furnitureBlit || 0) + 1;
+        propSprites.push(args[0]);
       }
       if (k === "drawImage" && args.length === 3 && args[0]?.width === 36 && args[0]?.height === 36) heldWeapon = args[0];
       if (k === "drawImage" && args.length === 9 && args[3] === 18 && args[4] === 32) {
         infectedFrames.push(args.slice(1, 7));
       }
-      if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 32) counts.actorBlit = (counts.actorBlit || 0) + 1;
+      if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 32) {
+        counts.actorBlit = (counts.actorBlit || 0) + 1;
+        survivorFrames.push(args.slice(1, 3).join(","));
+      }
     }; },
   set(t, k, v) { t[k] = v; return true; }});
 const mkCanvas = () => ({width: 0, height: 0, getContext: () => mk(), getBoundingClientRect: () => ({left: 0, top: 0, width: 1280, height: 720}), style: {}, clientWidth: 160});
@@ -139,6 +143,40 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
     idle?.[1] === 0 && walk?.[1] === 32 && step?.[0] === walk[0] + 18 &&
     attack?.[1] === 64 && hit?.[1] === 96 && hit[0] === 486 - idle[0] &&
     idle[5] === walk[5] && step[5] === attack[5] && attack[5] === hit[5]);
+}
+{
+  const d = Sim.createControl("survival", "carer", "shelter");
+  d.world.enemies = [];
+  d.world.npc.ridingVehicle = true;
+  d.look = "dark";
+  View.prepare(d.world);
+  const pose = (clock = 0) => {
+    survivorFrames.length = 0;
+    View.render(d, clock, 1 / 60);
+    return survivorFrames[0];
+  };
+  const idle = pose();
+  const breath = pose(.6);
+  d.player.moving = true;
+  const walk = pose();
+  d.running = true;
+  const run = pose();
+  d.quiet = true;
+  const sneak = pose();
+  d.player.moving = false;
+  d.player.resting = true;
+  const rest = pose();
+  d.player.resting = false;
+  d.player.swing = .16;
+  const windup = pose();
+  d.player.swing = .1;
+  const strike = pose();
+  d.player.swing = 0;
+  d.player.flash = .3;
+  const hit = pose();
+  const poses = [idle, breath, walk, run, sneak, rest, windup, strike, hit];
+  check("dark pixel: poses distintas do sobrevivente usam células em cache",
+    poses.every(Boolean) && new Set(poses).size === poses.length && pose() === hit);
 }
 {
   const interior = Sim.createControl("survival", "carer", "shelter"), world = interior.world;
@@ -241,13 +279,16 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   run.reduceFlicker = false;
   run.world.objects.push({kind:"tree",x:player.x,y:player.y,active:true,tint:.25});
   const worldMotion = clock => {
-    smokeFrames.length = canopyPositions.length = rippleFrames.length = 0;
+    smokeFrames.length = canopyPositions.length = rippleFrames.length = propSprites.length = 0;
     View.render(run, clock, .016);
-    return {smoke:JSON.stringify(smokeFrames), trees:JSON.stringify(canopyPositions), rain:JSON.stringify(rippleFrames)};
+    return {smoke:JSON.stringify(smokeFrames), trees:JSON.stringify(canopyPositions), rain:JSON.stringify(rippleFrames), props:[...propSprites]};
   };
   const ambientStart = worldMotion(1), ambientLater = worldMotion(1.85);
   run.reduceFlicker = true;
   const stillStart = worldMotion(1), stillLater = worldMotion(1.85);
+  check("dark pixel: fogueira alterna sprites e mantém uma pose com redução de cintilação",
+    ambientStart.props.length > 0 && ambientStart.props.some((sprite, index) => sprite !== ambientLater.props[index]) &&
+    stillStart.props.length > 0 && stillStart.props.every((sprite, index) => sprite === stillLater.props[index]));
   check("dark pixel: fumo, copas e poças animam, reduzir cintilação desativa o movimento ambiente",
     ambientStart.smoke !== "[]" && ambientStart.smoke !== ambientLater.smoke &&
     ambientStart.trees !== "[]" && ambientStart.trees !== ambientLater.trees &&

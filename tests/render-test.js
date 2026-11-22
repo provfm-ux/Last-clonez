@@ -10,6 +10,8 @@ const pascal = f => f.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(
 const counts = {};
 let heldWeapon = null;
 const infectedFrames = [], survivorFrames = [];
+const bagPigments = new Set(["#3b2822","#c4875e","#985b40","#714534","#513629","#e0b784"]);
+const bagPixels = [];
 const smokeFrames = [], canopyPositions = [], rippleFrames = [], propSprites = [];
 let beamOpacity = 1;
 const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
@@ -19,6 +21,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
     return (...args) => {
       counts[k] = (counts[k] || 0) + 1;
       if (k === "fillRect" && (t.fillStyle === "#afc1c66b" || t.fillStyle === "#879fa840")) rippleFrames.push(args);
+      if (k === "fillRect" && bagPigments.has(t.fillStyle)) bagPixels.push(t.fillStyle);
       if (k === "save") t.savedAlpha.push(t.globalAlpha);
       if (k === "restore") t.globalAlpha = t.savedAlpha.pop() ?? 1;
       if (k === "drawImage" && args.length === 5) {
@@ -41,7 +44,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
       if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 40) {
         infectedFrames.push(args.slice(1, 7));
       }
-      if (k === "drawImage" && args.length === 9 && args[3] === 30 && args[4] === 40) {
+      if (k === "drawImage" && args.length === 9 && args[3] === 36 && args[4] === 48) {
         counts.actorBlit = (counts.actorBlit || 0) + 1;
         survivorFrames.push(args.slice(1, 3).join(","));
       }
@@ -196,6 +199,20 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   check("dark pixel: mochila fica tapada de frente e de lado, visível de costas",
     packPoses.every(([without,withPack],index) => Boolean(without) && Boolean(withPack) &&
       (index === 3 ? without !== withPack : without === withPack)));
+  Object.assign(d.player,{headingX:-1,headingY:-1,backpack:true,moving:true});
+  d.player.gear.body = "raincoat";
+  const bagSignature = () => {
+    bagPixels.length = 0;
+    pose();
+    return bagPixels.sort().join(",");
+  };
+  const walkingBag = bagSignature();
+  Object.assign(d.player,{moving:false,resting:true});
+  const restingBag = bagSignature();
+  Object.assign(d.player,{resting:false,swing:.10});
+  const strikingBag = bagSignature();
+  check("dark pixel: mochila traseira mantém os mesmos pixels e cores em marcha, repouso e ataque",
+    Boolean(walkingBag) && walkingBag === restingBag && walkingBag === strikingBag);
 }
 {
   const interior = Sim.createControl("survival", "carer", "shelter"), world = interior.world;

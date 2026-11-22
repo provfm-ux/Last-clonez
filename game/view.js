@@ -1379,14 +1379,34 @@ const View = (() => {
     return {x:sx, y:sy, width:w};
   }
 
-  // Original 1px sprite art packed into fixed-size atlas pages. A pose is drawn only on first use.
+  // Frame cells share a native pixel grid and fixed equipment palettes.
   const actorFrames = new Map(), actorAtlases = [], strides = new WeakMap();
-  const actorDetail = 1.25, spriteWidth = 30, spriteHeight = 40;
-  const backpackCloth = "#9b6547", backpackLight = "#bf8963";
+  const spriteWidth = 36, spriteHeight = 48, spriteGround = 46;
+  const backpackCloth = "#985b40", backpackLight = "#c4875e";
+  const backpackPixels = [
+    "...#######...",
+    "..#hhhhhhh#..",
+    ".#hmmmmmmhh#.",
+    "#hhmmmmmmhms#",
+    "#mKKmmmmKKms#",
+    "#mLLmmmmLLms#",
+    "#mKKmmmmKKms#",
+    "#mmmmmmmmms#",
+    "#msshhhhssms#",
+    "#msmmmmmsms#",
+    "#msmmmmmsms#",
+    "#mssssssssms#",
+    "#mmmmmmmmmss#",
+    ".#sssssssss#.",
+    "..#########.."
+  ];
+  const backpackPalette = {
+    "#":"#3b2822", h:backpackLight, m:backpackCloth, s:"#714534", K:"#513629", L:"#e0b784"
+  };
 
   function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack, gesture) {
     const back = (direction & 2) !== 0, axial = (direction & 4) !== 0;
-    const showPack = back && pack;
+    const showPack = back && pack && pose !== "dead";
     const key = [shirt, trousers, skin, hair, direction, pose, step, lift, showPack, gesture].join("|");
     if (actorFrames.has(key)) return actorFrames.get(key);
     const index = actorFrames.size, slot = index % 128, page = Math.floor(index / 128);
@@ -1398,143 +1418,133 @@ const View = (() => {
     }
     const canvas = actorAtlases[page], c = canvas.getContext("2d");
     const left = slot % 16 * spriteWidth, top = Math.floor(slot / 16) * spriteHeight;
-    const ink = "#151a19", boots = "#2b2c29";
-    const side = direction % 2 === 0 ? 1 : -1;
+    const mirrored = (direction & 1) !== 0;
+    const ink = "#222a29", boot = "#3f3831";
+    const jacketDark = tint(shirt,-28), jacketLight = tint(shirt,28);
+    const jeanDark = tint(trousers,-19), jeanLight = tint(trousers,22);
+    const skinDark = tint(skin,-32), skinLight = tint(skin,23);
     const rect = (x, y, w, h, color) => {
-      const x0 = Math.max(0, Math.round(x * actorDetail));
-      const x1 = Math.min(spriteWidth, Math.round((x + w) * actorDetail));
-      const y0 = Math.max(0, Math.round(y * actorDetail));
-      const y1 = Math.min(spriteHeight, Math.round((y + h) * actorDetail));
+      const x0 = Math.max(0, x), y0 = Math.max(0, y);
+      const x1 = Math.min(spriteWidth, x + w), y1 = Math.min(spriteHeight, y + h);
       if (x1 <= x0 || y1 <= y0) return;
       c.fillStyle = color;
-      c.fillRect(left + (side > 0 ? x0 : spriteWidth - x1), top + y0, x1 - x0, y1 - y0);
+      c.fillRect(left + (mirrored ? spriteWidth - x1 : x0),top+y0,x1-x0,y1-y0);
+    };
+    const shape = (points,color) => {
+      const rows = points.map(([,y]) => y);
+      for (let y = Math.max(0,Math.min(...rows)); y < Math.min(spriteHeight,Math.max(...rows)); y++) {
+        const cuts = [];
+        for (let i=0; i<points.length; i++) {
+          const [x0,y0]=points[i], [x1,y1]=points[(i+1)%points.length];
+          if ((y0>y+.5) !== (y1>y+.5)) cuts.push(x0+(x1-x0)*(y+.5-y0)/(y1-y0));
+        }
+        cuts.sort((a,b)=>a-b);
+        for (let i=0; i+1<cuts.length; i+=2) {
+          const start=Math.ceil(cuts[i]-.5), end=Math.ceil(cuts[i+1]-.5);
+          rect(start,y,end-start,1,color);
+        }
+      }
     };
     let grip = null;
     if (pose === "dead") {
-      rect(2, 26, 20, 5, ink); rect(3, 27, 7, 3, trousers);
-      rect(10, 25, 7, 5, shirt); rect(17, 26, 4, 4, skin); rect(20, 26, 2, 3, hair);
+      shape([[3,42],[7,39],[17,40],[21,37],[29,38],[33,42],[30,45],[8,45]],ink);
+      rect(7,41,10,3,trousers); rect(17,39,9,5,jacketDark);
+      rect(24,40,3,2,shirt); rect(28,41,3,2,skinDark); rect(29,39,3,2,hair);
     } else {
-      const pixel = (x, y, w, h, color) => rect(x / actorDetail, y / actorDetail, w / actorDetail, h / actorDetail, color);
-      // Fill whole pixels in the atlas to keep the small sprite's edges crisp at any zoom.
-      const shape = (points, color) => {
-        const rows = points.map(point => point[1]);
-        for (let y = Math.max(0, Math.floor(Math.min(...rows))); y < Math.min(spriteHeight, Math.ceil(Math.max(...rows))); y++) {
-          const cuts = [];
-          for (let i = 0; i < points.length; i++) {
-            const [x0,y0] = points[i], [x1,y1] = points[(i + 1) % points.length];
-            if ((y0 > y + .5) !== (y1 > y + .5)) cuts.push(x0 + (x1 - x0) * (y + .5 - y0) / (y1 - y0));
-          }
-          cuts.sort((a,b) => a - b);
-          for (let i = 0; i + 1 < cuts.length; i += 2) {
-            const start = Math.ceil(cuts[i] - .5), end = Math.ceil(cuts[i+1] - .5);
-            if (end > start) pixel(start,y,end-start,1,color);
-          }
-        }
-      };
-      const clothLight = tint(shirt, 30), clothShade = tint(shirt, -27);
-      const trouserLight = tint(trousers, 23), trouserShade = tint(trousers, -16);
-      const skinLight = tint(skin, 22), skinShade = tint(skin, -31);
       const strike = pose === "strike" || pose === "chase";
       const crouch = pose === "rest" ? 7 : pose === "sneak" ? 4 : 0;
       const lean = pose === "hurt" ? -3 : strike ? [-2,1,3][gesture] : pose === "run" || pose === "sneak" ? 2 : 0;
-      const sx = (axial ? 15 : 14) + (axial ? Math.sign(lean) : lean);
-      const sy = 12 + crouch - Number(lift !== 0) - (pose === "idle" ? gesture : 0);
-      const hip = Math.min(29, sy + 12);
-      for (const [leg, x] of [17, 11].entries()) {
-        const stride = (leg ? step : -step) * (axial ? 1 : 2);
-        // In a straight approach or retreat the stride projects mostly into screen Y.
-        const advance = axial ? Math.sign(stride) * (back ? -2 : 2) : 0;
-        const knee = x + Math.round(stride * .6) + (crouch ? 2 : 0);
-        const foot = x + (axial ? 0 : stride);
-        const sole = 37 + Math.min(0, advance) - (lift === (leg ? -1 : 1) ? 3 : 0);
-        shape([[x-3,hip-1],[x+3,hip-1],[knee+2,hip+5],[foot+2,sole-2],[foot+4,sole-1],
-          [foot+4,sole+1],[foot-3,sole+1],[foot-3,sole-2],[knee-3,hip+5]], ink);
-        shape([[x-2,hip],[x+2,hip],[knee+1,hip+5],[foot+1,sole-2],[foot-2,sole-2],[knee-2,hip+5]],
-          leg ? trousers : trouserShade);
-        pixel(foot-1, sole-1, 4, 1, boots);
-        pixel(foot+1, sole-1, 2, 1, "#77705d");
-        const kneeY = Math.min(sole-4, hip+5);
-        pixel(knee-1,kneeY,2,1,trouserLight);
-        pixel(knee-1,kneeY+1,1,1,trouserShade);
-        if (leg && sole-kneeY > 6) pixel(foot-1,sole-5,1,2,trouserLight);
-        pixel(foot-2,sole,4,1,"#4c4539");
+      const x = 18 + (axial ? Math.sign(lean) : lean);
+      const y = 15 + crouch - Number(lift !== 0) - (pose === "idle" ? gesture : 0);
+      const hip = Math.min(34,y+14);
+      for (const [leg,root] of [21,15].entries()) {
+        const stride = (leg ? step : -step) * (axial ? 1 : 3);
+        const knee = root + Math.round(stride*.6) + Number(crouch>0), foot = root + (axial ? 0 : stride);
+        const depth = axial ? Math.min(0,Math.sign(stride)*(back ? -2 : 2)) : 0;
+        const sole = 45 + depth - (lift === (leg ? -1 : 1) ? 3 : 0);
+        const bend = Math.min(sole-4,hip+6);
+        shape([[root-4,hip-2],[root+3,hip-2],[knee+3,bend],[foot+2,sole-3],
+          [foot+5,sole-2],[foot+5,sole+1],[foot-4,sole+1],[foot-3,sole-4],[knee-3,bend]],ink);
+        shape([[root-3,hip-1],[root+2,hip-1],[knee+2,bend],[foot+1,sole-4],
+          [foot-2,sole-4],[knee-2,bend]],leg ? trousers : jeanDark);
+        rect(knee-1,bend,3,1,jeanLight);
+        rect(knee,bend+1,2,1,jeanDark);
+        rect(foot-2,sole-3,5,2,boot);
+        rect(foot+1,sole-2,3,1,"#82715b");
+        rect(foot-3,sole,7,1,"#65574a");
       }
-      const armSwing = step * (axial ? 1 : 2);
-      shape([[sx-6,sy],[sx-3,sy+1],[sx-4+armSwing,sy+8],[sx-3+armSwing,sy+11],
-        [sx-6+armSwing,sy+12],[sx-8+armSwing,sy+8],[sx-8,sy+2]], ink);
-      shape([[sx-6,sy+1],[sx-4,sy+2],[sx-5+armSwing,sy+7],[sx-7+armSwing,sy+8],[sx-7,sy+3]], shirt);
-      pixel(sx-6+armSwing,sy+9,2,2,skin);
-      shape([[sx-5,sy-2],[sx+3,sy-2],[sx+6,sy+1],[sx+4,sy+6],[sx+3,hip],
-        [sx-4,hip],[sx-5,hip-3],[sx-7,sy+2]], ink);
-      shape([[sx-5,sy-1],[sx+2,sy-1],[sx+5,sy+1],[sx+3,sy+6],[sx+2,hip-1],
-        [sx-3,hip-1],[sx-4,hip-3],[sx-6,sy+2]], shirt);
-      shape([[sx-5,sy],[sx+2,sy],[sx+1,sy+2],[sx-3,sy+3]], clothLight);
-      pixel(sx-4,sy+3,2,1,clothShade);
-      pixel(sx-3,hip-2,4,1,clothShade);
-      pixel(sx+2,sy+5,1,Math.max(1,hip-sy-6),"#27372c66");
+      const swing = Math.sign(step);
+      const farHand = x-9+swing, farY = Math.min(41,y+14-swing);
+      shape([[x-7,y],[x-4,y+2],[farHand+3,y+8],[farHand+2,farY+2],
+        [farHand-2,farY+2],[farHand-2,y+7],[x-9,y+3]],ink);
+      shape([[x-7,y+1],[x-5,y+2],[farHand+1,y+8],[farHand+1,farY-1],
+        [farHand-1,farY-1],[farHand-1,y+7],[x-8,y+3]],jacketDark);
+      rect(farHand-1,farY-1,2,2,skinDark);
+
+      shape([[x-6,y-2],[x+4,y-2],[x+8,y+1],[x+6,y+6],[x+4,hip],
+        [x-5,hip],[x-6,hip-4],[x-8,y+2]],ink);
+      shape([[x-6,y-1],[x+3,y-1],[x+6,y+1],[x+5,y+6],[x+3,hip-1],
+        [x-4,hip-1],[x-5,hip-5],[x-7,y+2]],shirt);
+      shape([[x-6,y],[x+3,y],[x+2,y+2],[x-4,y+3],[x-6,y+2]],jacketLight);
+      rect(x+3,y+6,1,Math.max(1,hip-y-7),jacketDark);
+      rect(x-3,hip-2,5,1,jacketDark);
+      if (!back) {
+        const zipper = x + (axial ? 0 : 1);
+        rect(zipper,y+2,1,hip-y-4,jacketDark);
+        rect(zipper,y+3,1,2,"#c2b8a0");
+        rect(x-4,y+5,3,1,jacketDark);
+        rect(x-4,y+6,2,1,jacketLight);
+        rect(x-5,y+2,1,1,"#aea176");
+      }
+
+      const handX = strike ? Math.min(32,x+[6,13,11][gesture]) : x+9-swing;
+      const handY = strike ? y+[4,6,3][gesture] : Math.min(41,y+14+swing);
+      const elbow = strike ? x+7 : x+9;
+      shape([[x+3,y],[x+7,y],[elbow+2,y+6],[handX+2,handY-1],
+        [handX+2,handY+3],[handX-2,handY+3],[elbow-2,y+9],[x+2,y+3]],ink);
+      shape([[x+3,y+1],[x+6,y+1],[elbow+1,y+6],[handX+1,handY-1],
+        [handX-1,handY],[elbow-1,y+8]],shirt);
+      rect(elbow,y+5,2,2,jacketLight);
+      rect(handX-1,handY-1,3,1,jacketDark);
+      rect(handX-1,handY,3,2,skin);
+      rect(handX-1,handY,1,1,skinLight);
+      rect(handX+1,handY+1,1,1,skinDark);
+      grip = [mirrored ? spriteWidth-handX-1 : handX+1, handY+1];
+
+      // Draw the same bag above the back of the jacket, with no layers on the front.
       if (showPack) {
-        shape([[sx-4,sy-1],[sx+1,sy-1],[sx+4,sy+2],[sx+4,hip-3],[sx+1,hip-1],
-          [sx-5,hip-1],[sx-7,hip-4],[sx-7,sy+3]], "#332720");
-        shape([[sx-4,sy],[sx+1,sy],[sx+3,sy+2],[sx+3,hip-3],[sx+1,hip-2],
-          [sx-5,hip-2],[sx-6,hip-4],[sx-6,sy+3]], backpackCloth);
-        shape([[sx-4,sy+1],[sx+1,sy+1],[sx+2,sy+3],[sx+1,sy+4],[sx-4,sy+4],[sx-5,sy+3]], backpackLight);
-        pixel(sx-4,sy+6,5,2,"#754b36");
-        pixel(sx-4,sy+6,5,1,"#a97451");
-        for (const x of [sx-3,sx]) {
-          pixel(x,sy+3,1,3,"#563a2c");
-          pixel(x,sy+5,1,1,"#d7bb90");
+        const bagX = x-7, bagY = y-1;
+        for (const [row,line] of backpackPixels.entries()) {
+          for (let col=0; col<line.length; col++) {
+            const color=backpackPalette[line[col]];
+            if (color) rect(bagX+col,bagY+row,1,1,color);
+          }
         }
-        pixel(sx+2,sy+4,1,hip-sy-7,"#744833");
-      } else if (!back) {
-        if (axial) {
-          pixel(sx-3,sy+1,2,1,"#bfa781");
-          pixel(sx+1,sy+1,2,1,"#bfa781");
-          pixel(sx,sy+2,1,hip-sy-4,"#414a37");
-          pixel(sx,sy+3,1,1,"#ded0a4");
-          pixel(sx-4,sy+5,2,1,"#bdbba080");
-        } else {
-          pixel(sx-1,sy+2,1,hip-sy-4,"#38463a");
-          pixel(sx-4,sy+4,2,1,"#bdbba0");
-        }
-        pixel(sx-4,sy+4,1,1,clothLight);
       }
-      const handX = strike ? Math.min(27, sx + [5,11,9][gesture]) : sx + 7 + Math.sign(-armSwing);
-      const handY = strike ? sy + [3,5,2][gesture] : Math.min(33,sy + 12 + Math.sign(step));
-      const elbow = strike ? sx + 5 : sx + 7;
-      shape([[sx+2,sy],[sx+6,sy],[elbow+2,sy+5],[handX+2,handY-1],[handX+2,handY+2],
-        [handX-2,handY+2],[elbow-2,sy+7],[sx+1,sy+3]], ink);
-      shape([[sx+2,sy+1],[sx+5,sy+1],[elbow+1,sy+5],[handX,handY],[handX-2,handY+1],[elbow-1,sy+6]], shirt);
-      pixel(handX-2,handY,2,1,"#4a483a");
-      pixel(handX,handY,2,2,skin);
-      pixel(handX,handY,1,1,skinLight);
-      pixel(handX+1,handY+1,1,1,skinShade);
-      pixel(elbow,sy+4,1,2,clothLight);
-      grip = [side > 0 ? handX + 1 : spriteWidth - handX - 1, handY + 1];
-      const hx = sx + (back || axial ? 0 : 1), hy = sy - 8 + Number(pose === "rest");
-      shape([[hx-4,hy+1],[hx-2,hy-1],[hx+3,hy-1],[hx+5,hy+1],[hx+5,hy+5],
-        [hx+2,hy+8],[hx-2,hy+7],[hx-4,hy+4]], ink);
-      shape([[hx-3,hy+1],[hx-1,hy],[hx+3,hy],[hx+4,hy+2],[hx+3,hy+6],
-        [hx+1,hy+7],[hx-2,hy+6],[hx-3,hy+4]], back ? hair : skin);
-      shape([[hx-3,hy+1],[hx-1,hy],[hx+3,hy],[hx+4,hy+2],[hx+1,hy+2],
-        [hx-1,hy+3],[hx-2,hy+5],[hx-3,hy+4]], hair);
-      pixel(hx-1,hy+1,3,1,tint(hair,28));
-      pixel(hx-2,hy+2,1,1,tint(hair,14));
-      if (back) pixel(hx-1,hy+6,3,1,skinShade);
-      if (axial && !back) {
-        shape([[hx-3,hy+2],[hx+3,hy+2],[hx+4,hy+4],[hx+2,hy+7],
-          [hx-2,hy+7],[hx-4,hy+4]], skin);
-        pixel(hx-2,hy+3,1,1,"#494038");
-        pixel(hx+2,hy+3,1,1,"#494038");
-        pixel(hx-2,hy+4,1,1,skinShade);
-        pixel(hx,hy+4,1,1,skinLight);
-        pixel(hx+2,hy+5,1,1,skinShade);
-        pixel(hx-1,hy+6,3,1,pose === "hurt" ? "#a35749" : "#856c58");
-      } else if (!back) {
-        pixel(hx+2,hy+3,2,1,"#494038");
-        pixel(hx+3,hy+4,2,1,skinLight);
-        pixel(hx-1,hy+4,1,2,skinShade);
-        pixel(hx+1,hy+6,2,1,pose === "hurt" ? "#a35749" : "#856c58");
+      const hx = x + Number(!axial && !back), hy = y-10;
+      shape([[hx-5,hy+1],[hx-3,hy-1],[hx+3,hy-1],[hx+6,hy+2],[hx+6,hy+6],
+        [hx+3,hy+10],[hx-3,hy+9],[hx-5,hy+6]],ink);
+      shape([[hx-4,hy+2],[hx-2,hy],[hx+3,hy],[hx+5,hy+2],[hx+4,hy+6],
+        [hx+2,hy+9],[hx-2,hy+8],[hx-4,hy+5]],back ? hair : skinDark);
+      shape([[hx-4,hy+2],[hx-2,hy],[hx+3,hy],[hx+5,hy+2],[hx+2,hy+3],
+        [hx-1,hy+3],[hx-3,hy+6],[hx-4,hy+5]],hair);
+      rect(hx-2,hy+1,4,1,tint(hair,26));
+      rect(hx-3,hy+2,2,1,tint(hair,13));
+      if (back) {
+        rect(hx-2,hy+8,4,1,skinDark);
+        rect(hx-3,hy+9,6,1,jacketLight);
+      } else if (axial) {
+        shape([[hx-4,hy+4],[hx+4,hy+4],[hx+3,hy+7],[hx+2,hy+9],[hx-2,hy+9],[hx-3,hy+7]],skin);
+        rect(hx-3,hy+5,2,1,ink); rect(hx+1,hy+5,2,1,ink);
+        rect(hx-1,hy+6,2,1,skinLight); rect(hx-1,hy+8,2,1,skinDark);
+      } else {
+        shape([[hx,hy+3],[hx+4,hy+3],[hx+6,hy+6],[hx+4,hy+7],[hx+3,hy+9],
+          [hx-1,hy+8],[hx-2,hy+6]],skin);
+        rect(hx+2,hy+4,2,1,ink);
+        rect(hx+4,hy+6,2,1,skinLight);
+        rect(hx+1,hy+8,2,1,skinDark);
       }
+      if (pose === "hurt" && !back) rect(hx-2,hy+7,2,1,"#a86452");
     }
     const frame = {canvas, left, top, grip};
     actorFrames.set(key, frame);
@@ -1685,7 +1695,7 @@ const View = (() => {
         pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
         isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step, lift,
         a.outfit === "hiker" || Boolean(isPlayer && a.backpack), gesture);
-      const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - Math.round(31 * actorDetail) * scale);
+      const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - spriteGround * scale);
       ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
         Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
       if (isPlayer && frame.grip) {
@@ -1709,7 +1719,7 @@ const View = (() => {
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.imageSmoothingEnabled = false;
       const player = {...state.player, moving:false, resting:false, flash:0, swing:0, headingX:1, headingY:1};
-      microActor(player,true,{...state,quiet:false},true,canvas.width/2,canvas.height-8,1);
+      microActor(player,true,{...state,quiet:false},true,canvas.width/2,canvas.height-5,.9);
     } finally {
       ctx = previous;
     }

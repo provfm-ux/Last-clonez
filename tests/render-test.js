@@ -213,6 +213,14 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   const strikingBag = bagSignature();
   check("dark pixel: mochila traseira mantém os mesmos pixels e cores em marcha, repouso e ataque",
     Boolean(walkingBag) && walkingBag === restingBag && walkingBag === strikingBag);
+  Object.assign(d.player,{headingX:1,headingY:1,swing:0,gear:{...d.player.gear,body:null}});
+  const styles = [pose()];
+  for (const [key,value] of Object.entries({skinTone:"deep",hairColor:"auburn",hairStyle:"wavy",jacketColor:"burgundy"})) {
+    d.player[key] = value;
+    styles.push(pose());
+  }
+  check("dark pixel: pele, cabelo e casaco selecionados alteram o sprite",
+    styles.every(Boolean) && new Set(styles).size === styles.length && pose() === styles.at(-1));
 }
 {
   const interior = Sim.createControl("survival", "carer", "shelter"), world = interior.world;

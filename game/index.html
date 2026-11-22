@@ -123,6 +123,13 @@
             <details id="advanced-start" class="advanced-start">
               <summary>Advanced</summary>
               <div class="new-world-options"><label>NAME<input id="survivor-name" type="text" maxlength="56" placeholder="Survivor" autocomplete="off"></label><label>APPEARANCE<select id="appearance"></select></label></div>
+              <details class="advanced-start survivor-style">
+                <summary>Customize survivor</summary>
+                <div class="equipment-overview">
+                  <canvas id="setup-portrait" class="survivor-portrait" width="48" height="48" aria-label="Survivor appearance preview"></canvas>
+                  <div id="setup-style-fields" class="rules-grid"></div>
+                </div>
+              </details>
               <div class="new-world-options"><label>BACKGROUND<select id="role" aria-describedby="background-detail"></select></label><label>WORLD PRESET<select id="difficulty" aria-describedby="preset-summary"></select></label></div>
               <p id="background-detail" class="background-detail"></p>
               <div class="preset-line"><p id="preset-summary" class="preset-summary"></p><button type="button" class="small-button" id="rules-btn">Customize</button></div>

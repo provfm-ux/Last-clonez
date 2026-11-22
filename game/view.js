@@ -1404,10 +1404,22 @@ const View = (() => {
     "#":"#3b2822", h:backpackLight, m:backpackCloth, s:"#714534", K:"#513629", L:"#e0b784"
   };
 
-  function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack, gesture) {
+  function survivorPalette(player) {
+    const options = Data.survivorStyle;
+    const colour = (key,fallback) => options[key].options[player[key]]?.color ?? fallback;
+    const female = player.appearance === "female";
+    return {
+      skin:colour("skinTone","#bca383"),
+      hair:colour("hairColor",female ? "#624c39" : "#413e35"),
+      jacket:colour("jacketColor","#748d7a"),
+      cut:player.hairStyle && player.hairStyle !== "default" ? player.hairStyle : female ? "tied" : "short"
+    };
+  }
+
+  function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack, gesture, cut = "short") {
     const back = (direction & 2) !== 0, axial = (direction & 4) !== 0;
     const showPack = back && pack && pose !== "dead";
-    const key = [shirt, trousers, skin, hair, direction, pose, step, lift, showPack, gesture].join("|");
+    const key = [shirt, trousers, skin, hair, direction, pose, step, lift, showPack, gesture, cut].join("|");
     if (actorFrames.has(key)) return actorFrames.get(key);
     const index = actorFrames.size, slot = index % 128, page = Math.floor(index / 128);
     if (!actorAtlases[page]) {
@@ -1526,10 +1538,27 @@ const View = (() => {
         [hx+3,hy+10],[hx-3,hy+9],[hx-5,hy+6]],ink);
       shape([[hx-4,hy+2],[hx-2,hy],[hx+3,hy],[hx+5,hy+2],[hx+4,hy+6],
         [hx+2,hy+9],[hx-2,hy+8],[hx-4,hy+5]],back ? hair : skinDark);
-      shape([[hx-4,hy+2],[hx-2,hy],[hx+3,hy],[hx+5,hy+2],[hx+2,hy+3],
-        [hx-1,hy+3],[hx-3,hy+6],[hx-4,hy+5]],hair);
-      rect(hx-2,hy+1,4,1,tint(hair,26));
-      rect(hx-3,hy+2,2,1,tint(hair,13));
+      if (cut === "shaved") {
+        rect(hx-3,hy+1,7,2,tint(hair,14));
+        rect(hx-2,hy+1,4,1,tint(hair,31));
+      } else {
+        shape([[hx-4,hy+2],[hx-2,hy],[hx+3,hy],[hx+5,hy+2],[hx+2,hy+3],
+          [hx-1,hy+3],[hx-3,hy+6],[hx-4,hy+5]],hair);
+        rect(hx-2,hy+1,4,1,tint(hair,26));
+        rect(hx-3,hy+2,2,1,tint(hair,13));
+        if (cut === "wavy") {
+          rect(hx-3,hy-1,3,2,hair);
+          rect(hx+2,hy-1,2,2,hair);
+          rect(hx-4,hy+3,2,2,tint(hair,17));
+          rect(hx+3,hy+1,2,2,tint(hair,21));
+        }
+        if (cut === "tied") {
+          const tie = axial && !back ? hx-6 : hx-5;
+          shape([[tie,hy+4],[tie+3,hy+4],[tie+3,hy+7],[tie+1,hy+10],[tie-2,hy+10],[tie-1,hy+7]],hair);
+          rect(tie,hy+6,2,1,"#a88c69");
+          rect(tie-1,hy+8,1,2,tint(hair,18));
+        }
+      }
       if (back) {
         rect(hx-2,hy+8,4,1,skinDark);
         rect(hx-3,hy+9,6,1,jacketLight);
@@ -1689,12 +1718,13 @@ const View = (() => {
     const direction = Number(across < 0) + 2 * Number(depth < 0) + 4 * Number(axial);
     const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, stride.phase, clock);
     if (!imported) {
-      const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : "#748d7a") :
+      const palette = isPlayer ? survivorPalette(a) : null;
+      const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : palette.jacket) :
         Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
       const frame = actorFrame(shirt, isPlayer ? "#465a5d" : "#56564c",
-        pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
-        isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step, lift,
-        a.outfit === "hiker" || Boolean(isPlayer && a.backpack), gesture);
+        palette?.skin ?? (pose === "hurt" ? "#cf9179" : "#99977f"),
+        palette?.hair ?? "#413e35", direction, pose, step, lift,
+        a.outfit === "hiker" || Boolean(isPlayer && a.backpack), gesture, palette?.cut);
       const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - spriteGround * scale);
       ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
         Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
@@ -1785,7 +1815,8 @@ const View = (() => {
     ctx.fillStyle = "#151e17";
     ctx.fillRect(-6, -2 + Math.max(0, step), 6, 2.2);
     ctx.fillRect(.5, -2 + Math.max(0, -step), 6, 2.2);
-    const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#bc9d50" : "#8daa92") : (Data.outfits[a.outfit]?.shirt || a.stats?.color || "#d0a968");
+    const palette = isPlayer ? survivorPalette(a) : null;
+    const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#bc9d50" : palette.jacket) : (Data.outfits[a.outfit]?.shirt || a.stats?.color || "#d0a968");
     poly([[-7.5, top + 4], [2.5, top + 3], [6, top + 8], [5, -8 + crouch * .3], [-5.7, -8 + crouch * .3]], shirt, "#16251b");
     ctx.fillStyle = isPlayer ? "#395f61" : "#5c6148";
     ctx.fillRect(-7.2, top + 7, 3.5, 9);
@@ -1841,18 +1872,23 @@ const View = (() => {
       ctx.fillStyle = "#d1b596";
       ctx.fillRect(handX - 1.5, handY - 1.6, 3, 3);
     }
-    const tiedHair = isPlayer && a.appearance === "female";
+    const tiedHair = palette?.cut === "tied";
     if (tiedHair) {
-      ctx.fillStyle = "#43342c";
+      ctx.fillStyle = palette.hair;
       ctx.fillRect(-6, top - 1.5, 4, 7);
       ctx.fillRect(-7.5, top + 3 + step * .3, 3.5, 4.5);
       ctx.fillStyle = "#a17c4d";
       ctx.fillRect(-6.4, top + 2, 2.4, 1.6);
     }
-    ctx.fillStyle = a.flash > 0 ? "#ffb096" : isPlayer ? "#c7ae84" : "#b0a078";
+    ctx.fillStyle = palette?.skin ?? (a.flash > 0 ? "#ffb096" : "#b0a078");
     ctx.fillRect(-3.3, top - 3, 8, 8.5);
-    ctx.fillStyle = isPlayer ? (tiedHair ? "#513f32" : "#343d31") : "#575c42";
-    ctx.fillRect(tiedHair ? -4.5 : -3.9, top - 5.5, 8.6, 4.8);
+    ctx.fillStyle = palette?.hair ?? "#575c42";
+    const cropped = palette?.cut === "shaved";
+    ctx.fillRect(tiedHair ? -4.5 : -3.9, top - (cropped ? 4 : 5.5), 8.6, cropped ? 2 : 4.8);
+    if (palette?.cut === "wavy") {
+      ctx.fillRect(-3,top-6.5,3,2);
+      ctx.fillRect(1,top-6,3,2);
+    }
     ctx.fillStyle = isPlayer ? "#18261e" : "#df8b62";
     ctx.fillRect(2.9, top + .5, 1.7, 1.5);
     if (a.windup > 0) {

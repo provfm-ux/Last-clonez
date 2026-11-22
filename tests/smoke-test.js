@@ -25,6 +25,21 @@ const run = (s, ticks, input = idle) => { for (let i = 0; i < ticks && s.mode ==
 const fresh = mode => Sim.createControl(mode, "carer", "shelter");
 
 {
+  const profile = {name:"Rita",appearance:"female",skinTone:"deep",hairStyle:"wavy",hairColor:"auburn",jacketColor:"burgundy"};
+  const run = Sim.createControl("training","carer","shelter",undefined,profile);
+  const saved = JSON.parse(JSON.stringify(Sim.snapshot(run)));
+  const loaded = Sim.restore(saved);
+  check("personalização do sobrevivente persiste da criação ao carregamento",
+    Object.entries(profile).every(([field,value]) => loaded.player[field] === value));
+  for (const key of Object.keys(Data.survivorStyle)) delete saved.player[key];
+  saved.player.hairColor = "unknown";
+  const legacy = Sim.restore(saved);
+  const defaults = Data.character({appearance:"female"});
+  check("saves antigos e opções inválidas recebem a aparência predefinida",
+    Object.keys(Data.survivorStyle).every(key => legacy.player[key] === defaults[key]));
+}
+
+{
   const s = fresh("training"), p = s.player;
   const baseAim = Sim.aimChance(s), baseRepair = Sim.vehicleRepairAmount(s);
   p.skills.marksmanship = Data.skillXp(2);

@@ -199,7 +199,8 @@
 
   function startLesson() {
     const previous = state;
-    const setup = ["difficulty","role","start-point","survivor-name","appearance","world-seed"].map(id => [id,$(id).value]);
+    const setup = ["difficulty","role","start-point","survivor-name","appearance","world-seed",
+      ...Object.keys(Data.survivorStyle).map(key => "setup-" + key)].map(id => [id,$(id).value]);
     activate(Sim.createControl("training","carer","shelter"));
     const {x,y} = state.player;
     const crate = state.world.objects.find(o => o.storage && o.building === state.world.base.id);
@@ -218,6 +219,7 @@
     lesson = null;
     titleScreen();
     for (const [id,value] of setup) $(id).value = value;
+    updateSurvivorPreview("setup");
     showStartDetail();
     View.prepare(state.world);
   }
@@ -287,7 +289,7 @@
   function start() {
     wakeSound();
     const preset = $("difficulty").value, role = $("role").value, startPoint = $("start-point").value;
-    const profile = Data.character({name:$("survivor-name").value,appearance:$("appearance").value});
+    const profile = survivorProfile("setup");
     const seedInput = $("world-seed"), enteredSeed = seedInput.value.trim();
     if (enteredSeed && !/^\d{1,9}$/.test(enteredSeed)) { seedInput.reportValidity(); return; }
     const seed = enteredSeed ? Number(enteredSeed) : Math.floor(Math.random()*1000000000);
@@ -306,8 +308,10 @@
     const skip = read(skipKey);
     wakeSound();
     setNavigation("locations");
-    activate(Sim.createRecommended(Math.floor(Math.random() * 1000000000), $("playtest-enabled").checked,
-      skip ? Number(skip) : null, savedAssists()));
+    const run = Sim.createRecommended(Math.floor(Math.random() * 1000000000), $("playtest-enabled").checked,
+      skip ? Number(skip) : null, savedAssists());
+    Object.assign(run.player,survivorProfile("setup"));
+    activate(run);
     write(skipKey, "");
     write(startChoiceKey, "recommended");
     $("advanced-start").open = false;
@@ -383,7 +387,7 @@
   }
 
   function rememberSetup() {
-    const profile = Data.character({name:$("survivor-name").value,appearance:$("appearance").value});
+    const profile = survivorProfile("setup");
     write(setupKey, JSON.stringify({preset:$("difficulty").value, role:$("role").value, start:$("start-point").value,
       seed:$("world-seed").value, profile, customBase, customRules}));
   }
@@ -489,8 +493,7 @@
     $("difficulty").value = state.difficulty;
     if (state.difficulty === "custom") customRules = state.rules;
     $("role").value = state.role;
-    $("survivor-name").value = state.player.name;
-    $("appearance").value = state.player.appearance;
+    setSetupSurvivor(state.player);
     showStartDetail();
     updateHud();
   }
@@ -1072,7 +1075,7 @@
       '<dl class="equipment-slots">' + slots.map(([label,name]) => '<div><dt>' + label + '</dt><dd>' +
         esc(name || "Empty") + '</dd></div>').join("") + '</dl></div>' +
       '<div class="stats-summary"><span>LOAD · ' + formatWeight(Sim.weight(p.bag)) + " / " + Sim.capacity(state) + " kg</span></div>" +
-      '<div class="item-actions">' + button("Backpack", "equipment-backpack") + button("Edit survivor", "edit-survivor") + button("Customize quick belt", "belt-edit", false, "primary") +
+      '<div class="item-actions">' + button("Backpack", "equipment-backpack") + button("Customize survivor", "edit-survivor") + button("Customize quick belt", "belt-edit", false, "primary") +
       (itemCount("watch") ? button("Wait with wristwatch", "watch-wait", Boolean(p.vehicle)) +
         button("Place watch alarm · 10 s", "arm-watch", Boolean(p.vehicle || state.atmosphere.alarm)) : "") + "</div>" +
       (lighting.length ? '<section class="inventory-section"><h3>LIGHTING</h3><div class="inventory-items">' + lighting.join("") + "</div></section>" : "") +
@@ -1085,13 +1088,50 @@
   const appearanceOptions = selected => Object.entries(Data.appearances).map(([id,label]) =>
     '<option value="' + id + '"' + (selected === id ? " selected" : "") + ">" + label + "</option>").join("");
 
+  function survivorFields(prefix, profile) {
+    return Object.entries(Data.survivorStyle).map(([key,field]) =>
+      '<label>' + field.label + '<select id="' + prefix + '-' + key + '">' +
+      Object.entries(field.options).map(([id,option]) =>
+        '<option value="' + id + '"' + (profile[key] === id ? " selected" : "") + '>' + option.label + '</option>'
+      ).join("") + '</select></label>'
+    ).join("");
+  }
+
+  function survivorProfile(prefix) {
+    const name = $(prefix === "setup" ? "survivor-name" : "profile-name").value;
+    const appearance = $(prefix === "setup" ? "appearance" : "profile-appearance").value;
+    const style = Object.fromEntries(Object.keys(Data.survivorStyle).map(key => [key,$(prefix + "-" + key).value]));
+    return Data.character({name,appearance,...style});
+  }
+
+  function updateSurvivorPreview(prefix) {
+    const preview = $(prefix + "-portrait");
+    const player = {...state.player, ...survivorProfile(prefix)};
+    // Show the chosen jacket in the editor even when protective gear covers it in play.
+    player.gear = {...player.gear,body:null};
+    View.equipmentPortrait(preview,{...state,player});
+  }
+
+  function setSetupSurvivor(profile) {
+    const player = Data.character(profile);
+    $("survivor-name").value = player.name;
+    $("appearance").value = player.appearance;
+    for (const key of Object.keys(Data.survivorStyle)) $("setup-" + key).value = player[key];
+    updateSurvivorPreview("setup");
+  }
+
   function editSurvivor() {
     if (!active()) return;
-    show("Edit survivor", '<form id="profile-form"><div class="rules-grid"><label>Name<input id="profile-name" maxlength="56" value="' +
+    show("Customize survivor", '<form id="profile-form"><div class="equipment-overview">' +
+      '<canvas id="profile-portrait" class="survivor-portrait" width="48" height="48" aria-label="Survivor appearance preview"></canvas>' +
+      '<div class="rules-grid"><label>Name<input id="profile-name" maxlength="56" value="' +
       esc(state.player.name) + '" autocomplete="off"></label><label>Appearance<select id="profile-appearance">' +
-      appearanceOptions(state.player.appearance) + '</select></label></div><div class="item-actions">' +
-      '<button type="submit" class="small-button primary">Save survivor</button>' + button("Back to Gear", "gear-open") +
+      appearanceOptions(state.player.appearance) + '</select></label>' +
+      survivorFields("profile",state.player) + '</div></div><div class="item-actions">' +
+      '<button type="submit" class="small-button primary">Save survivor</button>' + button("Cancel", "gear-open") +
       "</div></form>", "edit-survivor");
+    updateSurvivorPreview("profile");
+    $("profile-form").addEventListener("change",() => updateSurvivorPreview("profile"));
   }
 
   function crafting(ingredient = null) {
@@ -1839,7 +1879,7 @@
     else if (event.target.id === "atmosphere-form") applyAtmosphere(event);
     else if (event.target.id === "profile-form" && dialogView === "edit-survivor" && active()) {
       event.preventDefault();
-      Object.assign(state.player,Data.character({name:$("profile-name").value,appearance:$("profile-appearance").value}));
+      Object.assign(state.player,survivorProfile("profile"));
       save();
       gear();
     }
@@ -2460,7 +2500,10 @@
   $("role").value = "carer";
   $("role").addEventListener("change",showStartDetail);
   $("appearance").innerHTML = appearanceOptions("male");
-  $("appearance").value = "male";
+  $("setup-style-fields").innerHTML = survivorFields("setup",Data.character());
+  $("setup-style-fields").addEventListener("change",() => updateSurvivorPreview("setup"));
+  $("appearance").addEventListener("change",() => updateSurvivorPreview("setup"));
+  setSetupSurvivor(Data.character());
   try {
     const setup = JSON.parse(read(setupKey));
     if (setup) {
@@ -2470,9 +2513,7 @@
       if (Object.hasOwn(Data.roles, setup.role)) $("role").value = setup.role;
       if (Object.hasOwn(Data.control.starts, setup.start)) startPoint.value = setup.start;
       if (typeof setup.seed === "string" && /^\d{1,9}$/.test(setup.seed)) $("world-seed").value = setup.seed;
-      const profile = Data.character(setup.profile);
-      $("survivor-name").value = profile.name;
-      $("appearance").value = profile.appearance;
+      setSetupSurvivor(setup.profile);
     }
   } catch { /* Ignore a damaged menu preference. */ }
   presets.addEventListener("change", () => {

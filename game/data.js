@@ -229,12 +229,38 @@ const Data = (() => {
   const characterNameLimit = 28;
   const appearances = {male:"Man",female:"Woman"};
 
+  const survivorStyle = {
+    skinTone:{label:"Skin tone", options:{
+      medium:{label:"Medium",color:"#bca383"}, light:{label:"Light",color:"#dbb99c"},
+      olive:{label:"Olive",color:"#a68962"}, deep:{label:"Deep",color:"#795240"}
+    }},
+    hairStyle:{label:"Hair style", options:{
+      default:{label:"By appearance"}, short:{label:"Short"}, tied:{label:"Tied back"},
+      shaved:{label:"Close crop"}, wavy:{label:"Wavy"}
+    }},
+    hairColor:{label:"Hair colour", options:{
+      default:{label:"By appearance"}, black:{label:"Black",color:"#342e2d"},
+      brown:{label:"Brown",color:"#634735"}, blond:{label:"Blond",color:"#aa8a55"},
+      auburn:{label:"Auburn",color:"#884c3a"}, grey:{label:"Grey",color:"#92928a"}
+    }},
+    jacketColor:{label:"Jacket colour", options:{
+      sage:{label:"Sage",color:"#748d7a"}, blue:{label:"Slate blue",color:"#566d86"},
+      burgundy:{label:"Burgundy",color:"#865762"}, charcoal:{label:"Charcoal",color:"#52585b"},
+      ochre:{label:"Ochre",color:"#9b784f"}
+    }}
+  };
+
   function character(profile) {
     const name = typeof profile?.name === "string" ? profile.name.replace(/[\p{Cc}\u202a-\u202e\u2066-\u2069]/gu,"").trim() : "";
     const appearance = profile?.appearance;
+    const style = Object.fromEntries(Object.entries(survivorStyle).map(([field,{options}]) => {
+      const selected = profile?.[field];
+      return [field, typeof selected === "string" && Object.hasOwn(options,selected) ? selected : Object.keys(options)[0]];
+    }));
     return {
       name:[...name].slice(0,characterNameLimit).join("").trimEnd() || "Survivor",
-      appearance:typeof appearance === "string" && Object.hasOwn(appearances,appearance) ? appearance : "male"
+      appearance:typeof appearance === "string" && Object.hasOwn(appearances,appearance) ? appearance : "male",
+      ...style
     };
   }
   const infected = {
@@ -305,6 +331,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,garden,crops,supplyCache,story,saveVersion:1};
 })();

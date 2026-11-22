@@ -1396,7 +1396,8 @@ const View = (() => {
     const canvas = actorAtlases[page], c = canvas.getContext("2d");
     const left = slot % 16 * spriteWidth, top = Math.floor(slot / 16) * spriteHeight;
     const ink = "#151a19", boots = "#2b2c29";
-    const back = direction >= 2, side = direction % 2 === 0 ? 1 : -1;
+    const back = (direction & 2) !== 0, axial = (direction & 4) !== 0;
+    const side = direction % 2 === 0 ? 1 : -1;
     const rect = (x, y, w, h, color) => {
       const x0 = Math.max(0, Math.round(x * actorDetail));
       const x1 = Math.min(spriteWidth, Math.round((x + w) * actorDetail));
@@ -1426,12 +1427,16 @@ const View = (() => {
       const strike = pose === "strike" || pose === "chase";
       const crouch = pose === "rest" ? 7 : pose === "sneak" ? 4 : 0;
       const lean = pose === "hurt" ? -3 : strike ? [-2,1,3][gesture] : pose === "run" || pose === "sneak" ? 2 : 0;
-      const sx = 14 + lean, sy = 12 + crouch - Number(lift !== 0) - (pose === "idle" ? gesture : 0);
+      const sx = (axial ? 15 : 14) + (axial ? Math.sign(lean) : lean);
+      const sy = 12 + crouch - Number(lift !== 0) - (pose === "idle" ? gesture : 0);
       const hip = Math.min(29, sy + 12);
       for (const [leg, x] of [17, 11].entries()) {
-        const stride = (leg ? step : -step) * 2;
+        const stride = (leg ? step : -step) * (axial ? 1 : 2);
+        // In a straight approach or retreat the stride projects mostly into screen Y.
+        const advance = axial ? Math.sign(stride) * (back ? -2 : 2) : 0;
         const knee = x + Math.round(stride * .6) + (crouch ? 2 : 0);
-        const foot = x + stride, sole = 37 - (lift === (leg ? -1 : 1) ? 3 : 0);
+        const foot = x + (axial ? 0 : stride);
+        const sole = 37 + Math.min(0, advance) - (lift === (leg ? -1 : 1) ? 3 : 0);
         shape([[x-3,hip-1],[x+3,hip-1],[knee+2,hip+5],[foot+2,sole-2],[foot+4,sole-1],
           [foot+4,sole+1],[foot-3,sole+1],[foot-3,sole-2],[knee-3,hip+5]], ink);
         shape([[x-2,hip],[x+2,hip],[knee+1,hip+5],[foot+1,sole-2],[foot-2,sole-2],[knee-2,hip+5]],
@@ -1440,7 +1445,7 @@ const View = (() => {
         pixel(foot+1, sole-1, 2, 1, "#77705d");
         pixel(knee-1, Math.min(sole-3,hip+5), 2, 1, "#91978175");
       }
-      const armSwing = step * 2;
+      const armSwing = step * (axial ? 1 : 2);
       shape([[sx-6,sy],[sx-3,sy+1],[sx-4+armSwing,sy+8],[sx-3+armSwing,sy+11],
         [sx-6+armSwing,sy+12],[sx-8+armSwing,sy+8],[sx-8,sy+2]], ink);
       shape([[sx-6,sy+1],[sx-4,sy+2],[sx-5+armSwing,sy+7],[sx-7+armSwing,sy+8],[sx-7,sy+3]], shirt);
@@ -1461,6 +1466,10 @@ const View = (() => {
         pixel(sx-1,sy+5,1,2,"#b7a17a");
       } else if (!back) {
         pixel(sx-1,sy+2,1,hip-sy-4,"#38463a");
+        if (axial) {
+          pixel(sx-3,sy+1,2,1,"#bfa781");
+          pixel(sx+1,sy+1,2,1,"#bfa781");
+        }
         pixel(sx-4,sy+4,2,3,"#c2b39580");
         pixel(sx+1,sy+5,2,2,"#a6aa8f80");
         pixel(sx-1,hip-2,2,1,"#b49a70");
@@ -1478,7 +1487,7 @@ const View = (() => {
       pixel(handX,handY,2,2,skin);
       pixel(handX,handY,1,1,"#d7b290");
       grip = [side > 0 ? handX + 1 : spriteWidth - handX - 1, handY + 1];
-      const hx = sx + (back ? 0 : 1), hy = sy - 8 + Number(pose === "rest");
+      const hx = sx + (back || axial ? 0 : 1), hy = sy - 8 + Number(pose === "rest");
       shape([[hx-4,hy+1],[hx-2,hy-1],[hx+3,hy-1],[hx+5,hy+1],[hx+5,hy+5],
         [hx+2,hy+8],[hx-2,hy+7],[hx-4,hy+4]], ink);
       shape([[hx-3,hy+1],[hx-1,hy],[hx+3,hy],[hx+4,hy+2],[hx+3,hy+6],
@@ -1486,7 +1495,14 @@ const View = (() => {
       shape([[hx-3,hy+1],[hx-1,hy],[hx+3,hy],[hx+4,hy+2],[hx+1,hy+2],
         [hx-1,hy+3],[hx-2,hy+5],[hx-3,hy+4]], hair);
       pixel(hx-1,hy+1,3,1,"#9e8b6365");
-      if (!back) {
+      if (axial && !back) {
+        shape([[hx-3,hy+2],[hx+3,hy+2],[hx+4,hy+4],[hx+2,hy+7],
+          [hx-2,hy+7],[hx-4,hy+4]], skin);
+        pixel(hx-2,hy+3,1,1,"#494038");
+        pixel(hx+2,hy+3,1,1,"#494038");
+        pixel(hx,hy+4,1,1,"#d9ae87");
+        pixel(hx-1,hy+6,3,1,pose === "hurt" ? "#a35749" : "#856c58");
+      } else if (!back) {
         pixel(hx+2,hy+3,2,1,"#494038");
         pixel(hx+3,hy+4,2,1,"#d9ae87");
         pixel(hx+1,hy+6,2,1,pose === "hurt" ? "#a35749" : "#856c58");
@@ -1630,7 +1646,9 @@ const View = (() => {
       pose === "idle" && isPlayer ? Math.floor(clock * 2) % 2 : 0;
     const swing = isPlayer && a.swing > 0 ? state.swingVisual : null;
     const dx = swing?.dx ?? a.headingX ?? (a.face < 0 ? -1 : 1), dy = swing?.dy ?? a.headingY ?? 0;
-    const direction = Number(dx < dy) + 2 * Number(dx + dy < 0);
+    const across = dx - dy, depth = dx + dy;
+    const axial = isPlayer && Math.abs(across) <= Math.abs(depth) * .35;
+    const direction = Number(across < 0) + 2 * Number(depth < 0) + 4 * Number(axial);
     const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, stride.phase, clock);
     if (!imported) {
       const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : "#748d7a") :

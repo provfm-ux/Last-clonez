@@ -177,6 +177,16 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   const poses = [idle, breath, walk, run, sneak, rest, windup, strike, hit];
   check("dark pixel: poses distintas do sobrevivente usam células em cache",
     poses.every(Boolean) && new Set(poses).size === poses.length && pose() === hit);
+
+  Object.assign(d.player,{flash:0,moving:true});
+  d.quiet = d.running = false;
+  const directions = [[1,1],[-1,-1],[1,0],[0,-1]].map(([headingX,headingY]) => {
+    Object.assign(d.player,{headingX,headingY});
+    return pose();
+  });
+  Object.assign(d.player,{headingX:1,headingY:1});
+  check("dark pixel: marcha usa poses distintas de frente, costas e diagonal",
+    directions.every(Boolean) && new Set(directions).size === directions.length && pose() === directions[0]);
 }
 {
   const interior = Sim.createControl("survival", "carer", "shelter"), world = interior.world;

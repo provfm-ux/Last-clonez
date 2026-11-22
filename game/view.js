@@ -1382,6 +1382,7 @@ const View = (() => {
   // Original 1px sprite art packed into fixed-size atlas pages. A pose is drawn only on first use.
   const actorFrames = new Map(), actorAtlases = [], strides = new WeakMap();
   const actorDetail = 1.25, spriteWidth = 30, spriteHeight = 40;
+  const backpackCloth = "#9b6547", backpackLight = "#bf8963";
 
   function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack, gesture) {
     const back = (direction & 2) !== 0, axial = (direction & 4) !== 0;
@@ -1472,15 +1473,18 @@ const View = (() => {
       pixel(sx-3,hip-2,4,1,clothShade);
       pixel(sx+2,sy+5,1,Math.max(1,hip-sy-6),"#27372c66");
       if (showPack) {
-        shape([[sx-5,sy],[sx+1,sy],[sx+3,sy+3],[sx+2,hip-1],[sx-5,hip],[sx-7,hip-3],[sx-7,sy+3]], ink);
-        shape([[sx-5,sy+1],[sx+1,sy+1],[sx+2,sy+3],[sx+1,hip-2],[sx-5,hip-1],[sx-6,hip-3],[sx-6,sy+3]], "#596249");
-        pixel(sx-5,sy+3,6,2,"#818262");
-        pixel(sx-4,sy+5,4,3,"#494e39");
-        pixel(sx-3,sy+5,1,2,"#b7a17a");
-        pixel(sx-1,sy+5,1,2,"#b7a17a");
-        pixel(sx-5,sy+7,1,3,"#73775a");
-        pixel(sx-4,hip-3,3,1,"#414431");
-        pixel(sx+1,sy+3,1,2,"#353d2d");
+        shape([[sx-4,sy-1],[sx+1,sy-1],[sx+4,sy+2],[sx+4,hip-3],[sx+1,hip-1],
+          [sx-5,hip-1],[sx-7,hip-4],[sx-7,sy+3]], "#332720");
+        shape([[sx-4,sy],[sx+1,sy],[sx+3,sy+2],[sx+3,hip-3],[sx+1,hip-2],
+          [sx-5,hip-2],[sx-6,hip-4],[sx-6,sy+3]], backpackCloth);
+        shape([[sx-4,sy+1],[sx+1,sy+1],[sx+2,sy+3],[sx+1,sy+4],[sx-4,sy+4],[sx-5,sy+3]], backpackLight);
+        pixel(sx-4,sy+6,5,2,"#754b36");
+        pixel(sx-4,sy+6,5,1,"#a97451");
+        for (const x of [sx-3,sx]) {
+          pixel(x,sy+3,1,3,"#563a2c");
+          pixel(x,sy+5,1,1,"#d7bb90");
+        }
+        pixel(sx+2,sy+4,1,hip-sy-7,"#744833");
       } else if (!back) {
         if (axial) {
           pixel(sx-3,sy+1,2,1,"#bfa781");
@@ -1759,10 +1763,10 @@ const View = (() => {
     const step = a.moving ? Math.sin(clock * (isPlayer && state.running ? 17 : 12) + (a.phase || 0)) * 2.5 : 0;
     const crouch = isPlayer && state.quiet ? 5 : 0;
     const top = -25 + crouch - Math.abs(step) * .35;
-    if (a.outfit === "hiker" || isPlayer && a.backpack) {
-      ctx.fillStyle = "#3c5041";
+    if (a.outfit === "hiker" || isPlayer && a.backpack && (a.headingX ?? 0) + (a.headingY ?? 0) < 0) {
+      ctx.fillStyle = isPlayer ? backpackCloth : "#3c5041";
       ctx.fillRect(-11, top + 5, 8, 14);
-      ctx.fillStyle = "#667b55";
+      ctx.fillStyle = isPlayer ? backpackLight : "#667b55";
       ctx.fillRect(-11, top + 7, 5, 7);
     }
     ctx.fillStyle = isPlayer ? "#293e3e" : "#3f4535";

@@ -187,16 +187,15 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   Object.assign(d.player,{headingX:1,headingY:1});
   check("dark pixel: marcha usa poses distintas de frente, costas e diagonal",
     directions.every(Boolean) && new Set(directions).size === directions.length && pose() === directions[0]);
-  d.player.backpack = false;
-  const frontWithoutPack = pose();
-  d.player.backpack = true;
-  const frontWithPack = pose();
-  Object.assign(d.player,{headingX:-1,headingY:-1});
-  const backWithPack = pose();
-  d.player.backpack = false;
-  const backWithoutPack = pose();
-  check("dark pixel: mochila só altera o sprite do sobrevivente visto de costas",
-    frontWithPack === frontWithoutPack && backWithPack !== backWithoutPack);
+  const packPoses = [[1,1],[1,-1],[-1,1],[-1,-1]].map(([headingX,headingY]) => {
+    Object.assign(d.player,{headingX,headingY,backpack:false});
+    const without = pose();
+    d.player.backpack = true;
+    return [without,pose()];
+  });
+  check("dark pixel: mochila fica tapada de frente e de lado, visível de costas",
+    packPoses.every(([without,withPack],index) => Boolean(without) && Boolean(withPack) &&
+      (index === 3 ? without !== withPack : without === withPack)));
 }
 {
   const interior = Sim.createControl("survival", "carer", "shelter"), world = interior.world;

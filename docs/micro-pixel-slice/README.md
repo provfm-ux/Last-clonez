@@ -33,6 +33,16 @@ phase selects the outfit, travel distance advances the walk cycle, and the
 existing combat timers select attack and hit poses. Left-facing sprites use
 the cached mirror of the atlas.
 
+The redraw uses three-quarter silhouettes, staggered footsteps and stronger
+attack anticipation. Visual references were
+[Clint Bellanger’s Zombie Sprites](https://opengameart.org/content/zombie-sprites)
+for the lurch and attack poses,
+[Pixor’s zombie](https://pixor.art/library/dungeon/zombie/) for the
+three-quarter lighting and selective outlines, and
+[Curt’s Zombie RPG sprites](https://opengameart.org/content/zombie-rpg-sprites)
+for readable body-type differences. The game atlas is original artwork
+drawn from native pixel shapes in Godot.
+
 To rebuild from the Godot pixel-art source, run this from the repository root:
 
 ```sh

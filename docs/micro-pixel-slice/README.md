@@ -24,20 +24,20 @@ variants, and the fridge indicator follows its existing power state. These
 sprites are drawn at the existing prop anchors in the depth stack, so doors,
 collision, targeting and loot continue to use the same world objects.
 
-## Supplied infected art
+## Animated infected art
 
-`game/micro-zombies.png` is the unmodified complete atlas supplied in the
-Last CloneZ sprite pack. Four rows of 28 cells use the pack's 18×32 frame and
-(9, 30) feet pivot. Each infected keeps a variant based on its existing spawn
-phase. The renderer mirrors the pose for left-facing movement and adds a
-subtle stride bob. The pack supplies static poses, so full directional and
-combat animation frames remain open. The partial row and the large figures
-are excluded. The existing idle, hit and threat feedback and game rules
-continue to run with the new drawing.
+Dark Pixel uses an original transparent atlas at `game/micro-zombies.png`.
+Each row contains four 18×32 frames for each of seven outfits. The rows are
+idle, walk, attack and hit, with a shared (9, 30) foot pivot. The saved spawn
+phase selects the outfit, travel distance advances the walk cycle, and the
+existing combat timers select attack and hit poses. Left-facing sprites use
+the cached mirror of the atlas.
 
-The pack identifies the artwork as user-supplied and its licensing as
-unverified. Confirm that the atlas may be redistributed before publishing
-it to the public repository or Worker Preview.
+To rebuild from the Godot pixel-art source, run this from the repository root:
+
+```sh
+godot --headless --script scripts/bake-infected.gd -- "$PWD/game/micro-zombies.png"
+```
 
 ## Running and testing
 

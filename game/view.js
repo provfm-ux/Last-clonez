@@ -1275,9 +1275,9 @@ const View = (() => {
   const zombieAtlasLink = document.getElementById("micro-zombie-atlas");
   let zombieAtlas, mirroredZombieAtlas;
 
-  function drawZombieSprite(zombie, x, y, scale, facesLeft, lift) {
+  function drawZombieSprite(zombie, x, y, scale, facesLeft, stride, clock) {
     if (!zombieAtlasLink?.href || typeof Image !== "function") return false;
-    // Four rows of 28 complete 18×32 cells, all with the manifest's (9, 30) foot pivot.
+    // Idle, walk, attack and hit rows. Each of the seven outfits has four frames.
     const columns = 28, rows = 4, width = 18, height = 32;
     if (!zombieAtlas) {
       zombieAtlas = new Image();
@@ -1297,16 +1297,28 @@ const View = (() => {
       }
       atlas = mirroredZombieAtlas;
     }
-    // Phase is selected at spawn and already stored in saves, so appearance does not flicker.
-    const variant = clamp(Math.floor((Number.isFinite(zombie.phase) ? zombie.phase : 0) * 14), 0, columns * rows - 1);
-    const column = variant % columns, row = Math.floor(variant / columns);
+    // Spawn phase is persisted in saves and keeps each infected's outfit stable.
+    const phase = Number.isFinite(zombie.phase) ? zombie.phase : 0;
+    const outfit = clamp(Math.floor(phase * 7 / 8), 0, 6);
+    let row = 0, frame = Math.floor(Math.max(0, clock + phase) * 4) % 4;
+    if (zombie.flash > 0) {
+      row = 3;
+      frame = zombie.flash > .18 ? 0 : zombie.flash > .10 ? 1 : zombie.flash > .04 ? 2 : 3;
+    } else if (zombie.windup > 0 || zombie.swing > 0) {
+      row = 2;
+      frame = zombie.windup > .16 ? 0 : zombie.windup > 0 ? 1 : zombie.swing > .08 ? 3 : 2;
+    } else if (zombie.moving) {
+      row = 1;
+      frame = Math.floor(stride * 4);
+    }
+    const column = outfit * 4 + frame;
     ctx.drawImage(atlas, (facesLeft ? columns - 1 - column : column) * width, row * height, width, height,
-      Math.round(x - 9 * scale), Math.round(y - (30 + Math.abs(lift)) * scale),
+      Math.round(x - 9 * scale), Math.round(y - 30 * scale),
       Math.round(width * scale), Math.round(height * scale));
     return true;
   }
 
-  function microActor(a, isPlayer, state, alive, x, y, scale) {
+  function microActor(a, isPlayer, state, alive, x, y, scale, clock = 0) {
     const moving = alive && a.moving;
     const running = moving && (isPlayer ? state.running : a.kind === "runner" && a.alert > 0);
     const stride = strides.get(a) ?? {x:a.x, y:a.y, phase:(a.phase || 0) % 1};
@@ -1322,7 +1334,7 @@ const View = (() => {
     const swing = isPlayer && a.swing > 0 ? state.swingVisual : null;
     const dx = swing?.dx ?? a.headingX ?? (a.face < 0 ? -1 : 1), dy = swing?.dy ?? a.headingY ?? 0;
     const direction = Number(dx < dy) + 2 * Number(dx + dy < 0);
-    const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, lift);
+    const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, stride.phase, clock);
     if (!imported) {
       const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : "#748d7a") :
         Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
@@ -1375,7 +1387,7 @@ const View = (() => {
       ctx.restore();
     }
     if (darkLook) {
-      microActor(a, isPlayer, state, alive, x, y, scale);
+      microActor(a, isPlayer, state, alive, x, y, scale, clock);
       if (alive && a.origin === "cinema-winner") {
         const hand = x+(a.face || 1)*9, bob = a.moving ? Math.round(Math.sin(clock*5)*2) : 0;
         ctx.fillStyle = "#d5ad52";

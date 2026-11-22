@@ -374,15 +374,13 @@ const View = (() => {
   const cream = ["#bfc1a9", "#8f927e", "#747c6d"];
 
   const gardenTrees = [];
-  function gardenTree(x, y, tintValue) {
+  function gardenTree(x, y, tintValue, wind) {
     const variant = Number.isFinite(tintValue) ? clamp(Math.floor(tintValue * 4), 0, 3) : 0;
     let sprite = gardenTrees[variant];
     if (!sprite) {
       sprite = document.createElement("canvas");
       sprite.width = 54; sprite.height = 61;
       const c = sprite.getContext("2d");
-      c.fillStyle = "#41382c"; c.fillRect(25, 29, 5, 31);
-      c.fillStyle = "#786653"; c.fillRect(25, 34, 2, 24);
       const crown = [[16, 29, 12], [38, 30, 12], [27, 35, 14], [13, 20, 9],
         [36, 16, 12], [23, 13, 12], [28, 22, 15]];
       const leaves = [["#344334", "#43533b", "#566649", "#687652"],
@@ -404,7 +402,10 @@ const View = (() => {
     }
     const [sx, sy] = p(x, y);
     shadow(x, y, 24, 9, "#10171090");
-    ctx.drawImage(sprite, Math.round(sx) - 27, Math.round(sy) - 60);
+    const left = Math.round(sx) - 27, top = Math.round(sy) - 60;
+    ctx.fillStyle = "#41382c"; ctx.fillRect(left + 25, top + 29, 5, 31);
+    ctx.fillStyle = "#786653"; ctx.fillRect(left + 25, top + 34, 2, 24);
+    ctx.drawImage(sprite, left + wind, top);
   }
 
   const furnitureSprites = new Map();
@@ -548,7 +549,28 @@ const View = (() => {
     ctx.drawImage(sprite, Math.round(sx) - 36, Math.round(sy) - 49);
   }
 
-  function prop(o, state, clock) {
+  let smokeSprite;
+  function campfireSmoke(x, y, clock) {
+    if (!smokeSprite) {
+      smokeSprite = document.createElement("canvas");
+      smokeSprite.width = 16; smokeSprite.height = 12;
+      const smoke = smokeSprite.getContext("2d");
+      smoke.fillStyle = "#767771";
+      smoke.fillRect(2, 4, 12, 4); smoke.fillRect(5, 2, 7, 8);
+      smoke.fillStyle = "#a6a59a";
+      smoke.fillRect(4, 4, 7, 3);
+    }
+    const alpha = ctx.globalAlpha;
+    for (let i = 0; i < 3; i++) {
+      const age = (clock * .64 + i / 3) % 1;
+      const size = Math.round(9 + age * 11);
+      ctx.globalAlpha = alpha * .38 * Math.sin(age * Math.PI);
+      ctx.drawImage(smokeSprite, Math.round(x - 5 + age * 15), Math.round(y - 15 - age * 38), size, Math.round(size * .75));
+    }
+    ctx.globalAlpha = alpha;
+  }
+
+  function prop(o, state, clock, motion, smoke) {
     const {x, y, kind, tint: tone} = o;
     if (darkLook) {
       const furniture = kind === "locker" && !o.opened && World.tileAt(state.world, x, y)?.room === "Bedroom" ? "cupboard" : kind;
@@ -909,7 +931,11 @@ const View = (() => {
       return;
     }
     if(kind==="tree") {
-      if (darkLook && o.treeType !== "pine") { gardenTree(x, y, tone); return; }
+      if (darkLook && o.treeType !== "pine") {
+        const wind = motion ? Math.round(Math.sin(clock * 1.6 + x * .8 + y * .4) * (state.weather === "Rain" ? 3 : 2)) : 0;
+        gardenTree(x, y, tone, wind);
+        return;
+      }
       shadow(x,y,30,11);
       f(-.1,-.1,0,.2,.2,24,wood);
       if (o.treeType === "pine") {
@@ -1030,6 +1056,7 @@ const View = (() => {
       f(-.35,-.15,0,.7,.3,4,wood);
       f(-.15,-.35,3,.3,.7,4,wood);
       const [xx,yy]=p(x,y,8);
+      if (smoke) campfireSmoke(xx, yy, clock);
       const sway = state.reduceFlicker ? 0 : Math.sin(clock*11)*3;
       poly([[xx-8,yy],[xx-4,yy-13-sway],[xx+2,yy-8],[xx+6,yy-18],[xx+9,yy]],"#efb16a");
       const batch = Sim.fireBatch(state, o);
@@ -1978,6 +2005,7 @@ const View = (() => {
     const world=state.world,player=state.player,menu=state.mode==="menu",cave=world.underground;
     const atmosphere = state.visualAtmosphere ?? "off";
     const effects = !menu && atmosphere !== "off", full = atmosphere === "full";
+    const motion = effects && !state.reduceFlicker;
     const wet = effects && !cave && state.weather === "Rain";
     const night = Sim.isNight(state);
     wetGround.length = 0;
@@ -2066,6 +2094,13 @@ const View = (() => {
         ctx.fillRect(sx-13,sy-3,26,7);
         ctx.fillStyle = "#a8c4d02a";
         ctx.fillRect(sx-8,sy-2,16+(t.x%5),2);
+        if (motion && darkLook) {
+          const age = (clock * 1.7 + t.x * .37 + t.y * .23) % 1;
+          const spread = Math.floor(age * 6);
+          ctx.fillStyle = age < .5 ? "#afc1c66b" : "#879fa840";
+          ctx.fillRect(sx - spread, sy - 2, spread * 2 + 1, 1);
+          ctx.fillRect(sx - spread + 2, sy + 1, Math.max(1, spread * 2 - 3), 1);
+        }
       }
     }
     if (menu || !state.roofsHidden) for (const b of world.buildings) {
@@ -2085,7 +2120,7 @@ const View = (() => {
         if (!cave || shown(step.x,step.y)) shadow(step.x,step.y,i===0?5:3,i===0?2.5:1.6,"#dbc48b75");
       }
     }
-    let fireBudget = full ? 8 : 4;
+    let fireBudget = full ? 8 : 4, smokeBudget = full ? 6 : 2;
     for(const o of world.objects) {
       if(o.active&&onScreen(o.x,o.y)&&shown(o.x,o.y)&&(!covered(o)||o.action==="door"))stack.push({kind:"prop",obj:o,depth:o.x+o.y});
       if (o.active && o.kind === "campfire" && onScreen(o.x,o.y) && (!cave || shown(o.x,o.y))) {
@@ -2114,7 +2149,11 @@ const View = (() => {
     const combatFocus = reachable || state.target;
     for(const entry of stack) {
       if(entry.kind==="wall")wall(entry.obj,player,menu);
-      else if(entry.kind==="prop")prop(entry.obj,state,clock);
+      else if(entry.kind==="prop") {
+        const smoke = darkLook && motion && !cave && entry.obj.kind === "campfire" && smokeBudget > 0;
+        if (smoke) smokeBudget--;
+        prop(entry.obj, state, clock, motion && !cave, smoke);
+      }
       else if(entry.kind==="roof") {
         if (entry.fade) {
           ctx.save();

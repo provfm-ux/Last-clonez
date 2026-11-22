@@ -3,9 +3,9 @@ extends SceneTree
 const CELL := Vector2i(18, 32)
 const INK := Color("#171c1b")
 const BOOT := Color("#242927")
-const SKIN := Color("#a7a985")
-const SKIN_SHADE := Color("#67775d")
-const BLOOD := Color("#6a2427")
+const SKIN := Color("#b9b690")
+const SKIN_SHADE := Color("#686f54")
+const BLOOD := Color("#69292a")
 const COATS := ["#647b68", "#816f54", "#657e87", "#795355", "#777c52", "#665e74", "#899190"]
 const TROUSERS := ["#46514b", "#4c4940", "#3c4c52", "#4e4344", "#4d5140", "#41434e", "#4b5255"]
 const HAIR := ["#3e4032", "#5e503e", "#464539", "#514145", "#4f513a", "#414140", "#696b5e"]
@@ -39,12 +39,12 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 	var hair := Color(HAIR[variant])
 	var stride := [0, 2, 0, -2][frame] as int if pose == 1 else 0
 	var bob := int(frame == 1 or frame == 3) if pose < 2 else 0
-	var lean := [0, -1, 1, 2][frame] as int if pose == 2 else 0
+	var lean := [0, -2, 1, 2][frame] as int if pose == 2 else [0, 1, 0, -1][frame] as int
 	if pose == 3:
 		lean = [-2, -1, -1, 0][frame]
-	var shoulder := 10 - bob + int(pose == 3 and frame == 0)
-	var head_x := 7 + lean - int(pose == 1 and frame == 2)
-	var head_y := 3 - bob + int(pose == 3)
+	var shoulder := 9 + bob + int(pose == 3 and frame == 0)
+	var head_x := 9 + lean - int(pose == 1 and frame == 2)
+	var head_y := 5 + bob + int(pose == 3) + int(variant % 3 == 1)
 	# Far leg and near leg share a planted baseline at y=30.
 	pixels(5, 20, 7, 4, INK)
 	for leg in range(2):
@@ -55,35 +55,43 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 		pixels(foot_x, foot_y, 4, 2, BOOT)
 		pixels(foot_x + 1, foot_y, 2, 1, pants)
 	# Far sleeve, ragged jacket, and forward arm.
-	pixels(3 + lean, shoulder + 3, 4, 9, INK)
+	pixels(3 + lean, shoulder + 4, 4, 10, INK)
 	pixels(4 + lean, shoulder + 4, 2, 6, coat.darkened(0.26))
-	pixels(4 + lean, shoulder + 10, 2, 1, SKIN_SHADE)
-	pixels(6 + lean, shoulder, 7, 12, INK)
+	pixels(4 + lean, shoulder + 10, 2, 4, SKIN_SHADE)
+	pixels(5 + lean, shoulder + 13, 2, 2, SKIN)
+	pixels(7 + lean, shoulder - 1, 5, 2, INK)
+	pixels(5 + lean, shoulder, 8, 12, INK)
 	pixels(7 + lean, shoulder + 1, 5, 9, coat)
-	pixels(7 + lean, shoulder + 2, 2, 5, coat.lightened(0.15))
+	pixels(6 + lean, shoulder + 2, 2, 6, coat.lightened(0.11))
+	pixels(7 + lean, shoulder + 8, 1, 4, coat.darkened(0.18))
 	pixels(10 + lean, shoulder + 5, 2, 5, coat.darkened(0.25))
 	pixels(8 + lean, shoulder + 9, 1, 2, coat)
 	pixels(9 + lean, shoulder + 4, 1, 2, BLOOD)
 	pixels(8 + lean, shoulder + 5, 1, 1, BLOOD.darkened(0.2))
-	var reach := 3 + int(pose == 2 and frame >= 2)
+	var lunge := pose == 2 and frame >= 2
+	var reach := 2 + int(lunge) * 2
 	var arm_x := mini(11 + lean, 18 - reach - 2)
-	var arm_y := shoulder + 4 - int(pose == 2 and frame >= 2) * 2 + int(pose == 0 and frame == 2)
+	var arm_y := shoulder + 7 - int(lunge) * 5 + int(pose == 1 and frame == 3)
 	pixels(arm_x, shoulder + 2, 3, arm_y - shoulder + 1, INK)
 	pixels(arm_x, arm_y, reach + 2, 4, INK)
 	pixels(arm_x + 1, arm_y + 1, reach, 2, coat.darkened(0.11))
 	pixels(arm_x + reach, arm_y + 1, 2, 2, SKIN_SHADE)
 	pixels(arm_x + reach, arm_y + 1, 1, 1, SKIN)
-	# Head silhouette, cheek highlight and recessed eye.
-	pixels(head_x + 1, head_y, 5, 1, INK)
-	pixels(head_x, head_y + 1, 7, 6, INK)
-	pixels(head_x + 1, head_y + 1, 5, 2, hair)
-	pixels(head_x + 2, head_y + 3, 5, 3, SKIN_SHADE)
-	pixels(head_x + 3, head_y + 3, 3, 2, SKIN)
-	pixels(head_x + 5, head_y + 3, 1, 1, INK)
-	pixels(head_x + 5, head_y + 5, 2, 1, BLOOD)
-	pixels(head_x + 3, head_y + 6, 3, 1, SKIN_SHADE)
-	if pose == 3:
-		pixels(head_x + 4, head_y + 4, 1, 1, Color("#c68170"))
+	# Crooked skull, sunken socket and a hanging jaw.
+	pixels(head_x + 1, head_y, 4, 1, INK)
+	pixels(head_x, head_y + 1, 6, 5, INK)
+	pixels(head_x + 1, head_y + 1, 4, 2, hair)
+	pixels(head_x + 2, head_y + 2, 4, 3, SKIN_SHADE)
+	pixels(head_x + 4, head_y + 2, 2, 1, SKIN)
+	pixels(head_x + 4, head_y + 3, 2, 1, INK)
+	pixels(head_x + 5, head_y + 3, 1, 1, Color("#d1ba8b"))
+	pixels(head_x + 3, head_y + 5, 4, 3, INK)
+	pixels(head_x + 4, head_y + 5, 2, 1, BLOOD)
+	pixels(head_x + 5, head_y + 6, 2, 1, SKIN_SHADE)
+	pixels(head_x + 4, head_y + 7, 2, 1, SKIN_SHADE)
+	if lunge:
+		pixels(15, head_y + 6, 2, 2, INK)
+		pixels(16, head_y + 7, 1, 1, SKIN)
 
 	# Outfit details stay readable at native scale and follow torso or head motion.
 	match variant:

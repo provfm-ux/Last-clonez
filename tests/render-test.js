@@ -10,6 +10,7 @@ const pascal = f => f.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(
 const counts = {};
 let heldWeapon = null;
 const infectedFrames = [];
+const smokeFrames = [], canopyPositions = [], rippleFrames = [];
 let beamOpacity = 1;
 const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
   get(t, k) { if (k in t) return t[k]; if (k === "canvas") return {width: 1280, height: 720}; if (k === "measureText") return () => ({width: 10});
@@ -17,9 +18,11 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
     if (k === "createRadialGradient" || k === "createLinearGradient") return () => { counts[k] = (counts[k] || 0) + 1; return {addColorStop() {}}; };
     return (...args) => {
       counts[k] = (counts[k] || 0) + 1;
+      if (k === "fillRect" && (t.fillStyle === "#afc1c66b" || t.fillStyle === "#879fa840")) rippleFrames.push(args);
       if (k === "save") t.savedAlpha.push(t.globalAlpha);
       if (k === "restore") t.globalAlpha = t.savedAlpha.pop() ?? 1;
       if (k === "drawImage" && args.length === 5) {
+        if (args[0]?.width === 16 && args[0]?.height === 12) smokeFrames.push(args.slice(1));
         if (args[0]?.width === 104 && args[0]?.height === 104) counts.windowGlow = (counts.windowGlow ?? 0) + 1;
         if (args[0]?.width === 68 && args[0]?.height === 68) counts.fireWindow = (counts.fireWindow ?? 0) + 1;
         if (args[0]?.width === 206 && args[0]?.height === 206) counts.fireGlow = (counts.fireGlow ?? 0) + 1;
@@ -29,6 +32,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
           beamOpacity = t.globalAlpha;
         }
       }
+      if (k === "drawImage" && args.length === 3 && args[0]?.width === 54 && args[0]?.height === 61) canopyPositions.push(args[1]);
       if (k === "drawImage" && args.length === 3 && args[0]?.width === 72 && args[0]?.height === 64) {
         counts.furnitureBlit = (counts.furnitureBlit || 0) + 1;
       }
@@ -232,6 +236,24 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   run.world.objects.push({kind:"campfire",x:player.x,y:player.y,active:true});
   const fire = per(() => View.render(run,1,.016));
   check("fogueira no exterior: luz no chão e brilho fraco perto da janela após corte", fire.fireGlow > 0 && fire.fireWindow > 0);
+
+  run.look = "dark";
+  run.reduceFlicker = false;
+  run.world.objects.push({kind:"tree",x:player.x,y:player.y,active:true,tint:.25});
+  const worldMotion = clock => {
+    smokeFrames.length = canopyPositions.length = rippleFrames.length = 0;
+    View.render(run, clock, .016);
+    return {smoke:JSON.stringify(smokeFrames), trees:JSON.stringify(canopyPositions), rain:JSON.stringify(rippleFrames)};
+  };
+  const ambientStart = worldMotion(1), ambientLater = worldMotion(1.85);
+  run.reduceFlicker = true;
+  const stillStart = worldMotion(1), stillLater = worldMotion(1.85);
+  check("dark pixel: fumo, copas e poças animam, reduzir cintilação desativa o movimento ambiente",
+    ambientStart.smoke !== "[]" && ambientStart.smoke !== ambientLater.smoke &&
+    ambientStart.trees !== "[]" && ambientStart.trees !== ambientLater.trees &&
+    ambientStart.rain !== "[]" && ambientStart.rain !== ambientLater.rain &&
+    stillStart.smoke === "[]" && stillLater.smoke === "[]" && stillStart.trees === stillLater.trees &&
+    stillStart.rain === "[]" && stillLater.rain === "[]");
 
   run.minutes = 19*60;
   for (const look of ["dark","fast","classic"]) {

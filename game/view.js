@@ -1451,17 +1451,12 @@ const View = (() => {
         [sx-6+armSwing,sy+12],[sx-8+armSwing,sy+8],[sx-8,sy+2]], ink);
       shape([[sx-6,sy+1],[sx-4,sy+2],[sx-5+armSwing,sy+7],[sx-7+armSwing,sy+8],[sx-7,sy+3]], shirt);
       pixel(sx-6+armSwing,sy+9,2,2,skin);
-      shape([[sx-5,sy-2],[sx+3,sy-2],[sx+7,sy+1],[sx+6,sy+6],[sx+4,hip],
-        [sx-5,hip+1],[sx-7,hip-3],[sx-7,sy+2]], ink);
-      shape([[sx-5,sy-1],[sx+2,sy-1],[sx+6,sy+1],[sx+5,sy+6],[sx+3,hip-1],
-        [sx-4,hip],[sx-6,hip-3],[sx-6,sy+2]], shirt);
-      shape([[sx-5,sy],[sx+2,sy],[sx+1,sy+2],[sx-3,sy+3],[sx-5,sy+6]], "#d9c7a65e");
-      if (axial && !back) {
-        pixel(sx+4,sy+3,1,hip-sy-5,"#27372c66");
-      } else {
-        shape([[sx+2,sy+3],[sx+5,sy+3],[sx+3,hip-1],[sx-1,hip-1],[sx+1,sy+7]], "#16282578");
-      }
-      pixel(sx-4,hip-2,7,1,"#302f29");
+      shape([[sx-5,sy-2],[sx+3,sy-2],[sx+6,sy+1],[sx+4,sy+6],[sx+3,hip],
+        [sx-4,hip],[sx-5,hip-3],[sx-7,sy+2]], ink);
+      shape([[sx-5,sy-1],[sx+2,sy-1],[sx+5,sy+1],[sx+3,sy+6],[sx+2,hip-1],
+        [sx-3,hip-1],[sx-4,hip-3],[sx-6,sy+2]], shirt);
+      shape([[sx-5,sy],[sx+2,sy],[sx+1,sy+2],[sx-3,sy+3]], "#d9c7a65e");
+      pixel(sx+2,sy+5,1,Math.max(1,hip-sy-6),"#27372c66");
       if (showPack) {
         shape([[sx-5,sy],[sx+1,sy],[sx+3,sy+3],[sx+2,hip-1],[sx-5,hip],[sx-7,hip-3],[sx-7,sy+3]], ink);
         shape([[sx-5,sy+1],[sx+1,sy+1],[sx+2,sy+3],[sx+1,hip-2],[sx-5,hip-1],[sx-6,hip-3],[sx-6,sy+3]], "#596249");
@@ -1480,11 +1475,11 @@ const View = (() => {
           pixel(sx-1,sy+2,1,hip-sy-4,"#38463a");
           pixel(sx-4,sy+4,2,1,"#bdbba0");
         }
-        pixel(sx-1,hip-2,2,1,"#b49a70");
+
       }
-      const handX = strike ? Math.min(27, sx + [5,11,9][gesture]) : sx + 5 - armSwing;
-      const handY = strike ? sy + [3,5,2][gesture] : sy + 10 + Math.sign(step);
-      const elbow = strike ? sx + 5 : sx + 6 - Math.sign(step);
+      const handX = strike ? Math.min(27, sx + [5,11,9][gesture]) : sx + 7 + Math.sign(-armSwing);
+      const handY = strike ? sy + [3,5,2][gesture] : Math.min(33,sy + 12 + Math.sign(step));
+      const elbow = strike ? sx + 5 : sx + 7;
       shape([[sx+2,sy],[sx+6,sy],[elbow+2,sy+5],[handX+2,handY-1],[handX+2,handY+2],
         [handX-2,handY+2],[elbow-2,sy+7],[sx+1,sy+3]], ink);
       shape([[sx+2,sy+1],[sx+5,sy+1],[elbow+1,sy+5],[handX,handY],[handX-2,handY+1],[elbow-1,sy+6]], shirt);
@@ -1538,7 +1533,7 @@ const View = (() => {
     rollingpin: [[1,0,13,1,lightWood],[3,-2,8,5,woodGrip],[4,-2,6,1,lightWood],[4,2,6,1,"#825132"]]
   };
   const weaponSprites = new Map();
-  const weaponAngles = [-1.15, -.45, .38, .95, 0, -.25];
+  const weaponAngles = [-1.15, -.45, .38, .95, 0, -.25, 1.28];
   const weaponExtent = 36;
 
   function drawHeldWeapon(id, x, y, side, phase) {
@@ -1668,7 +1663,7 @@ const View = (() => {
       if (isPlayer && frame.grip) {
         const id = swing?.weapon ?? Sim.weapon(state).id;
         const phase = swing ? (id === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
-          a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : step > 0 ? 2 : 1;
+          a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : 6;
         drawHeldWeapon(id, left + Math.round(frame.grip[0] * scale), top + Math.round(frame.grip[1] * scale), dx < dy ? -1 : 1, phase);
       }
     }

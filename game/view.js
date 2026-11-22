@@ -409,7 +409,7 @@ const View = (() => {
   }
 
   const furnitureSprites = new Map();
-  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug", "crate", "generator"]);
+  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug", "crate", "generator", "barrel", "radio"]);
 
   function paintFurniture(kind, variant, powered) {
     const oak = ["#947859", "#735943", "#514035"];
@@ -418,6 +418,10 @@ const View = (() => {
     const enamel = ["#c7c9b4", "#a3a796", "#777e76"];
     const metal = ["#b1b7aa", "#818c86", "#576965"];
     const edge = (a, b, color) => line(p(...a), p(...b), color);
+    const mark = (position, color, width = 1, height = 1) => {
+      const [x, y] = p(...position);
+      dot(x, y, width, height, color);
+    };
     if (kind !== "rug") shadow(0, 0, kind === "bed" || kind === "sofa" ? 28 : 23, 9, "#0d120f70");
 
     switch (kind) {
@@ -432,6 +436,34 @@ const View = (() => {
         ctx.fillRect(x-2,y-4,4,3);
         break;
       }
+      case "barrel": {
+        const paint = ["#56746d", "#3f6059", "#304b46"];
+        box(-.29, -.29, 0, .58, .58, 4, paint);
+        box(-.31, -.31, 3, .62, .62, 2, metal);
+        box(-.29, -.29, 5, .58, .58, 11, paint);
+        box(-.31, -.31, 15, .62, .62, 2, metal);
+        box(-.29, -.29, 17, .58, .58, 6, paint);
+        box(-.32, -.32, 22, .64, .64, 2, metal);
+        box(-.26, -.26, 24, .52, .52, 1, powered ? ["#486963", "#344e48", "#2a403c"] : paint);
+        edge([-.13, .293, 6], [-.13, .293, 15], "#92a08a");
+        edge([.18, .293, 6], [.18, .293, 15], "#2c483e");
+        mark([-.23, .295, 14], "#b28c64", 2, 2);
+        mark([.12, .295, 7], "#8d6249", 3, 1);
+        mark([.11, -.13, 25], "#aeb29a", 2, 2);
+        if (powered) edge([-.2, .05, 25], [.09, .05, 25], "#9cae9d");
+        break;
+      }
+      case "radio":
+        box(-.35, -.27, 0, .70, .54, 19, oak);
+        box(-.26, -.20, 19, .52, .40, 11, iron);
+        edge([.14, -.16, 30], [.14, -.16, 43], "#a3a999");
+        mark([.14, -.16, 43], "#c4bda0", 1, 2);
+        box(-.22, .20, 21, .19, .03, 7, rubber);
+        for (const z of [22, 24, 26]) edge([-.20, .235, z], [-.06, .235, z], "#68726a");
+        mark([.04, .235, 26], powered ? "#c0d58f" : "#745945", 4, 2);
+        mark([.15, .235, 22], "#c1b298", 2, 2);
+        mark([-.12, .275, 16], "#9eaa9c", 2, 1);
+        break;
       case "crate":
         box(-.35, -.31, 0, .70, .62, 17, oak);
         for (const z of [4, 9, 14]) {
@@ -440,6 +472,14 @@ const View = (() => {
         }
         for (const x of [-.32, .24]) box(x, .31, 1, .075, .045, 16, metal);
         edge([-.23, -.18, 17], [.23, -.18, 17], "#b89b74");
+        for (const x of [-.29, .27]) for (const z of [3, 13]) mark([x, .361, z], "#d1c09b");
+        for (const z of [6, 11, 15]) {
+          edge([-.19, .313, z], [.09, .313, z], "#a0835b");
+          mark([.16, .314, z - 1], "#574332", 2);
+        }
+        const stencil = ["#baad83", "#a6a18d", "#917050"][variant];
+        mark([-.12, .315, 11], stencil, 3, 2);
+        mark([-.03, .315, 10], stencil, 2);
         break;
       case "generator":
         box(-.38, -.30, 0, .76, .60, 3, rubber);
@@ -449,6 +489,10 @@ const View = (() => {
         for (const z of [6, 8, 10, 12]) edge([-.25, .305, z], [.02, .305, z], "#293533");
         box(.10, .25, 9, .12, .05, 5, rubber);
         box(.13, .305, 11, .06, .03, 2, powered ? ["#bfd391", "#95aa6a", "#7c8f55"] : metal);
+        edge([-.20, -.12, 18], [.14, -.12, 18], "#e0ceb1");
+        mark([.16, .09, 18], "#414a44", 3, 2);
+        mark([.312, .11, 11], "#bf9169", 2, 2);
+        for (const x of [-.25, .02]) mark([x, .307, 13], "#c5baa1");
         break;
       case "bed": {
         for (const side of [-.32, .26]) for (const end of [-.43, .38]) box(side, end, 0, .07, .07, 9, oak);
@@ -475,6 +519,10 @@ const View = (() => {
         const [px, py] = p(.24, .36, 28);
         dot(px, py, 2, 1, powered ? "#ceda91" : "#666f61");
         dot(px - 10, py + 7, 3, 2, "#a480697d");
+        mark([.14, .36, 17], "#b19069", 3, 2);
+        mark([.15, .36, 16], "#c9b38b", 2);
+        edge([-.31, .36, 7], [.29, .36, 7], "#818a7a");
+        mark([.22, .36, 8], "#927b65", 2);
         break;
       }
       case "sink":
@@ -605,7 +653,10 @@ const View = (() => {
       const furniture = kind === "locker" && !o.opened && World.tileAt(state.world, x, y)?.room === "Bedroom" ? "cupboard" : kind;
       if (furnitureKinds.has(furniture)) {
         const variant = Number.isFinite(tone) ? clamp(Math.floor(tone * 3), 0, 2) : 0;
-        const powered = kind === "generator" ? Boolean(o.running) : kind === "fridge" && Sim.hasPower(state, o);
+        const powered = kind === "generator" ? Boolean(o.running) :
+          kind === "barrel" ? Sim.rainBottles(o) > 0 :
+          kind === "radio" ? Boolean(state.flags.radio) :
+          kind === "fridge" && Sim.hasPower(state, o);
         drawFurniture(furniture, x, y, variant, powered);
         if (kind === "generator" && powered) glow(x, y, "#9dca77", 30, .35);
         return;
@@ -1234,6 +1285,8 @@ const View = (() => {
         rect(foot + 1, hip + 1, 1, 3, "#c4c7a750");
         rect(foot - 1, y, 4, 2, boots);
         rect(foot + 1, y, 2, 1, "#6d6c58");
+        rect(foot, y + 1, 3, 1, "#191e1d");
+        rect(foot, y - 2, 1, 1, "#b0a78975");
       }
       rect(7 + lean, shoulder, 10, hip - shoulder + 1, ink);
       rect(8 + lean, shoulder + 1, 8, hip - shoulder - 1, shirt);
@@ -1242,6 +1295,8 @@ const View = (() => {
       if (!back) {
         rect(12 + lean, shoulder + 2, 1, hip - shoulder - 3, "#242d2b8c");
         rect(13 + lean, shoulder + 4, 2, 2, "#d2c6a63d");
+        rect(13 + lean, shoulder + 6, 2, 1, "#29342d85");
+        rect(12 + lean, shoulder + 3, 1, 1, "#bca97e");
       }
       rect(8 + lean, hip - 2, 8, 1, "#2b302be0");
       if (!back) rect(12 + lean, hip - 2, 2, 1, "#bfaa78");
@@ -1249,7 +1304,12 @@ const View = (() => {
       if (pack) {
         const px = back ? 9 + lean : 6 + lean;
         rect(px, shoulder + 2, back ? 6 : 3, 7, "#3d4836");
-        rect(px + 1, shoulder + 3, 2, 3, "#73785a");
+        rect(px + 1, shoulder + 3, back ? 4 : 2, 2, "#73785a");
+        rect(px + 1, shoulder + 5, back ? 4 : 2, 1, "#a29865");
+        if (back) {
+          rect(px + 1, shoulder + 6, 4, 2, "#505942");
+          rect(px + 2, shoulder + 6, 1, 1, "#c0ae7d");
+        }
       }
       const reaches = pose === "strike" || pose === "chase";
       const arm = pose === "strike" ? gesture : reaches ? 2 : step;
@@ -1271,6 +1331,9 @@ const View = (() => {
       if (!back) {
         rect(14 + lean, head + 3, 2, 2, skin);
         rect(14 + lean, head + 3, 1, 1, ink);
+        rect(12 + lean, head + 2, 2, 1, "#e3bb8d");
+        rect(13 + lean, head + 5, 1, 1, "#bd9879");
+        rect(11 + lean, head + 4, 1, 1, "#97725a");
       }
       if (pose === "hurt") rect(13 + lean, head + 4, 2, 1, "#a35749");
     }

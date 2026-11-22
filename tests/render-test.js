@@ -296,6 +296,20 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
     stillStart.smoke === "[]" && stillLater.smoke === "[]" && stillStart.trees === stillLater.trees &&
     stillStart.rain === "[]" && stillLater.rain === "[]");
 
+  const barrel = {kind:"barrel", x:player.x, y:player.y, active:true, water:0};
+  const radio = {kind:"radio", x:player.x, y:player.y, active:true};
+  run.world.objects.push(barrel, radio);
+  run.flags.radio = false;
+  const emptyProps = worldMotion(1).props;
+  barrel.water = context.Data.rainCollector.bottleVolume;
+  run.flags.radio = true;
+  const activeProps = worldMotion(1).props;
+  const reusedProps = worldMotion(1).props;
+  check("dark pixel: rádio e barril alternam entre sprites em cache",
+    emptyProps.length === activeProps.length &&
+    emptyProps.filter((sprite, index) => sprite !== activeProps[index]).length === 2 &&
+    activeProps.every((sprite, index) => sprite === reusedProps[index]));
+
   run.minutes = 19*60;
   for (const look of ["dark","fast","classic"]) {
     run.look = look;

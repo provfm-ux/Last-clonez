@@ -179,8 +179,34 @@ const View = (() => {
     } else if (t.surface === "asphalt") {
       if (h % 4 === 0) { const [a, b] = at(.2, .3), [c, d] = at(.5, .55), [e, f] = at(.8, .5); line([a, b], [c, d], "#141212c0", 1); line([c, d], [e, f], "#141212c0", 1); }
       for (let k = 0; k < 3; k++) { const q = ((h + k * 31) * 2654435761) >>> 0, [px, py] = at((q % 80) / 100 + .1, ((q >> 8) % 80) / 100 + .1); dot(px, py, 2, 2, k % 2 ? "#3a3a3a" : "#777168"); }
+      if (h % 11 === 0) {
+        const grate = [at(.54,.65),at(.74,.65),at(.74,.86),at(.54,.86)];
+        poly(grate, "#242830", "#73746b");
+        for (const r of [.69,.74,.79,.84]) line(at(.56,r),at(.72,r),"#77796f");
+      } else if (h % 7 === 0) {
+        const stain = [at(.25,.51),at(.48,.44),at(.67,.61),at(.54,.78),at(.31,.72)];
+        poly(stain, "#23262c61");
+        const [sx, sy] = at(.44,.58);
+        dot(sx,sy,3,1,"#9b9e8552");
+      }
+    } else if (t.surface === "path" || t.surface === "concrete") {
+      if (h % 3 === 0) {
+        line(at(.24,.16),at(.38,.37),"#353b33");
+        line(at(.38,.37),at(.32,.52),"#353b33");
+        const [sx, sy] = at(.33,.53);
+        dot(sx,sy-2,1,3,"#767f4f");
+        dot(sx+1,sy-1,2,1,"#94987a");
+      }
+      if (h % 5 === 0) {
+        line(at(.58,.27),at(.83,.27),"#c2b79859");
+        line(at(.58,.30),at(.81,.30),"#464a3e69");
+      }
     } else if (t.surface === "tile" || t.surface === "sand") {
       for (let k = 0; k < 4; k++) { const q = ((h + k * 733) * 2654435761) >>> 0, [px, py] = at((q % 80) / 100 + .1, ((q >> 8) % 80) / 100 + .1); dot(px, py, 2, 2, t.surface === "sand" ? "#c9b98c" : k % 2 ? "#2c2820" : "#5a5444"); }
+    }
+    if (t.surface === "tile" && t.room && h % 4 === 0) {
+      line(at(.21,.40),at(.71,.40),"#ab967458");
+      line(at(.26,.43),at(.63,.43),"#52463264");
     }
     if (t.nearHome && (t.surface === "tile" || t.surface === "path") && h % 29 === 0) {
       const [px, py] = at(.36, .57);
@@ -409,7 +435,7 @@ const View = (() => {
   }
 
   const furnitureSprites = new Map();
-  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug", "crate", "generator", "barrel", "radio"]);
+  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug", "crate", "generator", "barrel", "radio", "bench", "chair", "cart"]);
 
   function paintFurniture(kind, variant, powered) {
     const oak = ["#947859", "#735943", "#514035"];
@@ -508,6 +534,34 @@ const View = (() => {
         mark([.04, .235, 26], powered ? "#c0d58f" : "#745945", 4, 2);
         mark([.15, .235, 22], "#c1b298", 2, 2);
         mark([-.12, .275, 16], "#9eaa9c", 2, 1);
+        break;
+      case "bench":
+      case "chair": {
+        const half = kind === "bench" ? .47 : .24;
+        for (const x of [-half + .03, half - .10]) {
+          box(x, -.22, 0, .07, .08, 23, metal);
+          box(x, .15, 0, .07, .08, 10, metal);
+        }
+        for (const y of [-.22, -.06, .10]) box(-half, y, 9, half * 2, .13, 2, oak);
+        for (const z of [15, 20]) {
+          box(-half, -.24, z, half * 2, .085, 3, oak);
+          edge([-half + .04,-.15,z+2],[half - .06,-.15,z+2],"#b59b73");
+          for (const x of [-half + .10, half - .11]) mark([x,-.149,z+1],"#485650");
+        }
+        break;
+      }
+      case "cart":
+        for (const x of [-.30,.22]) for (const y of [-.23,.16]) box(x,y,0,.10,.10,5,rubber);
+        box(-.37,-.28,4,.74,.56,3,metal);
+        box(-.34,-.25,7,.68,.50,8,variant === 2 ? red : iron);
+        box(-.31,-.22,15,.62,.44,1,["#3a4945","#35443d","#2f3e37"]);
+        edge([-.30,.25,12],[.30,.25,12],"#8d9b90");
+        for (const x of [-.24,-.08,.08,.24]) edge([x,.253,8],[x,.253,13],"#a5a68f");
+        box(-.36,-.27,10,.06,.06,9,metal);
+        box(-.36,.19,10,.06,.06,9,metal);
+        box(-.38,-.27,19,.10,.52,2,metal);
+        if (powered) box(-.21,.26,9,.42,.26,2,metal);
+        else mark([.02,.256,10],"#c3b391",3,1);
         break;
       case "crate":
         box(-.35, -.31, 0, .70, .62, 17, oak);
@@ -701,6 +755,7 @@ const View = (() => {
         const powered = kind === "generator" ? Boolean(o.running) :
           kind === "barrel" ? Sim.rainBottles(o) > 0 :
           kind === "radio" ? Boolean(state.flags.radio) :
+          kind === "cart" ? Boolean(o.opened) :
           kind === "fridge" && Sim.hasPower(state, o);
         drawFurniture(furniture, x, y, variant, powered);
         if (kind === "generator" && powered) glow(x, y, "#9dca77", 30, .35);
@@ -1332,89 +1387,84 @@ const View = (() => {
       rect(2, 26, 20, 5, ink); rect(3, 27, 7, 3, trousers);
       rect(10, 25, 7, 5, shirt); rect(17, 26, 4, 4, skin); rect(20, 26, 2, 3, hair);
     } else {
-      const low = pose === "rest" ? 6 : pose === "sneak" ? 3 : 0;
-      const leap = pose === "run" ? 2 : 0;
-      const lean = pose === "hurt" ? -2 : pose === "strike" ? gesture - 1 : pose === "chase" || pose === "run" || pose === "sneak" ? 1 : 0;
-      const shoulder = 9 + low - leap - Number(lift !== 0) - (pose === "idle" ? gesture : 0);
-      const hip = Math.min(23, shoulder + 10);
-      rect(8, hip - 1, 8, 3, ink);
-      for (const [index, x] of [8, 13].entries()) {
-        const stride = index ? -step : step;
-        const foot = x + stride;
-        const y = 28 + Math.sign(stride) - (lift === (index ? 1 : -1) ? 2 : 0);
-        rect(x - 1, hip, 4, 4, ink);
-        rect(x, hip, 2, 4, trousers);
-        rect(foot - 1, hip + 3, 4, y - hip - 1, ink);
-        rect(foot, hip + 3, 2, Math.max(0, y - hip - 2), trousers);
-        rect(foot + 1, hip + 1, 1, 3, "#c4c7a750");
-        rect(foot - 1, y, 4, 2, boots);
-        rect(foot + 1, y, 2, 1, "#6d6c58");
-        rect(foot, y + 1, 3, 1, "#191e1d");
-        rect(foot, y - 2, .8, .8, "#b0a78975");
-        rect(foot + .8, y - .8, 1.6, .8, "#47473c");
-        rect(foot + .8, y, .8, .8, "#b4a384");
-      }
-      rect(7 + lean, shoulder, 10, hip - shoulder + 1, ink);
-      rect(8 + lean, shoulder + 1, 8, hip - shoulder - 1, shirt);
-      rect(8 + lean, shoulder + 1, 4, 2, "#d2c6a643");
-      rect(9 + lean, shoulder + 3, 1, Math.min(5, hip - shoulder - 3), "#d2c6a630");
-      if (!back) {
-        rect(12 + lean, shoulder + 2, 1, hip - shoulder - 3, "#242d2b8c");
-        rect(13 + lean, shoulder + 4, 2, 2, "#d2c6a63d");
-        rect(13 + lean, shoulder + 6, 2, 1, "#29342d85");
-        rect(12 + lean, shoulder + 3, 1, 1, "#bca97e");
-      }
-      rect(8 + lean, shoulder + 2, .8, 3.2, "#a4a38b60");
-      rect(10 + lean, shoulder + 6.4, 1.6, .8, "#b3a38650");
-      rect(8 + lean, hip - 2, 8, 1, "#2b302be0");
-      if (!back) rect(12 + lean, hip - 2, 2, 1, "#bfaa78");
-      rect(15 + lean, shoulder + 2, 1, 8, "#151a194f");
-      if (pack) {
-        const px = back ? 9 + lean : 6 + lean;
-        rect(px, shoulder + 2, back ? 6 : 3, 7, "#3d4836");
-        rect(px + 1, shoulder + 3, back ? 4 : 2, 2, "#73785a");
-        rect(px + 1, shoulder + 5, back ? 4 : 2, 1, "#a29865");
-        if (back) {
-          rect(px + 1, shoulder + 6, 4, 2, "#505942");
-          rect(px + 2, shoulder + 6, 1, 1, "#c0ae7d");
-          rect(px - .8, shoulder + 2.4, 1.6, 3.2, "#38453a");
-          rect(px - .8, shoulder + 2.4, 1.6, .8, "#8a926f");
-          rect(px + 5, shoulder + 6.4, .8, 1.6, "#a39a76");
+      const shape = (points, color) => {
+        c.beginPath();
+        for (const [i, [x, y]] of points.entries()) {
+          const px = left + (side > 0 ? x : spriteWidth - x);
+          if (i === 0) c.moveTo(px, top + y);
+          else c.lineTo(px, top + y);
         }
+        c.closePath();
+        c.fillStyle = color;
+        c.fill();
+      };
+      const pixel = (x, y, w, h, color) => rect(x / actorDetail, y / actorDetail, w / actorDetail, h / actorDetail, color);
+      const strike = pose === "strike" || pose === "chase";
+      const crouch = pose === "rest" ? 7 : pose === "sneak" ? 4 : 0;
+      const lean = pose === "hurt" ? -3 : strike ? [-2,1,3][gesture] : pose === "run" || pose === "sneak" ? 2 : 0;
+      const sx = 14 + lean, sy = 12 + crouch - Number(lift !== 0) - (pose === "idle" ? gesture : 0);
+      const hip = Math.min(29, sy + 12);
+      for (const [leg, x] of [17, 11].entries()) {
+        const stride = (leg ? step : -step) * 2;
+        const knee = x + Math.round(stride * .6) + (crouch ? 2 : 0);
+        const foot = x + stride, sole = 37 - (lift === (leg ? -1 : 1) ? 3 : 0);
+        shape([[x-3,hip-1],[x+3,hip-1],[knee+2,hip+5],[foot+2,sole-2],[foot+4,sole-1],
+          [foot+4,sole+1],[foot-3,sole+1],[foot-3,sole-2],[knee-3,hip+5]], ink);
+        shape([[x-2,hip],[x+2,hip],[knee+1,hip+5],[foot+1,sole-2],[foot-2,sole-2],[knee-2,hip+5]],
+          leg ? trousers : "#343e3e");
+        pixel(foot-1, sole-1, 4, 1, boots);
+        pixel(foot+1, sole-1, 2, 1, "#77705d");
+        pixel(knee-1, Math.min(sole-3,hip+5), 2, 1, "#91978175");
       }
-      const reaches = pose === "strike" || pose === "chase";
-      const arm = pose === "strike" ? gesture : reaches ? 2 : step;
-      rect(5 + lean, shoulder + 2 + step, 3, 7, ink);
-      rect(6 + lean, shoulder + 3 + step, 2, 4, shirt);
-      rect(6 + lean, shoulder + 7 + step, 2, 2, skin);
-      rect(16 + lean, shoulder + 2 - arm, reaches ? 6 : 3, reaches ? 4 : 7, ink);
-      rect(16 + lean, shoulder + 3 - arm, reaches ? 4 : 2, reaches ? 2 : 4, shirt);
-      const handX = reaches ? 19 + gesture : 17 + lean, handY = shoulder + (reaches ? 3 : 7) - arm;
-      rect(handX, handY, 2, 2, skin);
-      rect(handX, handY, .8, .8, "#d4b18a");
-      rect(handX + .8, handY + .8, .8, .8, "#735848");
-      rect(16 + lean, shoulder + 4.8 - arm, 1.6, .8, "#b1a58572");
-      const gripX = Math.round((handX + 1) * actorDetail);
-      grip = [side > 0 ? gripX : spriteWidth - gripX, Math.round((handY + 1) * actorDetail)];
-      rect(10.4 + lean, shoulder - .8, 3.2, 1.6, "#493f36");
-      rect(12 + lean, shoulder, 2.4, .8, "#af775d");
-      const head = shoulder - 7 + (step ? 1 : 0);
-      rect(9 + lean, head, 6, 7, ink);
-      rect(10 + lean, head + 1, 5, 5, back ? hair : skin);
-      rect(9 + lean, head, 6, 2, hair);
-      rect(10 + lean, head, 3, 1, "#9e8b633c");
-      rect(10 + lean, head + 5, 4, 1, back ? hair : "#817063");
+      const armSwing = step * 2;
+      shape([[sx-6,sy],[sx-3,sy+1],[sx-4+armSwing,sy+8],[sx-3+armSwing,sy+11],
+        [sx-6+armSwing,sy+12],[sx-8+armSwing,sy+8],[sx-8,sy+2]], ink);
+      shape([[sx-6,sy+1],[sx-4,sy+2],[sx-5+armSwing,sy+7],[sx-7+armSwing,sy+8],[sx-7,sy+3]], shirt);
+      pixel(sx-6+armSwing,sy+9,2,2,skin);
+      shape([[sx-5,sy-2],[sx+3,sy-2],[sx+7,sy+1],[sx+6,sy+6],[sx+4,hip],
+        [sx-5,hip+1],[sx-7,hip-3],[sx-7,sy+2]], ink);
+      shape([[sx-5,sy-1],[sx+2,sy-1],[sx+6,sy+1],[sx+5,sy+6],[sx+3,hip-1],
+        [sx-4,hip],[sx-6,hip-3],[sx-6,sy+2]], shirt);
+      shape([[sx-5,sy],[sx+2,sy],[sx+1,sy+2],[sx-3,sy+3],[sx-5,sy+6]], "#d9c7a65e");
+      shape([[sx+2,sy+3],[sx+5,sy+3],[sx+3,hip-1],[sx-1,hip-1],[sx+1,sy+7]], "#16282578");
+      pixel(sx-4,hip-2,7,1,"#302f29");
+      if (back && pack) {
+        shape([[sx-5,sy],[sx+1,sy],[sx+3,sy+3],[sx+2,hip-1],[sx-5,hip],[sx-7,hip-3],[sx-7,sy+3]], ink);
+        shape([[sx-5,sy+1],[sx+1,sy+1],[sx+2,sy+3],[sx+1,hip-2],[sx-5,hip-1],[sx-6,hip-3],[sx-6,sy+3]], "#596249");
+        pixel(sx-5,sy+3,6,2,"#818262");
+        pixel(sx-4,sy+5,4,3,"#494e39");
+        pixel(sx-3,sy+5,1,2,"#b7a17a");
+        pixel(sx-1,sy+5,1,2,"#b7a17a");
+      } else if (!back) {
+        pixel(sx-1,sy+2,1,hip-sy-4,"#38463a");
+        pixel(sx-4,sy+4,2,3,"#c2b39580");
+        pixel(sx+1,sy+5,2,2,"#a6aa8f80");
+        pixel(sx-1,hip-2,2,1,"#b49a70");
+        if (pack) pixel(sx-5,sy+1,2,5,"#555b41");
+      }
+      const handX = strike ? Math.min(27, sx + [5,11,9][gesture]) : sx + 5 - armSwing;
+      const handY = strike ? sy + [3,5,2][gesture] : sy + 10 + Math.sign(step);
+      const elbow = strike ? sx + 5 : sx + 6 - Math.sign(step);
+      shape([[sx+2,sy],[sx+6,sy],[elbow+2,sy+5],[handX+2,handY-1],[handX+2,handY+2],
+        [handX-2,handY+2],[elbow-2,sy+7],[sx+1,sy+3]], ink);
+      shape([[sx+2,sy+1],[sx+5,sy+1],[elbow+1,sy+5],[handX,handY],[handX-2,handY+1],[elbow-1,sy+6]], shirt);
+      pixel(handX-2,handY,2,1,"#4a483a");
+      pixel(handX,handY,2,2,skin);
+      pixel(handX,handY,1,1,"#d7b290");
+      grip = [side > 0 ? handX + 1 : spriteWidth - handX - 1, handY + 1];
+      const hx = sx + (back ? 0 : 1), hy = sy - 8 + Number(pose === "rest");
+      shape([[hx-4,hy+1],[hx-2,hy-1],[hx+3,hy-1],[hx+5,hy+1],[hx+5,hy+5],
+        [hx+2,hy+8],[hx-2,hy+7],[hx-4,hy+4]], ink);
+      shape([[hx-3,hy+1],[hx-1,hy],[hx+3,hy],[hx+4,hy+2],[hx+3,hy+6],
+        [hx+1,hy+7],[hx-2,hy+6],[hx-3,hy+4]], back ? hair : skin);
+      shape([[hx-3,hy+1],[hx-1,hy],[hx+3,hy],[hx+4,hy+2],[hx+1,hy+2],
+        [hx-1,hy+3],[hx-2,hy+5],[hx-3,hy+4]], hair);
+      pixel(hx-1,hy+1,3,1,"#9e8b6365");
       if (!back) {
-        rect(14 + lean, head + 3, 2, 2, skin);
-        rect(14 + lean, head + 3, 1, 1, ink);
-        rect(12 + lean, head + 2, 2, 1, "#e3bb8d");
-        rect(13 + lean, head + 5, 1, 1, "#bd9879");
-        rect(11 + lean, head + 4, 1, 1, "#97725a");
-        rect(13.6 + lean, head + 2.4, 1.6, .8, "#765947");
-        rect(14.4 + lean, head + 4.8, .8, .8, "#e0b18a");
-        rect(12 + lean, head + 4.8, .8, .8, "#8e6853");
+        pixel(hx+2,hy+3,2,1,"#494038");
+        pixel(hx+3,hy+4,2,1,"#d9ae87");
+        pixel(hx+1,hy+6,2,1,pose === "hurt" ? "#a35749" : "#856c58");
       }
-      if (pose === "hurt") rect(13 + lean, head + 4, 2, 1, "#a35749");
     }
     const frame = {canvas, left, top, grip};
     actorFrames.set(key, frame);
@@ -1914,11 +1964,11 @@ const View = (() => {
   let chunkWorld = null, chunkFrame = 0, fastGround = true;
 
   function chunkSignature(world, cx, cy, menu) {
-    if (menu) return darkLook ? "dm" : -1;
+    if (menu) return darkLook ? "dm2" : -1;
     let n = 0;
     const x1 = Math.min(world.width, cx * CH + CH), y1 = Math.min(world.height, cy * CH + CH);
     for (let y = cy * CH; y < y1; y++) for (let x = cx * CH; x < x1; x++) if (world.explored[y * world.width + x]) n++;
-    return darkLook ? "d" + n : n;
+    return darkLook ? "d2:" + n : n;
   }
 
   function buildChunk(world, key, cx, cy, menu, scale, signature, entry) {

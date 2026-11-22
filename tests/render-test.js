@@ -322,6 +322,16 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
     doorIndex >= 0 && new Set([closedProps[doorIndex], openProps[doorIndex], brokenProps[doorIndex]]).size === 3 &&
     worldMotion(1).props[doorIndex] === brokenProps[doorIndex]);
 
+  const cart = {kind:"cart", x:player.x, y:player.y, active:true};
+  run.world.objects.push(cart);
+  const stockedProps = worldMotion(1).props;
+  cart.opened = true;
+  const searchedProps = worldMotion(1).props;
+  check("dark pixel: carrinho aberto usa sprite próprio em cache",
+    stockedProps.length === searchedProps.length &&
+    stockedProps.filter((sprite, index) => sprite !== searchedProps[index]).length === 1 &&
+    worldMotion(1).props.every((sprite, index) => sprite === searchedProps[index]));
+
   run.minutes = 19*60;
   for (const look of ["dark","fast","classic"]) {
     run.look = look;

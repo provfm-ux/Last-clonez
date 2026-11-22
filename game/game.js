@@ -576,13 +576,14 @@
       return o.action === "loot" && (o.loot.length || Sim.unreadClueAt(state, o)) ? 0 :
         o.action === "door" ? .2 : o.action === "harvest" ? 2 : .5;
     };
-    const choices = Sim.nearby(state).filter(o => o.action && (o.action !== "loot" || !o.searched || o.loot.length ||
+    const choices = Sim.nearby(state).filter(o => (o.action || Sim.isFurniture(o)) && (o.action !== "loot" || !o.searched || o.loot.length ||
       Sim.canStore(o) || Sim.unreadClueAt(state, o) || Sim.isSupplyCache(state, o)))
       .sort((a, b) => rank(a) - rank(b) || Sim.distance(state.player, a) - Sim.distance(state.player, b));
     return includeDecor || !choices.some(o => !o.decor) ? choices : choices.filter(o => !o.decor);
   }
 
   function interactionLabel(o) {
+    if (Sim.isFurniture(o)) return "Furniture";
     if (o.kind === "car") return "Vehicle";
     if (o.action === "loot") return "Loot";
     if (o.action === "door") return o.kind === "fence" ? "Fence" : o.boards ? "Barricade" :
@@ -963,7 +964,7 @@
     show("Inventory", '<div class="bag-controls"><div class="bag-header"><div class="bag-panes" aria-label="Inventory view">' +
       '<button type="button" id="bag-nearby" data-action="bag-nearby">Nearby</button><button type="button" id="bag-carried" data-action="bag-carried">Backpack</button>' +
       '<button type="button" data-action="equipment">Equipment</button>' +
-      '</div><b id="bag-weight"></b></div><input class="input-search" type="search" id="bag-search" placeholder="Search items" aria-label="Search items">' +
+      '</div><b id="bag-weight"></b></div><details class="bag-search-toggle"><summary>Search items</summary><input class="input-search" type="search" id="bag-search" placeholder="Item name" aria-label="Search items"></details>' +
       '<div class="tabs bag-filters" aria-label="Item category">' + categories.map(([id, label]) => '<button type="button" data-filter="' + id +
         '" aria-pressed="' + (id === bagTab) + '">' + label + "</button>").join("") +
       '</div></div><div id="bag-feedback" class="bag-feedback" role="status" hidden></div>' +
@@ -977,7 +978,12 @@
       (state.player.vehicle || !nearbyObjects().some(o => o.action !== "loot") && !canTalk() ? "" :
         '<div class="item-actions">' + button("Other nearby actions", "interactions") + "</div>"), "bag");
     updateInventoryLists();
-    $("bag-search").addEventListener("input", event => { bagFilter = event.target.value; updateInventoryLists(); });
+    const search = $("bag-search");
+    search.addEventListener("input", () => { bagFilter = search.value; updateInventoryLists(); });
+    search.parentElement.addEventListener("toggle", () => {
+      if (search.parentElement.open) search.focus();
+      else if (search.value) { search.value = bagFilter = ""; updateInventoryLists(); }
+    });
     $("loot-source").addEventListener("change", event => { bagSource = event.target.value; updateInventoryLists(); });
     $("store-source").addEventListener("change", event => { storeSource = event.target.value; updateInventoryLists(); });
   }
@@ -1067,7 +1073,8 @@
         esc(name || "Empty") + '</dd></div>').join("") + '</dl></div>' +
       '<div class="stats-summary"><span>LOAD · ' + formatWeight(Sim.weight(p.bag)) + " / " + Sim.capacity(state) + " kg</span></div>" +
       '<div class="item-actions">' + button("Backpack", "equipment-backpack") + button("Edit survivor", "edit-survivor") + button("Customize quick belt", "belt-edit", false, "primary") +
-      (itemCount("watch") ? button("Place watch alarm · 10 s", "arm-watch", Boolean(p.vehicle || state.atmosphere.alarm)) : "") + "</div>" +
+      (itemCount("watch") ? button("Wait with wristwatch", "watch-wait", Boolean(p.vehicle)) +
+        button("Place watch alarm · 10 s", "arm-watch", Boolean(p.vehicle || state.atmosphere.alarm)) : "") + "</div>" +
       (lighting.length ? '<section class="inventory-section"><h3>LIGHTING</h3><div class="inventory-items">' + lighting.join("") + "</div></section>" : "") +
       '<section class="inventory-section"><h3>WEAPONS</h3><p class="item-meta">Blunt hits work well on walkers. Quick and long-reach weapons help against runners. Heavy hits can interrupt brutes.</p><div class="gear-list">' + (weapons.join("") || '<div class="empty">No weapons carried.</div>') +
       '</div></section><section class="inventory-section"><h3>WEARABLE GEAR</h3><div class="gear-list">' +
@@ -1555,6 +1562,11 @@
     if (Chronicle.isScene(o) || o.action === "ledger-desk") { ledgerPanel(o); return; }
     if (o.delivery && Sim.readDispatchReport(state,o)) { save(); ledgerReport(o); return; }
     const id = objectIndex(o);
+    if (Sim.isFurniture(o)) {
+      show(o.name, '<div class="item-actions">' + button("Dismantle…", "furnituremenu-" + id) +
+        button("Back", "interactions") + "</div>", "object-" + id);
+      return;
+    }
     if (o.kind === "car") {
       const repairProblem = Sim.vehicleRepairProblem(state,o);
       const condition = Math.round(Math.min(140 - o.hp,Sim.vehicleRepairAmount(state)) / 1.4);
@@ -1892,6 +1904,16 @@
     else if (action === "belt-edit") beltPanel();
     else if (action === "edit-survivor") editSurvivor();
     else if (action === "gear-open") gear();
+    else if (action === "watch-wait" && dialogView === "gear" && itemCount("watch")) {
+      show("Wait with wristwatch", "<p>Choose how many in-game minutes to wait. Nearby danger interrupts waiting.</p>" +
+        '<div class="item-actions">' + [15, 30, 60].map(minutes => button(minutes + " min", "wait-" + minutes)).join("") +
+        button("Cancel", "gear-open") + "</div>", "watch-wait");
+    }
+    else if (action.startsWith("wait-") && dialogView === "watch-wait") {
+      if (Sim.waitWithWatch(state, Number(action.slice(5)))) close();
+      else { gear(); if (state.notice) $("dialog-title").textContent = state.notice.text; }
+      updateHud();
+    }
     else if (action === "arm-watch" && dialogView === "gear") { if (Sim.armWatch(state)) close(); updateHud(); }
     else if (action === "pinhere" && active()) map({x:state.player.x, y:state.player.y});
     else if (action === "pincancel") map();
@@ -1955,6 +1977,19 @@
     } else {
       const [kind, first, second] = action.split("-");
       const index = Number(first), o = state.world.objects[index];
+      if (Sim.isFurniture(o) && Sim.reachableObject(state, o)) {
+        if (kind === "furnituremenu" && dialogView === "object-" + index) {
+          show("Dismantle " + o.name + "?", "<p>This removes the furniture and leaves two scrap and one plank.</p>" +
+            '<div class="item-actions">' + button("Dismantle", "furnitureconfirm-" + index, false, "danger") +
+            button("Cancel", "furniturecancel-" + index) + "</div>", "furniture-" + index);
+          body.querySelector('[data-action="furniturecancel-' + index + '"]')?.focus();
+          return;
+        }
+        if (dialogView === "furniture-" + index) {
+          if (kind === "furniturecancel") { objectPanel(o); return; }
+          if (kind === "furnitureconfirm" && Sim.dismantleFurniture(state, o)) { close(); updateHud(); return; }
+        }
+      }
       if (kind === "patchcar" && dialogView === "car-" + index && o?.kind === "car") {
         if (Sim.repairVehicle(state,o)) save();
         objectPanel(o,state.notice?.text);

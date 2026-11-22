@@ -400,14 +400,15 @@ const View = (() => {
   const cream = ["#bfc1a9", "#8f927e", "#747c6d"];
 
   const gardenTrees = [];
-  function gardenTree(x, y, tintValue, wind) {
+  function gardenTree(x, y, tintValue, wind, pine) {
     const variant = Number.isFinite(tintValue) ? clamp(Math.floor(tintValue * 4), 0, 3) : 0;
-    let sprite = gardenTrees[variant];
+    const key = variant + (pine ? 4 : 0);
+    let sprite = gardenTrees[key];
     if (!sprite) {
       sprite = document.createElement("canvas");
       sprite.width = 54; sprite.height = 61;
       const c = sprite.getContext("2d");
-      const crown = [[16, 29, 12], [38, 30, 12], [27, 35, 14], [13, 20, 9],
+      const crown = pine ? [[27, 11, 7], [26, 20, 10], [29, 29, 13], [26, 36, 16]] : [[16, 29, 12], [38, 30, 12], [27, 35, 14], [13, 20, 9],
         [36, 16, 12], [23, 13, 12], [28, 22, 15]];
       const leaves = [["#344334", "#43533b", "#566649", "#687652"],
         ["#3e4834", "#50583d", "#656b48", "#7b7e55"],
@@ -418,19 +419,25 @@ const View = (() => {
           for (let px = cx - radius; px <= cx + radius; px += 2) {
             const noise = ((px * 73856093 ^ py * 19349663 ^ variant * 83492791) >>> 0) % 7;
             const dx = px - cx, dy = (py - cy) * 1.25;
+            if (pine && Math.abs(dx) > (py - cy + radius) * .75 + noise * .55) continue;
             if (dx * dx + dy * dy > (radius - noise * .65) ** 2) continue;
             const shade = clamp(Math.floor(1.3 - (dx + dy) / radius + noise * .22), 0, 3);
             c.fillStyle = leaves[shade]; c.fillRect(px, py, 2, 2);
+            if (noise === 2 && shade > 0) {
+              c.fillStyle = leaves[shade - 1]; c.fillRect(px + 1, py + 1, 1, 1);
+            }
           }
         }
       }
-      gardenTrees[variant] = sprite;
+      gardenTrees[key] = sprite;
     }
     const [sx, sy] = p(x, y);
     shadow(x, y, 24, 9, "#10171090");
     const left = Math.round(sx) - 27, top = Math.round(sy) - 60;
     ctx.fillStyle = "#41382c"; ctx.fillRect(left + 25, top + 29, 5, 31);
     ctx.fillStyle = "#786653"; ctx.fillRect(left + 25, top + 34, 2, 24);
+    ctx.fillStyle = "#302c24"; ctx.fillRect(left + 28, top + 43, 1, 15);
+    ctx.fillStyle = "#8f795a"; ctx.fillRect(left + 26, top + 52, 1, 4);
     ctx.drawImage(sprite, left + wind, top);
   }
 
@@ -1127,9 +1134,9 @@ const View = (() => {
       return;
     }
     if(kind==="tree") {
-      if (darkLook && o.treeType !== "pine") {
+      if (darkLook) {
         const wind = motion ? Math.round(Math.sin(clock * 1.6 + x * .8 + y * .4) * (state.weather === "Rain" ? 3 : 2)) : 0;
-        gardenTree(x, y, tone, wind);
+        gardenTree(x, y, tone, wind, o.treeType === "pine");
         return;
       }
       shadow(x,y,30,11);
@@ -1322,8 +1329,25 @@ const View = (() => {
         }
       }
       line(ridgeA, ridgeB, "#9b8c7e", 2);
+      if (building.type === "home") {
+        for (const edge of [[a,d],[b,c]]) line(edge[0],edge[1],"#837c69",2);
+        const gableY = y + h + .11;
+        line(p(x-.05,gableY,39),p(x+w*.5,gableY,peak-2),"#302d29",2);
+        line(p(x+w*.5,gableY,peak-2),p(x+w+.05,gableY,39),"#302d29",2);
+        const ventX = x + w * .5;
+        box(ventX-.18,gableY- .025,44,.36,.05,4,["#756758","#453b33","#40382e"]);
+        for (const offset of [-.11,0,.11]) line(p(ventX+offset,gableY+.034,45),p(ventX+offset,gableY+.034,47),"#292923");
+      }
     }
-    if (!building.compact || (x+y) % 2 === 0) box(x+w*.72,y+h*.2,42,.55,.55,21,["#866b58","#5b493d","#493d32"]);
+    if (!building.compact || (x+y) % 2 === 0) {
+      const chimneyX = x+w*.72, chimneyY = y+h*.2;
+      box(chimneyX,chimneyY,42,.55,.55,21,["#866b58","#5b493d","#493d32"]);
+      if (darkLook && building.type === "home") {
+        box(chimneyX-.035,chimneyY-.035,62,.62,.62,2,["#a28b70","#786958","#5f5548"]);
+        box(chimneyX+.13,chimneyY+.12,64,.30,.3,1,["#363733","#423b31","#38342b"]);
+        for (const z of [56,59]) line(p(chimneyX,chimneyY+.551,z),p(chimneyX+.55,chimneyY+.551,z),"#aa8a6e67");
+      }
+    }
   }
 
   function roofCoversPlayer(b, player) {
@@ -1440,6 +1464,8 @@ const View = (() => {
         pixel(sx-4,sy+4,2,3,"#c2b39580");
         pixel(sx+1,sy+5,2,2,"#a6aa8f80");
         pixel(sx-1,hip-2,2,1,"#b49a70");
+        pixel(sx-4,sy+4,2,1,"#bdbba0");
+        pixel(sx+2,sy+7,1,2,"#222c27");
         if (pack) pixel(sx-5,sy+1,2,5,"#555b41");
       }
       const handX = strike ? Math.min(27, sx + [5,11,9][gesture]) : sx + 5 - armSwing;
@@ -2422,7 +2448,7 @@ const View = (() => {
         const hasNote = o => Boolean(Sim.unreadClueAt(state, o));
         const hasCache = o => Sim.isSupplyCache(state, o);
         const hasHarvest = o => o.kind === "garden" && Boolean(Sim.gardenYield(state, o));
-        const actions = Sim.nearby(state).filter(o => o.action && (!player.vehicle || o.action === "travel") &&
+        const actions = Sim.nearby(state).filter(o => (o.action || Sim.isFurniture(o)) && (!player.vehicle || o.action === "travel") &&
           !(o.action==="loot"&&o.searched&&!o.loot.length&&!Sim.canStore(o)&&!hasNote(o)&&!hasCache(o)));
         const priority = o => {
           if (o.action === "travel") return 4;
@@ -2493,10 +2519,10 @@ const View = (() => {
     ctx.setTransform(dpr,0,0,dpr,0,0);
     if (!effects) drawDestination(state,width,height,zoom);
     const hour=(state.minutes%1440)/60;
-    const darkness=clamp((Math.abs(hour-12)-5)/7,0,.67);
+    const darkness = night ? Math.max(.35, .90 - .34 * Sim.moonlight(state)) : clamp((Math.abs(hour-12)-5)/7,0,.67);
     if(!menu&&!cave&&darkness>0){
       const shade=ctx.createRadialGradient(width*.5,height*.54,30,width*.5,height*.54,Math.max(width,height)*.65);
-      shade.addColorStop(0,"rgba(10,20,29,"+darkness*(lit ? .15 : .46)+")");shade.addColorStop(1,"rgba(5,13,24,"+darkness+")");
+      shade.addColorStop(0,"rgba(10,20,29,"+darkness*(lit ? .15 : optics.lamp ? .36 : .68)+")");shade.addColorStop(1,"rgba(5,13,24,"+darkness+")");
       ctx.fillStyle=shade;ctx.fillRect(0,0,width,height);
     }
     if (effects) {
@@ -2531,7 +2557,7 @@ const View = (() => {
       (!state.player.vehicle || object.action === "travel") && Math.abs(sx - x) < width / 2 + 6 && Math.abs(sy - y) < 15 && Sim.reachableObject(state, object));
     if (label) return {object:label.object};
     const currentBuilding=World.tileAt(state.world,state.player.x,state.player.y)?.building;
-    const object=state.world.objects.filter(o=>o.active&&o.action&&(!o.building||o.building===currentBuilding||o.action==="door")&&visible(state,o.x,o.y,optics)&&hit(o,o.kind==="tree"?30:["locker","fridge","exit"].includes(o.kind)?25:13,o.kind==="car"?30:20,o.kind==="tree"?35:27)).sort((a,b)=>b.x+b.y-a.x-a.y)[0];
+    const object=state.world.objects.filter(o=>o.active&&(o.action||Sim.isFurniture(o))&&(!o.building||o.building===currentBuilding||o.action==="door")&&visible(state,o.x,o.y,optics)&&hit(o,o.kind==="tree"?30:["locker","fridge","exit"].includes(o.kind)?25:13,o.kind==="car"?30:20,o.kind==="tree"?35:27)).sort((a,b)=>b.x+b.y-a.x-a.y)[0];
     if(object)return {object};
     return ground;
   }

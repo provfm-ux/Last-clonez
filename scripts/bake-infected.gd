@@ -95,6 +95,8 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 	pixel(body, 2, 8, BLOOD.darkened(.28))
 	pixel(body, 0, 11, coat.lightened(.28))
 	pixel(body, 1, 10, coat.lightened(.16))
+	pixel(body, 4, 6, coat.darkened(.42))
+	pixel(body, 3, 8, coat.lightened(.20))
 
 	# A crooked elbow drives the reach. The near hand drops again during recovery.
 	var reach := attack and frame >= 2
@@ -120,6 +122,7 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 	pixel(head, 6, 4, BLOOD)
 	pixel(head, 5, 4, BLOOD.darkened(.3))
 	pixel(head, 5, 5, skin)
+	pixel(head, 6, 5, skin.darkened(.43))
 	if hurt:
 		pixel(head, 3, 3, BLOOD)
 		pixel(head, 4, 4, BLOOD.lightened(.17))

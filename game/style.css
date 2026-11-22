@@ -339,6 +339,8 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 .small-button:disabled { opacity:.4; cursor:default; }
 .small-button:hover:not(:disabled) { border-color:#c1c693; }
 .small-button.danger { color:#e3a289; }
+.bag-search-toggle summary { width:max-content; padding:5px 0; cursor:pointer; color:var(--gold); font-size:12px; }
+.bag-search-toggle:not([open]) { margin-bottom:3px; }
 .input-search { width:100%; padding:9px 10px; background:#111c13; border:1px solid #46543e; color:var(--text); border-radius:5px; margin-bottom:11px; font:12px var(--sans); }
 .inventory-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 .inventory-section h3, .item-head { color:#bdc8aa; font:700 10px var(--mono); letter-spacing:.09em; margin:9px 0; }

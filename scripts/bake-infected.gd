@@ -60,7 +60,9 @@ func leg(hip: Vector2i, knee: Vector2i, foot: Vector2i, color: Color) -> void:
 	shape(center, [[hip.x-1,hip.y],[hip.x+2,hip.y],[knee.x+1,knee.y],[foot.x+1,foot.y-2],
 		[foot.x-2,foot.y-1],[knee.x-2,knee.y]], color)
 	shape(foot, [[-2,-1],[2,-1],[3,0],[3,1],[-2,1]], BOOT.lightened(.13))
-	pixel(knee, 0, 1, color.lightened(.19))
+	pixel(knee, -1, -1, color.lightened(.23))
+	pixel(knee, 0, 0, color.lightened(.27))
+	pixel(knee, 1, 1, color.darkened(.20))
 	pixel(foot, 1, 0, color.lightened(.22))
 
 func draw_infected(variant: int, pose: int, frame: int) -> void:
@@ -77,7 +79,8 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 	var bob := [0, 1, 0, 2][frame] as int if not attack and not hurt else 0
 	var build := [0, 1, 0, -1, 2, -1, 0][variant] as int
 	var height := [0, 1, -1, 2, -2, 1, 0][variant] as int
-	var body := Vector2i(8 + lean, 12 + bob + height)
+	var lunge := attack and frame >= 2
+	var body := Vector2i(8 + lean, 12 + bob + height + (frame - 1 if lunge else 0))
 	var hips := Vector2i(10 + int(lean / 2.0), 25)
 	leg(hips + Vector2i(2,0), Vector2i(14 - phase,31), Vector2i(12 - phase*2,36 - int(phase < 0)), pants.darkened(.29))
 	leg(hips - Vector2i(3,0), Vector2i(7 + phase,30), Vector2i(7 + phase*2,36 - int(phase > 0)), pants)
@@ -97,16 +100,20 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 	pixel(body, 1, 10, coat.lightened(.16))
 	pixel(body, 4, 6, coat.darkened(.42))
 	pixel(body, 3, 8, coat.lightened(.20))
+	shape(body, [[-1-build,2],[1-build,1],[2-build,2],[2-build,4],[0-build,4]], coat.lightened(.30))
+	pixel(body, 5, 5, coat.lightened(.21))
+	pixel(body, 0, 12, coat.darkened(.42))
+	pixel(body, 1, 12, coat.lightened(.22))
 
 	# A crooked elbow drives the reach. The near hand drops again during recovery.
-	var reach := attack and frame >= 2
-	var elbow := Vector2i(4, 7) if reach else Vector2i(0, 8 + int(walk and frame == 3))
-	var hand := Vector2i(11-int(frame == 3), 5-int(frame == 3)*2) if reach else Vector2i(1+int(walk and frame == 1), 13)
+	var elbow := Vector2i(5, 6) if lunge else Vector2i(0, 8 + int(walk and frame == 3))
+	var hand := Vector2i(11-int(frame == 3), 5-int(frame == 3)*2) if lunge else Vector2i(1+int(walk and frame == 1), 13)
 	shape(body, [[-2,2],[2,2],[elbow.x+1,elbow.y-2],[hand.x+1,hand.y-2],
 		[hand.x+2,hand.y],[hand.x+1,hand.y+2],[elbow.x,elbow.y+2],[-2,8],[-3,5]], INK)
 	shape(body, [[-1,3],[1,3],[elbow.x,elbow.y-1],[elbow.x-1,elbow.y+1],[-2,7]], coat.lightened(.13))
 	shape(body, [[elbow.x,elbow.y-1],[hand.x+1,hand.y-1],[hand.x+1,hand.y+1],
 		[hand.x-1,hand.y+1],[elbow.x-1,elbow.y+1]], skin.darkened(.34))
+	pixel(body, hand.x-1, hand.y-1, skin.lightened(.15))
 	pixel(body, hand.x, hand.y-1, skin)
 	pixel(body, hand.x+1, hand.y, skin.darkened(.16))
 	pixel(body, hand.x, hand.y+1, BLOOD)
@@ -118,7 +125,9 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 	shape(head, [[4,-1],[6,0],[6,1],[4,1],[4,3],[3,3],[3,1]], skin)
 	shape(head, [[5,1],[7,1],[7,3],[5,3],[4,2]], INK)
 	pixel(head, 6, 2, Color("#d2bd95"))
-	pixel(head, 4, 3, skin.lightened(.10))
+	pixel(head, 4, 3, skin.lightened(.18))
+	pixel(head, 3, 3, skin.darkened(.21))
+	pixel(head, 4, 5, skin.darkened(.42))
 	pixel(head, 6, 4, BLOOD)
 	pixel(head, 5, 4, BLOOD.darkened(.3))
 	pixel(head, 5, 5, skin)

@@ -183,12 +183,12 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
 
   Object.assign(d.player,{flash:0,moving:true});
   d.quiet = d.running = false;
-  const directions = [[1,1],[-1,-1],[1,0],[0,-1]].map(([headingX,headingY]) => {
+  const directions = [[1,1],[-1,-1],[1,0],[0,-1],[1,-1],[-1,1],[0,1],[-1,0]].map(([headingX,headingY]) => {
     Object.assign(d.player,{headingX,headingY});
     return pose();
   });
   Object.assign(d.player,{headingX:1,headingY:1});
-  check("dark pixel: marcha usa poses distintas de frente, costas e diagonal",
+  check("dark pixel: marcha usa oito orientações de acordo com a projeção no ecrã",
     directions.every(Boolean) && new Set(directions).size === directions.length && pose() === directions[0]);
   const packPoses = [[1,1],[1,-1],[-1,1],[-1,-1]].map(([headingX,headingY]) => {
     Object.assign(d.player,{headingX,headingY,backpack:false});

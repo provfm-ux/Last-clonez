@@ -1417,7 +1417,7 @@ const View = (() => {
   }
 
   function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack, gesture, cut = "short") {
-    const back = (direction & 2) !== 0, axial = (direction & 4) !== 0;
+    const back = (direction & 2) !== 0, axial = (direction & 4) !== 0, profile = (direction & 8) !== 0;
     const showPack = back && pack && pose !== "dead";
     const key = [shirt, trousers, skin, hair, direction, pose, step, lift, showPack, gesture, cut].join("|");
     if (actorFrames.has(key)) return actorFrames.get(key);
@@ -1464,13 +1464,15 @@ const View = (() => {
       rect(24,40,3,2,shirt); rect(28,41,3,2,skinDark); rect(29,39,3,2,hair);
     } else {
       const strike = pose === "strike" || pose === "chase";
-      const crouch = pose === "rest" ? 7 : pose === "sneak" ? 4 : 0;
-      const lean = pose === "hurt" ? -3 : strike ? [-2,1,3][gesture] : pose === "run" || pose === "sneak" ? 2 : 0;
+      const running = pose === "run";
+      const crouch = pose === "rest" ? 7 : pose === "sneak" ? 4 : running ? 1 : 0;
+      const lean = pose === "hurt" ? -3 : strike ? [-2,1,3][gesture] : running ? 4 : pose === "sneak" ? 2 : 0;
       const x = 18 + (axial ? Math.sign(lean) : lean);
       const y = 15 + crouch - Number(lift !== 0) - (pose === "idle" ? gesture : 0);
       const hip = Math.min(34,y+14);
-      for (const [leg,root] of [21,15].entries()) {
-        const stride = (leg ? step : -step) * (axial ? 1 : 3);
+      const legs = profile ? [19,16] : [21,15];
+      for (const [leg,root] of legs.entries()) {
+        const stride = (leg ? step : -step) * (axial ? 1 : running ? 4 : 3);
         const knee = root + Math.round(stride*.6) + Number(crouch>0), foot = root + (axial ? 0 : stride);
         const depth = axial ? Math.min(0,Math.sign(stride)*(back ? -2 : 2)) : 0;
         const sole = 45 + depth - (lift === (leg ? -1 : 1) ? 3 : 0);
@@ -1479,44 +1481,54 @@ const View = (() => {
           [foot+5,sole-2],[foot+5,sole+1],[foot-4,sole+1],[foot-3,sole-4],[knee-3,bend]],ink);
         shape([[root-3,hip-1],[root+2,hip-1],[knee+2,bend],[foot+1,sole-4],
           [foot-2,sole-4],[knee-2,bend]],leg ? trousers : jeanDark);
+        if (leg) {
+          rect(knee-2,bend-2,3,2,jeanLight);
+          rect(knee,bend-3,2,1,jeanLight);
+        }
         rect(knee-1,bend,3,1,jeanLight);
         rect(knee,bend+1,2,1,jeanDark);
         rect(foot-2,sole-3,5,2,boot);
-        rect(foot+1,sole-2,3,1,"#82715b");
+        rect(foot+1,sole-2,3,1,"#a58a6b");
+        rect(foot-1,sole-3,2,1,"#b99b74");
         rect(foot-3,sole,7,1,"#65574a");
       }
       const swing = Math.sign(step);
-      const farHand = x-9+swing, farY = Math.min(41,y+14-swing);
+      const armSwing = swing * (running ? 5 : 2);
+      const farHand = x-(profile ? 5 : 9)+armSwing;
+      const farY = Math.min(41,y+14-(running ? 4 : 1)*Math.max(0,swing));
       shape([[x-7,y],[x-4,y+2],[farHand+3,y+8],[farHand+2,farY+2],
         [farHand-2,farY+2],[farHand-2,y+7],[x-9,y+3]],ink);
       shape([[x-7,y+1],[x-5,y+2],[farHand+1,y+8],[farHand+1,farY-1],
         [farHand-1,farY-1],[farHand-1,y+7],[x-8,y+3]],jacketDark);
       rect(farHand-1,farY-1,2,2,skinDark);
 
-      shape([[x-6,y-2],[x+4,y-2],[x+8,y+1],[x+6,y+6],[x+4,hip],
-        [x-5,hip],[x-6,hip-4],[x-8,y+2]],ink);
-      shape([[x-6,y-1],[x+3,y-1],[x+6,y+1],[x+5,y+6],[x+3,hip-1],
-        [x-4,hip-1],[x-5,hip-5],[x-7,y+2]],shirt);
-      shape([[x-6,y],[x+3,y],[x+2,y+2],[x-4,y+3],[x-6,y+2]],jacketLight);
-      rect(x+3,y+6,1,Math.max(1,hip-y-7),jacketDark);
+      const torsoLeft = x - (profile ? 5 : 7), torsoRight = x + (profile ? 5 : 7);
+      shape([[torsoLeft+1,y-2],[torsoRight-3,y-2],[torsoRight+1,y+1],[torsoRight-1,y+6],
+        [x+4,hip],[x-5,hip],[torsoLeft+1,hip-4],[torsoLeft-1,y+2]],ink);
+      shape([[torsoLeft+1,y-1],[torsoRight-4,y-1],[torsoRight-1,y+1],[torsoRight-2,y+6],
+        [x+3,hip-1],[x-4,hip-1],[torsoLeft+2,hip-5],[torsoLeft,y+2]],shirt);
+      shape([[torsoLeft+1,y],[torsoRight-4,y],[x+2,y+2],[x-4,y+3],[torsoLeft+1,y+2]],jacketLight);
+      shape([[torsoRight-2,y+4],[x+4,y+9],[x+3,hip-1],[x-3,hip-1],[x+1,hip-4]],jacketDark);
       rect(x-3,hip-2,5,1,jacketDark);
       if (!back) {
-        const zipper = x + (axial ? 0 : 1);
-        rect(zipper,y+2,1,hip-y-4,jacketDark);
-        rect(zipper,y+3,1,2,"#c2b8a0");
+        const zipper = x + (axial ? 0 : profile ? 3 : 1);
+        rect(zipper,y+1,1,hip-y-4,jacketDark);
+        rect(zipper,y+3,1,2,"#ded0ac");
         rect(x-4,y+5,3,1,jacketDark);
         rect(x-4,y+6,2,1,jacketLight);
-        rect(x-5,y+2,1,1,"#aea176");
+        rect(x-5,y+2,1,1,"#c4ad80");
+        rect(x-3,hip-4,2,1,jacketLight);
       }
 
-      const handX = strike ? Math.min(32,x+[6,13,11][gesture]) : x+9-swing;
-      const handY = strike ? y+[4,6,3][gesture] : Math.min(41,y+14+swing);
-      const elbow = strike ? x+7 : x+9;
+      const handX = Math.min(32,strike ? x+[6,13,11][gesture] : x+(profile ? 5 : 8)-armSwing);
+      const handY = strike ? y+[4,6,3][gesture] : Math.min(41,y+14+swing-(running ? 3 : 0));
+      const elbow = strike ? x+7 : x+(profile ? 4 : 7) - (running ? swing * 2 : 0);
       shape([[x+3,y],[x+7,y],[elbow+2,y+6],[handX+2,handY-1],
         [handX+2,handY+3],[handX-2,handY+3],[elbow-2,y+9],[x+2,y+3]],ink);
       shape([[x+3,y+1],[x+6,y+1],[elbow+1,y+6],[handX+1,handY-1],
         [handX-1,handY],[elbow-1,y+8]],shirt);
       rect(elbow,y+5,2,2,jacketLight);
+      rect(elbow-1,y+7,2,1,jacketDark);
       rect(handX-1,handY-1,3,1,jacketDark);
       rect(handX-1,handY,3,2,skin);
       rect(handX-1,handY,1,1,skinLight);
@@ -1533,7 +1545,7 @@ const View = (() => {
           }
         }
       }
-      const hx = x + Number(!axial && !back), hy = y-10;
+      const hx = x + (profile ? 2 : Number(!axial && !back)), hy = y-11;
       shape([[hx-5,hy+1],[hx-3,hy-1],[hx+3,hy-1],[hx+6,hy+2],[hx+6,hy+6],
         [hx+3,hy+10],[hx-3,hy+9],[hx-5,hy+6]],ink);
       shape([[hx-4,hy+2],[hx-2,hy],[hx+3,hy],[hx+5,hy+2],[hx+4,hy+6],
@@ -1544,8 +1556,8 @@ const View = (() => {
       } else {
         shape([[hx-4,hy+2],[hx-2,hy],[hx+3,hy],[hx+5,hy+2],[hx+2,hy+3],
           [hx-1,hy+3],[hx-3,hy+6],[hx-4,hy+5]],hair);
-        rect(hx-2,hy+1,4,1,tint(hair,26));
-        rect(hx-3,hy+2,2,1,tint(hair,13));
+        shape([[hx-3,hy+1],[hx+2,hy],[hx+4,hy+2],[hx+1,hy+3],[hx-3,hy+3]],tint(hair,24));
+        rect(hx-2,hy+1,3,1,tint(hair,38));
         if (cut === "wavy") {
           rect(hx-3,hy-1,3,2,hair);
           rect(hx+2,hy-1,2,2,hair);
@@ -1565,12 +1577,14 @@ const View = (() => {
       } else if (axial) {
         shape([[hx-4,hy+4],[hx+4,hy+4],[hx+3,hy+7],[hx+2,hy+9],[hx-2,hy+9],[hx-3,hy+7]],skin);
         rect(hx-3,hy+5,2,1,ink); rect(hx+1,hy+5,2,1,ink);
-        rect(hx-1,hy+6,2,1,skinLight); rect(hx-1,hy+8,2,1,skinDark);
+        rect(hx-2,hy+6,4,1,skinLight);
+        rect(hx-1,hy+8,2,1,skinDark);
       } else {
         shape([[hx,hy+3],[hx+4,hy+3],[hx+6,hy+6],[hx+4,hy+7],[hx+3,hy+9],
           [hx-1,hy+8],[hx-2,hy+6]],skin);
-        rect(hx+2,hy+4,2,1,ink);
-        rect(hx+4,hy+6,2,1,skinLight);
+        rect(hx+(profile ? 3 : 2),hy+4,2,1,ink);
+        rect(hx+2,hy+6,4,1,skinLight);
+        rect(hx,hy+5,1,2,skinDark);
         rect(hx+1,hy+8,2,1,skinDark);
       }
       if (pose === "hurt" && !back) rect(hx-2,hy+7,2,1,"#a86452");
@@ -1714,8 +1728,12 @@ const View = (() => {
     const swing = isPlayer && a.swing > 0 ? state.swingVisual : null;
     const dx = swing?.dx ?? a.headingX ?? (a.face < 0 ? -1 : 1), dy = swing?.dy ?? a.headingY ?? 0;
     const across = dx - dy, depth = dx + dy;
-    const axial = isPlayer && Math.abs(across) <= Math.abs(depth) * .35;
-    const direction = Number(across < 0) + 2 * Number(depth < 0) + 4 * Number(axial);
+    // Convert to screen-space before selecting the eight directional poses.
+    const screenX = Math.abs(across) * halfW, screenY = Math.abs(depth) * halfH;
+    const axial = isPlayer && screenX <= screenY * .414;
+    const profile = isPlayer && !axial && screenY <= screenX * .414;
+    const direction = Number(across < 0) + 2 * Number(depth < 0 && !profile) +
+      4 * Number(axial) + 8 * Number(profile);
     const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, stride.phase, clock);
     if (!imported) {
       const palette = isPlayer ? survivorPalette(a) : null;

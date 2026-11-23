@@ -1273,6 +1273,110 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   }
 }
 
+{
+  const {Expedition} = context;
+  const restore = s => Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  const quarry = () => Sim.create(17,"training","carer",Expedition.generator,undefined,"quarry");
+  const resources = s => s.world.objects.find(o => o.loot?.some(i => i.id === "flint"));
+  const trial = xp => {
+    const s = quarry(), p = s.player, stash = resources(s);
+    p.skills.knapping = p.skills.masonry = xp;
+    const take = (source,id,count) => {
+      Object.assign(p,{x:source.x,y:source.y});
+      for (let i = 0; i < count; i++) {
+        if (!Sim.collect(s,source,source.loot.findIndex(item => item.id === id))) return false;
+      }
+      return true;
+    };
+    const acquired = take(stash,"flint",1) && take(stash,"rubble",2) && take(stash,"mortar",1);
+    const bench = s.world.objects.find(o => o.action === "workbench");
+    Object.assign(p,{x:bench.x,y:bench.y});
+    const noTool = !Sim.craft(s,"flintknife") && Sim.quantity(p.bag,"flint") === 1 && p.skills.knapping === xp;
+    const locker = s.world.objects.find(o => o.loot?.some(i => i.id === "hammer"));
+    const gotHammer = take(locker,"hammer",1);
+    Object.assign(p,{x:bench.x,y:bench.y});
+    const madeKnife = Sim.craft(s,"flintknife");
+    const knife = p.bag.find(i => i.id === "flintknife");
+    const ready = Sim.craft(s,"stonewall");
+    const tile = s.world.tiles.find(t => !t.building && !t.solid && t.x > 5 && t.x < 58 && t.y > 5 && t.y < 58 &&
+      World.clear(s.world,t.x-1.5,t.y+.5) && !s.world.objects.some(o => Sim.distance(o,{x:t.x+.5,y:t.y+.5}) < 4.6));
+    const spot = {x:tile.x+.5,y:tile.y+.5};
+    Object.assign(p,{x:spot.x-2,y:spot.y});
+    const invalid = !Sim.place(s,p.x,p.y) && Sim.quantity(p.bag,"rubble") === 2;
+    const built = Sim.place(s,spot.x,spot.y);
+    const wall = s.world.objects.find(o => o.material === "stone");
+    const loaded = restore(s);
+    const copy = loaded.world.objects.find(o => o.id === wall?.id);
+    return {ok:acquired && noTool && gotHammer && madeKnife && ready && invalid && built &&
+      copy?.name === "Stone wall" && !World.clear(loaded.world,spot.x,spot.y) &&
+      p.skills.knapping === xp+5 && p.skills.masonry === xp+6 &&
+      !Sim.quantity(p.bag,"flint") && !Sim.quantity(p.bag,"rubble") && !Sim.quantity(p.bag,"mortar") &&
+      Sim.quantity(p.bag,"hammer") === 1, condition:knife?.condition, hp:copy?.hp};
+  };
+  const low = trial(0), high = trial(Data.skillXp(10));
+  check("quarry crafting: collect finite stock, require tools, build and reload with level effects",
+    low.ok && high.ok && high.condition > low.condition && high.hp > low.hp);
+  const old = JSON.parse(JSON.stringify(Sim.snapshot(quarry())));
+  old.fieldRevision = 1;
+  const stash = old.objects.find(o => o.loot?.some(i => i.id === "flint"));
+  stash.loot = stash.loot.filter(i => !["flint","rubble","mortar"].includes(i.id));
+  const migrated = Sim.restore(old), restored = restore(migrated);
+  check("quarry crafting: revision 1 receives material stock once",
+    resources(migrated).loot.find(i => i.id === "flint").qty === 6 &&
+    resources(restored).loot.find(i => i.id === "flint").qty === 6);
+}
+
+{
+  const ingredients = ["oats","flour","cannedbeans","lentils","herbs","honey"];
+  const reload = s => Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  const start = () => Sim.createControl("survival","carer","shelter",undefined,{seed:17});
+  const countInWorld = (s,id) => s.world.objects.reduce((total,o) =>
+    total + (o.loot ? Sim.quantity(o.loot,id) : 0),0);
+  const current = start();
+  check("pantry: new food ingredients exist in Cold Vale loot",
+    ingredients.every(id => countInWorld(current,id) > 0));
+  const old = JSON.parse(JSON.stringify(Sim.snapshot(current)));
+  old.fieldRevision = 2;
+  for (const o of old.objects) if (o.loot) o.loot = o.loot.filter(i => !ingredients.includes(i.id));
+  const upgraded = Sim.restore(old);
+  const stock = ingredients.map(id => countInWorld(upgraded,id));
+  const used = upgraded.world.objects.find(o => o.loot?.some(i => i.id === "oats"));
+  const selected = used.loot.findIndex(i => i.id === "oats");
+  Object.assign(upgraded.player,{x:used.x,y:used.y});
+  const took = Sim.collect(upgraded,used,selected);
+  Object.assign(upgraded.player,upgraded.world.start);
+  const again = reload(upgraded);
+  check("pantry: revision 2 stocks ingredients once and preserves collected loot",
+    stock.every(n => n > 0) && took === 1 && countInWorld(again,"oats") === stock[0]-1 &&
+    Sim.quantity(again.player.bag,"oats") === 1);
+
+  for (const id of ["porridge","bread","lentils","beans","herbfish","compote","apples","skillet","chowder"]) {
+    const run = start();
+    const tile = run.world.tiles.find(t => !t.building && t.x > 2 && t.y > 2 && t.x < run.world.width-2 &&
+      t.y < run.world.height-2 && World.clear(run.world,t.x+.5,t.y+.5,.28));
+    const fire = {id:"built"+run.serial++,x:tile.x+.5,y:tile.y+.5,name:"Campfire",kind:"campfire",action:"campfire",
+      active:true,solid:true,loot:[],searched:true};
+    run.world.objects.push(fire);
+    Object.assign(run.player,{x:fire.x,y:fire.y});
+    const recipe = Data.fireRecipes[id];
+    run.player.bag = Object.entries(recipe.inputs).map(([item,qty]) => ({id:item,qty,born:run.minutes}));
+    if (recipe.identify) {
+      check("cooking: unknown Pantrycaps are not cooked or consumed",
+        !Sim.startFireBatch(run,fire,id) && Sim.quantity(run.player.bag,"pantrycap") === 1);
+      run.player.skills.foraging = Data.skillXp(2);
+    }
+    const started = Sim.startFireBatch(run,fire,id);
+    const consumed = run.player.bag.length === 0;
+    const early = !Sim.collectCookedFood(run,fire);
+    if (fire.cook) run.minutes = fire.cook.until;
+    const collected = Sim.collectCookedFood(run,fire);
+    check("cooking: " + id + " consumes ingredients once and yields a usable meal",
+      started && consumed && early && collected && !Sim.collectCookedFood(run,fire) &&
+      Sim.quantity(run.player.bag,recipe.product) === recipe.qty &&
+      Data.items[recipe.product].use === "food" && run.player.skills.cooking === 3);
+  }
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

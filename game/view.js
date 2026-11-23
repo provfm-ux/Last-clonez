@@ -1054,6 +1054,12 @@ const View = (() => {
         (other.x === x + dx && other.y === y + dy || other.x === x - dx && other.y === y - dy));
       const alongX = connects(1, 0), alongY = connects(0, 1);
       const axis = alongX === alongY ? o.axis : alongX ? "x" : "y";
+      if (o.material === "stone") {
+        const horizontal = axis === "x";
+        f(horizontal ? -.48 : -.20,horizontal ? -.20 : -.48,0,horizontal ? .96 : .40,
+          horizontal ? .40 : .96,24,["#898783","#646460","#50504d"]);
+        return;
+      }
       const rails = (horizontal, open) => {
         for (const offset of [-.43, .38]) f(horizontal ? offset : -.06, horizontal ? -.06 : offset, 0, .11, .11, 28, wood);
         if (open) { f(-.43, -.06, 3, .09, .50, 21, olive); return; }
@@ -1614,6 +1620,7 @@ const View = (() => {
   const weaponArt = {
     bat: [[1,0,4,2,woodGrip],[5,-1,8,3,woodGrip],[6,-1,6,1,lightWood]],
     pipe: [[1,-1,11,2,steel],[10,-2,3,4,darkSteel],[11,-1,2,2,lightSteel]],
+    flintknife: [[1,0,3,2,woodGrip],[4,-1,3,2,darkSteel],[6,-1,2,1,steel]],
     carvedspear: [[1,0,12,1,lightWood],[11,-1,3,3,lightWood],[14,0,2,1,lightWood]],
     spear: [[1,0,12,1,lightWood],[12,-1,3,3,steel],[15,0,1,1,lightSteel]],
     axe: [[1,0,10,2,woodGrip],[8,-3,4,4,darkSteel],[11,-4,2,5,lightSteel]],

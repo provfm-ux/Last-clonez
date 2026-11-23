@@ -14,6 +14,10 @@ O catálogo inclui as 40 entradas e 80 variantes do anexo. A colocação usa um 
 - Os Pantrycaps identificados podem ser preparados na fogueira. A receita exige Pantrycaps, madeira e identificação. Bitterfold provoca doença e não entra na receita. A pesca tem reserva e recuperação por local.
 - O novo spear talhado exige faca em bom estado, madeira e bancada. O nível altera a condição inicial. Novos dados são texto, regras e desenhos em pixels do próprio projeto. Não foram importados assets de terceiros.
 
+## Primeira entrega da fase de materiais
+
+Procura sílex, pedra e argamassa no Crusher shed em Slag Quarry e no Stonecutters Hut em Highmoor. A faca de sílex exige um martelo e uma bancada. O muro de pedra exige um martelo e espaço no exterior, longe de portas e travessias. A construção consome os materiais quando encontra uma posição válida. Os saves anteriores recebem os materiais uma vez por região.
+
 ## Matriz de competências
 
 Os identificadores entre parênteses são os usados pelo save. Carpentry, Aiming, First Aid e Agriculture reutilizam IDs históricos. A validação indica o que foi exercitado explicitamente nesta entrega ou já tem cobertura na suite. As linhas pendentes correspondem a ciclos ainda sem implementação.
@@ -44,9 +48,9 @@ Os identificadores entre parênteses são os usados pelo save. Carpentry, Aiming
 | 22 Tailoring | Remendar roupa danificada. Aumenta condição restaurada. | XP e condição restaurada comparados |
 | 23 Blacksmithing | Faltam forja e peças combináveis. | Pendente |
 | 24 Carving | Talhar lança na bancada com faca e madeira. Melhora condição inicial. | Ferramenta, custo, XP e níveis comparados |
-| 25 Knapping | Falta lascagem com pedra e saída utilizável. | Pendente |
+| 25 Knapping | Talhar lâmina de sílex com martelo e bancada. Melhora a condição inicial. | Custo, ferramenta, XP e comparação de níveis |
 | 26 Glassmaking | Faltam posto quente e recipientes funcionais. | Pendente |
-| 27 Masonry | Falta construção mineral própria. | Pendente |
+| 27 Masonry | Construir um muro em pedra e argamassa. Melhora a resistência do muro. | Custo, colocação inválida, colisão, save, XP e comparação de níveis |
 | 28 Pottery | Faltam argila, forno e recipientes funcionais. | Pendente |
 | 29 Agriculture (gardening) | Cultivar e colher. Melhora rendimento sem eliminar tempo de crescimento. | Cultura e colheita na suite |
 | 30 Animal Care | Faltam animais, alimentação, hidratação e produção. | Pendente |

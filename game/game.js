@@ -1671,7 +1671,7 @@
         (pry ? button("Pry with crowbar", "pry-" + id, Boolean(Sim.breachProblem(state, o, "pry"))) : "") +
         (force ? button("Smash glass", "smash-" + id, Boolean(Sim.breachProblem(state, o, "smash")), "danger") : "") +
         (Sim.canListen(state,o) ? button("Listen", "listen-" + id) : "") +
-        button("Reinforce", "board-" + id, o.boards >= 3) + button("Remove plank", "unboard-" + id, !o.boards) +
+        (o.material === "stone" ? "" : button("Reinforce", "board-" + id, o.boards >= 3) + button("Remove plank", "unboard-" + id, !o.boards)) +
         (barrier ? button("Dismantle", "removebarrier-" + id, false, "danger") : "") + "</div>", "object-" + id);
       return;
     }

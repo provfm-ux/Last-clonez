@@ -10,6 +10,7 @@ const Data = (() => {
       detail:"Congratulations. You survived the raffle. The winner didn't."},
     bat: {combat:"blunt", name:"Wooden bat", group:"Weapons", weight:1.4, damage:25, range:1.4, delay:.55, effort:6, noise:3, wear:.6, icon:"bat"},
     pipe: {combat:"blunt", name:"Steel pipe", group:"Weapons", weight:1.8, damage:31, range:1.4, delay:.68, effort:8, noise:4, wear:.35, icon:"bat"},
+    flintknife:{combat:"quick",name:"Flint knife",group:"Weapons",weight:.26,damage:15,range:1.05,delay:.39,effort:3,noise:1.5,wear:1.1,icon:"bat"},
     carvedspear:{combat:"reach",name:"Carved spear",group:"Weapons",weight:1.15,damage:31,range:1.9,delay:.64,effort:6,noise:2.5,wear:1.4,icon:"bat"},
     spear: {combat:"reach", name:"Improvised spear", group:"Weapons", weight:1.2, damage:34, range:1.9, delay:.64, effort:6, noise:2.5, wear:1.6, icon:"bat"},
     axe: {combat:"heavy", name:"Axe", group:"Weapons", weight:2.2, damage:43, range:1.4, delay:.78, effort:10, noise:5, wear:.45, icon:"bat"},
@@ -50,6 +51,9 @@ const Data = (() => {
     cloth: {name:"Cloth", group:"Materials", weight:.1, icon:"pack"},
     wood: {name:"Plank", group:"Materials", weight:.7, icon:"build"},
     nails: {name:"Nails", group:"Materials", weight:.02, icon:"build"},
+    flint:{name:"Flint nodule",group:"Materials",weight:.22,icon:"build"},
+    rubble:{name:"Dressed stone",group:"Materials",weight:1.1,icon:"build"},
+    mortar:{name:"Mortar bag",group:"Materials",weight:.7,icon:"build"},
     scrap: {name:"Scrap", group:"Materials", weight:.3, icon:"build"},
     tape: {name:"Duct tape", group:"Materials", weight:.1, icon:"build"},
     ammo: {name:"9 mm rounds", group:"Materials", weight:.02, icon:"aim"},
@@ -99,6 +103,10 @@ const Data = (() => {
     {id:"spear",name:"Improvised spear",out:"spear",qty:1,inputs:{wood:1,tape:1},desc:"Longer reach with faster wear."},
     {id:"carvedspear",name:"Carve a spear",out:"carvedspear",qty:1,inputs:{wood:1},tool:"knife",skill:"carving",
       desc:"Use a carried kitchen knife and a workbench. Carving skill improves starting condition."},
+    {id:"flintknife",name:"Shape a flint knife",out:"flintknife",qty:1,inputs:{flint:1,cloth:1},tool:"hammer",skill:"knapping",
+      desc:"Use a hammer at a workbench to shape a short blade. Knapping improves its initial condition."},
+    {id:"stonewall",name:"Stone wall",build:"fence",material:"stone",inputs:{rubble:2,mortar:1},tool:"hammer",skill:"masonry",
+      desc:"Lay a durable outdoor wall. Masonry improves its strength."},
     {id:"planks",name:"Reclaim planks",out:"wood",qty:2,inputs:{scrap:2},desc:"Turn salvaged material into planks."},
     {id:"rainbarrel",name:"Rain collector",build:"barrel",inputs:{wood:3,scrap:2,tape:1},desc:"Collects rainwater for boiling at a campfire."},
     {id:"crate",name:"Storage crate",build:"crate",inputs:{wood:2,nails:4},desc:"A container for storing supplies."},
@@ -215,6 +223,8 @@ const Data = (() => {
   const skillXp = level => 12 * level * level;
   const skills = {
     running:{name:"Running",desc:"Reduces stamina spent on sprints. Practice by running a real distance."},
+    knapping:{name:"Knapping",desc:"Shape flint blades at a workbench. Practice improves their starting condition."},
+    masonry:{name:"Masonry",desc:"Build stone walls outdoors. Practice makes the walls stronger."},
     carving:{name:"Carving",desc:"Carve spears at a workbench. Practice produces sturdier starting equipment."},
     nimble:{name:"Nimble",desc:"Move more quickly while sneaking near a visible infected. Practice by repositioning."},
     electrical:{name:"Electrical",desc:"Helps stretch generator fuel. Practice by fixing the shelter radio."},
@@ -242,11 +252,11 @@ const Data = (() => {
   };
   const weaponSkills = {axe:"axe",hatchet:"axe",bat:"long_blunt",pipe:"long_blunt",golfclub:"long_blunt",
     crowbar:"long_blunt",shovel:"long_blunt",fryingpan:"short_blunt",wrench:"short_blunt",rollingpin:"short_blunt",
-    machete:"long_blade",knife:"short_blade",spear:"spear",carvedspear:"spear",broom:"spear"};
+    machete:"long_blade",knife:"short_blade",flintknife:"short_blade",spear:"spear",carvedspear:"spear",broom:"spear"};
   const skillGroups = {
     "Physical & movement":["fitness","strength","running","lightfooted","nimble","sneaking"],
     "Combat & equipment":["combat","marksmanship","axe","long_blunt","short_blunt","long_blade","short_blade","spear","maintenance"],
-    "Craft & care":["crafting","medical","mechanics","tailoring","electrical","carving","cooking"],
+    "Craft & care":["crafting","medical","mechanics","tailoring","electrical","carving","knapping","masonry","cooking"],
     "Food & fieldwork":["gardening","foraging","fishing"]
   };
   // Seasons last `seasonDays` days each. `chill` lowers the outdoor body-temperature target; `grow` scales crop growth.

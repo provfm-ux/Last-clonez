@@ -1,6 +1,8 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Added flint knapping at workbenches, with skill-based blade condition.
+- Added outdoor stone walls, skill-based strength, and material stores in the quarry and Highmoor.
 - Added seed-based field notes, linked survivor accounts, and optional scavenging rewards.
 - Added mushroom identification, safe cooking, and readable patch warnings that can draw nearby infected.
 - Added skill categories, weapon-family practice, movement skills, equipment care, electrical work, and carving.

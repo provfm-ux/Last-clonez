@@ -55,8 +55,8 @@ const Sim = (() => {
     ["No chão", "On the ground"], ["Tábua recuperada", "Recovered plank"], ["Madeira cortada", "Chopped wood"],
     ["Mobiliário desmontado", "Dismantled furniture"], ["Infetado caído", "Fallen infected"]
   ]);
-  const dropNames = new Set(legacyDropNames.values());
-  const builtNames = new Map(Data.recipes.filter(recipe => recipe.build).map(recipe => [recipe.build, recipe.name]));
+  const dropNames = new Set([...legacyDropNames.values(),"Recovered stone"]);
+  const builtNames = new Map(Data.recipes.filter(recipe => recipe.build && !recipe.material).map(recipe => [recipe.build, recipe.name]));
   const utilityIds = new Set(["shelter-tap", "shelter-generator"]);
   const beamLimit = Math.cos(Data.flashlight.angle);
   const individualItem = id => Data.items[id].damage || id === "flashlight" || Data.items[id].individual;
@@ -226,6 +226,16 @@ const Sim = (() => {
     }
   }
 
+  function stockStoneMaterials(world) {
+    if (!["quarry","highmoor"].includes(world.region)) return;
+    const building = world.buildings.find(b => b.name === (world.region === "quarry" ? "Crusher shed" : "Stonecutters Hut"));
+    if (!building) return;
+    const stash = world.objects.find(o => o.building === building.id && o.action === "loot" &&
+      (world.region !== "quarry" || o.name === "Spare parts"));
+    if (!stash) return;
+    for (const [id,qty] of Object.entries({flint:6,rubble:6,mortar:3})) add(stash.loot,id,qty);
+  }
+
   function create(seed, difficulty = "survival", role = "carer", generator = 2, options, region = Regions.home, profile) {
     const rules = Data.worldRules(difficulty, options);
     const world = World.build(seed, difficulty, generator, rules, region);
@@ -275,6 +285,7 @@ const Sim = (() => {
     if (difficulty === "longhaul") stockLongHaul(world,seed);
     World.sync(world);
     FieldStories.place(world);
+    stockStoneMaterials(world);
     const bag = [];
     for (const [id, qty] of [["bat", 1], ["bandage", 2], ["cloth", 2], ["food", 2], ["water", 2], ["jeans", 1], ["boots", 1]]) add(bag, id, qty);
     for (const [id,qty] of Object.entries(Data.roles[role]?.kit ?? {})) add(bag,id,qty);
@@ -746,8 +757,12 @@ const Sim = (() => {
       }
     }
     if (recipe.tool) {
-      if (!s.player.bag.some(i => i.id === recipe.tool && i.condition > 0)) return "Bring a usable kitchen knife.";
-      if (s.player.vehicle || !nearby(s).some(o => o.action === "workbench")) return "Work within reach of a workbench.";
+      if (!s.player.bag.some(i => i.id === recipe.tool && (i.condition ?? 100) > 0)) {
+        return "Bring a usable " + Data.items[recipe.tool].name.toLowerCase() + ".";
+      }
+      if (s.player.vehicle || !recipe.build && !nearby(s).some(o => o.action === "workbench")) {
+        return recipe.build ? "Exit the vehicle to build." : "Work within reach of a workbench.";
+      }
     }
     const missing = Object.entries(recipe.inputs).filter(([id, n]) => available(s, id) < n);
     if (missing.length) return missing.map(([id, n]) => (n - available(s, id)) + " " + Data.items[id].name).join(" · ");
@@ -803,19 +818,23 @@ const Sim = (() => {
         "Choose a clear spot within reach, away from entrances. Only crates can go indoors.", true);
       return false;
     }
-    if (!consume(s, recipe.inputs)) { notify(s, "You are missing materials.", true); return false; }
+    const problem = recipeProblem(s,recipe);
+    if (problem) { notify(s,problem,true); return false; }
+    if (!consume(s, recipe.inputs)) return false;
     const structure = {id: "built" + s.serial++, x, y, kind: recipe.build, name: recipe.name,
       active: true, solid: !barrier, action: barrier ? "door" : recipe.build === "crate" ? "loot" : recipe.build,
       storage: recipe.build === "crate", searched: true, loot: []};
     if (barrier) {
       const horizontal = s.world.objects.some(o => o.active && isBarrier(o) && Math.abs(o.x - x) === 1 && o.y === y);
-      Object.assign(structure, {open:false, boards:0, hp:recipe.build === "fence" ? 90 : 75, axis:horizontal ? "x" : "y"});
+      const hp = recipe.material === "stone" ? 145 + 8 * level(s,recipe.skill) : recipe.build === "fence" ? 90 : 75;
+      Object.assign(structure, {open:false, boards:0, hp, axis:horizontal ? "x" : "y"});
+      if (recipe.material) structure.material = recipe.material;
     }
     if (recipe.build === "barrel") { structure.water = 0; structure.rawRain = true; }
     if (recipe.build === "garden") structure.garden = {crop: null, moisture: 0, growth: 0};
     s.world.objects.push(structure);
     World.sync(s.world);
-    addXp(s, "crafting", 6);
+    addXp(s, recipe.skill ?? "crafting", 6);
     s.blueprint = null;
     notify(s, recipe.name + " built.");
     return true;
@@ -1669,7 +1688,7 @@ const Sim = (() => {
   }
 
   function barricade(s, o) {
-    if (!reachableObject(s, o) || o.action !== "door" || s.player.vehicle || o.boards >= 3) return false;
+    if (!reachableObject(s, o) || o.action !== "door" || s.player.vehicle || o.material === "stone" || o.boards >= 3) return false;
     if (openingOccupied(s, o)) { notify(s, "The opening is occupied.", true); return false; }
     const inputs = available(s, "nails") >= 4 ? {wood: 2, nails: 4} : {wood: 3, tape: 1};
     if (!consume(s, inputs)) { notify(s, "You need 2 planks and 4 nails, or 3 planks and duct tape.", true); return false; }
@@ -1699,8 +1718,9 @@ const Sim = (() => {
     if (!isBarrier(o) || !reachableObject(s, o) || s.player.vehicle) return false;
     o.active = false;
     World.sync(s.world);
-    if (o.hp > 0) s.world.objects.push({id:"built" + s.serial++, x:o.x, y:o.y, kind:"drop", name:"Recovered plank",
-      active:true, solid:false, action:"loot", searched:true, loot:[{id:"wood", qty:1 + o.boards}]});
+    if (o.hp > 0) s.world.objects.push({id:"built" + s.serial++, x:o.x, y:o.y, kind:"drop", name:o.material === "stone" ? "Recovered stone" : "Recovered plank",
+      active:true, solid:false, action:"loot", searched:true,
+      loot:[{id:o.material === "stone" ? "rubble" : "wood",qty:1+o.boards}]});
     noise(s, o.x, o.y, 5);
     notify(s, o.name + " dismantled.");
     return true;
@@ -3054,7 +3074,7 @@ const Sim = (() => {
     const supportedMap = data?.mapRevision === Regions.mapRevision ||
       region !== Regions.cavern && (data?.mapRevision === undefined || data.mapRevision === 2);
     return data && Object.hasOwn(Regions.definitions, region) && supportedMap &&
-      (data.fieldRevision === undefined || data.fieldRevision === FieldStories.revision) &&
+      (data.fieldRevision === undefined || data.fieldRevision === 1 || data.fieldRevision === FieldStories.revision) &&
       (data.ledgerRevision === undefined || [1,2,3,4,Chronicle.revision].includes(data.ledgerRevision)) &&
       Array.isArray(data.objects) && data.objects.length <= 1000 &&
       Array.isArray(data.enemies) && data.enemies.length <= 200 && Array.isArray(data.explored) && data.explored.length === mapSize &&
@@ -3216,7 +3236,9 @@ const Sim = (() => {
           const previous = oldMap && original?.kind === "exit" ? Regions.oldExit(region,o.id) : original;
           const validKind = original ? original.kind === o.kind && original.action === o.action &&
             (original.kind === "car" || previous.x === o.x && previous.y === o.y) : foreignCar(o) || /^built\d+$/.test(o.id) && addedKinds.has(o.kind);
-          return validPosition(o) && validKind && validStation(o, original) && validCar(o, original) && typeof o.active === "boolean" && typeof o.solid === "boolean" &&
+          const validMaterial = o.material === undefined || !original && o.kind === "fence" &&
+            o.material === "stone" && o.boards === 0 && o.hp <= 225 && (!o.open || o.broken);
+          return validPosition(o) && validKind && validMaterial && validStation(o, original) && validCar(o, original) && typeof o.active === "boolean" && typeof o.solid === "boolean" &&
             (o.action === "loot" ? validBag(o.loot) : !o.loot || validBag(o.loot)) && (o.action !== "door" || validOpening(o, original));
         }) || !s.world.objects.every(o => savedIds.has(o.id) || missingLegacyFixture(o))) throw new Error("Invalid world data.");
     if (!data.enemies.every(z => validPosition(z) && Data.infected[z.kind] && Number.isFinite(z.hp) && z.hp >= 0 && z.hp <= 88)) throw new Error("Invalid infected data.");
@@ -3252,7 +3274,7 @@ const Sim = (() => {
       ...(o.loot ? {loot:o.loot.map(item => ({...item}))} : {}), ...(o.garden ? {garden:{...o.garden}} : {}), ...(o.cook ? {cook:{...o.cook}} : {}),
       ...(o.kind === "car" ? {homeRegion:o.homeRegion ?? region} : {}),
       ...(oldMap && o.kind === "exit" ? {x:originalObjects.get(o.id).x,y:originalObjects.get(o.id).y} : {}),
-      name: originalObjects.get(o.id)?.name ?? (o.kind === "car" ? Regions.vehicleNames[o.id] ?? "Car boot" : undefined) ?? builtNames.get(o.kind) ?? legacyDropNames.get(o.name) ??
+      name: originalObjects.get(o.id)?.name ?? (o.kind === "car" ? Regions.vehicleNames[o.id] ?? "Car boot" : undefined) ?? (o.material === "stone" ? "Stone wall" : builtNames.get(o.kind)) ?? legacyDropNames.get(o.name) ??
         (dropNames.has(o.name) || o.name === "The El Gordo Winner" ? o.name : "On the ground"),
       ...(o.kind === "barrel" ? {water: o.water ?? 0} : {})
     }));
@@ -3261,6 +3283,7 @@ const Sim = (() => {
       s.world.objects.push(overlaps ? {...original,solid:false} : original);
     }
     if (data.booksStocked !== undefined && typeof data.booksStocked !== "boolean") throw new Error("Invalid book stock.");
+    if ((data.fieldRevision ?? 0) < 2) stockStoneMaterials(s.world);
     s.world.booksStocked = data.booksStocked === true;
     stockSkillBooks(s.world);
     if (p.readBooks !== undefined && (!Array.isArray(p.readBooks) || p.readBooks.length > Object.keys(Data.skillBooks).length ||

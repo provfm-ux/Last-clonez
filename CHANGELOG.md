@@ -1,6 +1,10 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Added seed-based field notes, linked survivor accounts, and optional scavenging rewards.
+- Added mushroom identification, safe cooking, and readable patch warnings that can draw nearby infected.
+- Added skill categories, weapon-family practice, movement skills, equipment care, electrical work, and carving.
+- Added finite, recovering fishing spots and kept older saves compatible.
 - Added clothing damage, DIY-scaled repairs, and ten one-time skill books.
 - Added explicit weapon unequip and kept hands empty when dropping or storing a weapon.
 - Added a character Equipment view and direct repairs for damaged and broken weapons.

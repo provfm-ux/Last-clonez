@@ -30,7 +30,7 @@ const Sim = (() => {
 
   const fists = {combat: "unarmed", name: "Fists", damage: 9, range: 1.05, delay: .48, effort: 5, noise: 2, wear: 0};
   const weaponData = s => Data.items[weapon(s).id] || fists;
-  const level = (s, skill) => Math.min(Data.skillMax, Math.floor(Math.sqrt((s.player.skills[skill] ?? 0) / 12)));
+  const level = (s, skill) => Math.min(Data.skillMax, Math.floor(Math.sqrt((s.player.skills[skill] ?? 0) / Data.skillXp(1))));
   const season = s => Data.seasons[Math.floor(s.minutes / 1440 / Data.seasonDays) % Data.seasons.length];
   function wornItem(s, slot) {
     const id = s.player.gear[slot];
@@ -274,6 +274,7 @@ const Sim = (() => {
     }
     if (difficulty === "longhaul") stockLongHaul(world,seed);
     World.sync(world);
+    FieldStories.place(world);
     const bag = [];
     for (const [id, qty] of [["bat", 1], ["bandage", 2], ["cloth", 2], ["food", 2], ["water", 2], ["jeans", 1], ["boots", 1]]) add(bag, id, qty);
     for (const [id,qty] of Object.entries(Data.roles[role]?.kit ?? {})) add(bag,id,qty);
@@ -632,6 +633,13 @@ const Sim = (() => {
         notify(s, "This food has spoiled. Look for canned food.", true);
         return false;
       }
+      if (data.toxic) {
+        p.sick = Math.min(100, p.sick + 45);
+        p.pain = Math.min(100, p.pain + 12);
+        if (--item.qty === 0) p.bag.splice(index, 1);
+        notify(s, "The mushroom leaves a bitter taste. You feel ill.", true);
+        return true;
+      }
       if (p.hunger >= 99 && (!data.hydration || p.hydration >= 99)) { notify(s, "You are already well fed."); return false; }
       p.hunger = Math.min(100, p.hunger + data.nutrition);
       if (data.hydration) p.hydration = Math.min(100, p.hydration + data.hydration);
@@ -667,7 +675,7 @@ const Sim = (() => {
       if (p.backpack) return false;
       p.backpack = true;
     } else return false;
-    const name = data.name;
+    const name = itemName(s, item.id);
     item.qty--;
     if (!item.qty) p.bag.splice(index, 1);
     notify(s, name + " used.");
@@ -694,7 +702,7 @@ const Sim = (() => {
     if (!id) return false;
     if (p.vehicle && p.driveSpeed > .15) { notify(s, "Stop the vehicle before using your belt."); return false; }
     const item = beltItem(s, id);
-    if (!item) { notify(s, "No usable " + Data.items[id].name.toLowerCase() + " in your pack."); return false; }
+    if (!item) { notify(s, "No usable " + itemName(s,id).toLowerCase() + " in your pack."); return false; }
     return use(s, p.bag.indexOf(item));
   }
 
@@ -727,7 +735,8 @@ const Sim = (() => {
     return true;
   }
 
-  const repairAmount = s => 35 + 3*level(s,"crafting");
+  const repairAmount = (s,item = weapon(s)) => 35 + 3*level(s,"crafting") +
+    2*level(s,canMend(item) ? "tailoring" : "maintenance");
 
   function recipeProblem(s, recipe, repairItem = weapon(s)) {
     if (recipe.repair || recipe.mend) {
@@ -735,6 +744,10 @@ const Sim = (() => {
           (recipe.mend ? !canMend(repairItem) : !Data.items[repairItem.id]?.damage)) {
         return recipe.mend ? "Choose damaged clothing in Equipment." : "Choose a damaged weapon you carry.";
       }
+    }
+    if (recipe.tool) {
+      if (!s.player.bag.some(i => i.id === recipe.tool && i.condition > 0)) return "Bring a usable kitchen knife.";
+      if (s.player.vehicle || !nearby(s).some(o => o.action === "workbench")) return "Work within reach of a workbench.";
     }
     const missing = Object.entries(recipe.inputs).filter(([id, n]) => available(s, id) < n);
     if (missing.length) return missing.map(([id, n]) => (n - available(s, id)) + " " + Data.items[id].name).join(" · ");
@@ -757,9 +770,14 @@ const Sim = (() => {
         s.player.bag.splice(s.player.bag.indexOf(repairItem)+1,0,{...repairItem,qty:repairItem.qty-1});
         repairItem.qty = 1;
       }
-      repairItem.condition = Math.min(100, repairItem.condition + repairAmount(s));
+      repairItem.condition = Math.min(100, repairItem.condition + repairAmount(s,repairItem));
+      addXp(s, recipe.mend ? "tailoring" : "maintenance", 4);
     }
-    else add(s.player.bag, recipe.out, recipe.qty, {born: s.minutes});
+    else {
+      const condition = recipe.skill ? 65 + 3.5 * level(s,recipe.skill) : 100;
+      add(s.player.bag, recipe.out, recipe.qty, {born:s.minutes,condition});
+      if (recipe.skill) addXp(s,recipe.skill,5);
+    }
     addXp(s, "crafting", 4);
     notify(s, recipe.repair || recipe.mend ? Data.items[repairItem.id].name + " repaired." : recipe.name + " completed.");
     return true;
@@ -1656,7 +1674,7 @@ const Sim = (() => {
     const inputs = available(s, "nails") >= 4 ? {wood: 2, nails: 4} : {wood: 3, tape: 1};
     if (!consume(s, inputs)) { notify(s, "You need 2 planks and 4 nails, or 3 planks and duct tape.", true); return false; }
     o.open = false; o.boards++;
-    o.hp += 70 * Data.roles[s.role].craft;
+    o.hp += (70 + 4 * level(s,"crafting")) * Data.roles[s.role].craft;
     s.flags.barricade = true;
     addXp(s, "crafting", 5);
     World.sync(s.world);
@@ -1785,9 +1803,10 @@ const Sim = (() => {
   function updateUtilities(s, before, minutes, away = false) {
     const gen = shelterGenerator(s);
     const gridMinutes = s.rules.powerDays < 0 ? minutes : clamp(s.rules.powerDays * 1440 - before, 0, minutes);
-    const backupMinutes = gen?.running ? Math.min(gen.fuel, minutes) : 0;
+    const fuelRate = 1 - .025 * level(s,"electrical");
+    const backupMinutes = gen?.running ? Math.min(gen.fuel / fuelRate, minutes) : 0;
     if (backupMinutes) {
-      gen.fuel = Math.max(0, gen.fuel - backupMinutes);
+      gen.fuel = Math.max(0, gen.fuel - backupMinutes * fuelRate);
       if (!gen.fuel) { gen.running = false; if (!away) notify(s, "The shelter generator ran out of fuel.", true); }
       else if (s.minutes >= gen.nextNoise) {
         if (!away) noise(s, gen.x, gen.y, 12);
@@ -1824,6 +1843,7 @@ const Sim = (() => {
   function startFireBatch(s, fire, id) {
     if (!canUseFire(s, fire) || fire.boilUntil != null || fire.cook || !Object.hasOwn(Data.fireRecipes, id)) return false;
     const recipe = Data.fireRecipes[id];
+    if (recipe.identify && !knownMushrooms(s)) return false;
     if (!consume(s, recipe.inputs)) {
       notify(s, id === "water" ? "You need untreated water and a plank for this batch." : "You need fresh ingredients and fuel for this batch.", true);
       return false;
@@ -1874,6 +1894,67 @@ const Sim = (() => {
 
   const forageAmount = (s, site) => Data.wildResources[site.resource].qty + (Data.roles[s.role].forageBonus ?? 0) + Math.floor(level(s, "foraging") / 3);
 
+  const knownMushrooms = s => level(s,"foraging") >= 2 || s.player.readBooks?.includes("forageguide");
+  const isMushroom = id => id === "pantrycap" || id === "bitterfold";
+  const itemName = (s,id) => isMushroom(id) && !knownMushrooms(s) ? "Unidentified mushroom" : Data.items[id].name;
+
+  function mushroomProblem(s, site) {
+    if (s.mode !== "play" || site?.action !== "mushroom" || !site.active || s.player.vehicle ||
+        !s.world.objects.includes(site) || !reachableObject(s,site)) return "Move closer on foot.";
+    if (site.harvested) return "Already picked.";
+    return roomFor(s,site.species) < 1 ? "Make room in your inventory." : "";
+  }
+
+  function harvestMushroom(s, site) {
+    const problem = mushroomProblem(s,site);
+    if (problem) { notify(s,problem,true); return false; }
+    site.harvested = true;
+    add(s.player.bag,site.species,1,{born:s.minutes});
+    addXp(s,"foraging",3);
+    if (site.colony === "active" && !s.fungalAlert && s.elapsed >= (s.nextFungalAlert ?? 0)) {
+      s.fungalAlert = {region:s.world.region,id:site.id,due:s.elapsed + FieldStories.mushroom.warning};
+      hear(s,"fungus",site);
+      notify(s,"The filaments are snapping. Infected may converge in four seconds.",true);
+    } else notify(s,"Gathered " + itemName(s,site.species) + ".");
+    return true;
+  }
+
+  function updateFungalAlert(s) {
+    const pending = s.fungalAlert;
+    if (!pending || pending.due > s.elapsed) return;
+    s.fungalAlert = null;
+    s.nextFungalAlert = s.elapsed + FieldStories.mushroom.cooldown;
+    if (pending.region !== s.world.region) return;
+    const site = s.world.objects.find(o => o.id === pending.id);
+    if (!site?.harvested || site.colony !== "active") return;
+    for (const z of s.world.enemies) {
+      if (z.hp <= 0 || distance(z,site) > FieldStories.mushroom.range) continue;
+      const path = World.route(s.world,z.x,z.y,site.x,site.y);
+      if (!path.length && World.tileAt(s.world,z.x,z.y) !== World.tileAt(s.world,site.x,site.y)) continue;
+      Object.assign(z,{path,alert:Math.max(z.alert,14),chaseX:site.x,chaseY:site.y,replan:1});
+    }
+  }
+
+  function readFieldNote(s, note) {
+    if (s.mode !== "play" || s.player.vehicle || note?.action !== "field-note" ||
+        !s.world.objects.includes(note) || !reachableObject(s,note)) return false;
+    const prerequisite = FieldStories.prereqs[note.id.slice("field-note-".length)];
+    if (prerequisite && ![s.world,...Object.values(s.regionStates)].some(zone =>
+        zone.objects.some(o => o?.id === "field-note-" + prerequisite && o.read))) {
+      notify(s,"The note refers to an earlier route card. Read that first.");
+      return false;
+    }
+    note.read = true;
+    const line = FieldStories.byLine[note.line].text;
+    if (note.reward && !note.claimed && roomFor(s,note.reward) >= 1) {
+      add(s.player.bag,note.reward,1,{born:s.minutes});
+      note.claimed = true;
+      notify(s,"Recovered " + Data.items[note.reward].name + ".");
+    }
+    notify(s,line);
+    return true;
+  }
+
   function wildProblem(s, site) {
     if (s.mode !== "play" || s.player.vehicle || !s.world.objects.includes(site) || !reachableObject(s, site)) return "Move closer on foot.";
     if (site.action === "spring") {
@@ -1887,6 +1968,8 @@ const Sim = (() => {
         if (site.fishUntil > s.minutes) return "Check the line in " + Math.ceil(site.fishUntil - s.minutes) + " in-game minutes.";
         if (!isSpoiled(s, {id:"rawfish",born:site.fishUntil}) && roomFor(s, "rawfish") < 1) return "Make room in your inventory.";
       } else {
+        if (site.fishStock === 0 && site.fishRecovery > s.minutes) return "The water is quiet. Try again in " +
+          Math.ceil(site.fishRecovery - s.minutes) + " in-game minutes.";
         if (!quantity(s.player.bag, "rod")) return "Bring a fishing rod. Look in the net shed.";
         if (!available(s, "bait")) return "Search under driftwood for bait.";
       }
@@ -1910,6 +1993,10 @@ const Sim = (() => {
       notify(s, "Gathered " + qty + " × " + Data.items[site.resource].name + ".");
     } else if (site.fishUntil == null) {
       if (!consume(s, {bait:1})) return false;
+      const stock = site.fishStock || Data.fishingStock.capacity;
+      site.fishStock = stock - 1;
+      if (!site.fishStock) site.fishRecovery = s.minutes + Data.fishingStock.recovery;
+      else delete site.fishRecovery;
       const wait = Math.max(10, Math.round(Data.fishingMinutes * (1 - level(s, "fishing") * .04)));
       site.fishUntil = s.minutes + wait;
       notify(s, "Line cast. Return to this spot in " + wait + " in-game minutes.");
@@ -2103,6 +2190,7 @@ const Sim = (() => {
         notify(s, "The radio needs 2 radio components, 2 scrap and 1 fuel."); return false;
       }
       s.flags.radio = true;
+      addXp(s,"electrical",12);
       noise(s, o.x, o.y, 24);
       notify(s, "The water tower heard your signal. So did the infected.");
     } else if (o.action === "barrel") {
@@ -2232,11 +2320,12 @@ const Sim = (() => {
     recordPlaytest(s, "fight");
     faceTowards(p, z);
     s.swingVisual = {weapon:item.id, dx:z.x - p.x, dy:z.y - p.y};
-    p.cooldown = w.delay; p.staminaDelay = .7; p.swing = .18;
+    const family = Data.weaponSkills[item.id];
+    p.cooldown = w.delay * (family ? 1 - .025 * level(s,family) : 1); p.staminaDelay = .7; p.swing = .18;
     p.stamina = Math.max(0, p.stamina - w.effort * staminaCost(s));
     if (w.firearm) remove(p.bag, "ammo", 1);
     const conditionBefore = item.condition;
-    item.condition = Math.max(0, item.condition - w.wear);
+    item.condition = Math.max(0, item.condition - w.wear * (1 - .035 * level(s,"maintenance")));
     if (conditionBefore > 0 && item.condition === 0) notify(s, w.name + " broke. Repair it in Equipment or switch weapons.", true);
     else if (conditionBefore >= 20 && item.condition < 20) notify(s, "Your " + Data.items[item.id].name + " is nearly worn out. Repair it or switch weapons.", true);
     noise(s, p.x, p.y, w.noise);
@@ -2256,6 +2345,8 @@ const Sim = (() => {
     }
     s.effects.push({x: z.x, y: z.y, text: hit ? (matchup < 1 ? "RESISTED " : matchup > 1 ? "STRONG " : "") + "−" + amount : "MISS", color: hit ? "#efc785" : "#d2cfb6", life: .8});
     addXp(s, "combat", hit ? 1.5 : .2);
+    if (hit && family) addXp(s,family,1.5);
+    if (w.wear > 0) addXp(s,"maintenance",.25);
     if (w.firearm) addXp(s, "marksmanship", hit ? 3 : 1);
     else addXp(s, "strength", hit ? .8 : .1);
     if (!z.hp) {
@@ -2466,7 +2557,9 @@ const Sim = (() => {
     s.running = !s.quiet && p.stamina > 8 && p.fatigue < 85 && !(p.grabbed > 0) && !(p.fracture > 0) && (s.dash || input.run) && (manual || p.path.length);
     const surface = World.tileAt(s.world, p.x, p.y)?.surface;
     const footing = surface === "sand" ? .78 : surface === "field" ? .88 : 1;
-    const speed = (s.running ? 4 : s.quiet ? 1.6 : 2.55) * (injury ? .8 : 1) * (load > .9 ? .9 : 1) * (p.fatigue > 85 || cold ? .8 : 1) * (p.grabbed > 0 ? .4 : 1) * (p.fracture > 0 ? (p.splinted ? Data.fracture.splintSpeed : Data.fracture.brokenSpeed) : 1) * footing;
+    const combatStep = s.quiet && (manual || p.path.length) && s.world.enemies.some(z =>
+      z.hp > 0 && !z.dormant && distance(z,p) < 5 && lineOfSight(s,p,z));
+    const speed = (s.running ? 4 : s.quiet ? 1.6 * (combatStep ? 1 + .025 * level(s,"nimble") : 1) : 2.55) * (injury ? .8 : 1) * (load > .9 ? .9 : 1) * (p.fatigue > 85 || cold ? .8 : 1) * (p.grabbed > 0 ? .4 : 1) * (p.fracture > 0 ? (p.splinted ? Data.fracture.splintSpeed : Data.fracture.brokenSpeed) : 1) * footing;
     const startX = p.x, startY = p.y;
     if (manual) {
       const dx = input.x * .5 + input.y, dy = input.y - input.x * .5, mag = Math.hypot(dx, dy);
@@ -2487,8 +2580,13 @@ const Sim = (() => {
       s.aim = Math.max(0, s.aim - dt * 2);
       if (p.footstep <= 0) {
         p.footstep = s.running ? .22 : .4;
-        const quiet = (s.role === "scout" ? .75 : 1) * (1 - level(s, "sneaking") * .04);
-        if (s.quiet) addXp(s, "sneaking", .25);
+        const quiet = (s.role === "scout" ? .75 : 1) * (1 - level(s,"lightfooted") * .03) *
+          (s.quiet ? 1 - level(s,"sneaking") * .04 : 1);
+        if (combatStep) addXp(s,"nimble",.3);
+        if (s.world.enemies.some(z => z.hp > 0 && distance(z,p) < 8)) {
+          addXp(s,"lightfooted",.2);
+          if (s.quiet) addXp(s,"sneaking",.25);
+        }
         const terrain = surface === "cave" ? 1.35 : surface === "grass" || surface === "sand" ? .8 :
           surface === "tile" || surface === "rail" ? 1.15 : 1;
         const rain = s.weather === "Rain" && surface !== "tile" ? .8 : 1;
@@ -2507,9 +2605,10 @@ const Sim = (() => {
     }
     const fit = 1 + level(s, "fitness") * .05;
     if (s.running && p.moving) {
-      p.stamina = Math.max(0, p.stamina - 13 * dt * staminaCost(s) / (Data.roles[s.role].fitness * fit));
+      p.stamina = Math.max(0, p.stamina - 13 * dt * staminaCost(s) / (Data.roles[s.role].fitness * fit * (1 + level(s,"running") * .035)));
       p.staminaDelay = .4;
       addXp(s, "fitness", dt * .5);
+      addXp(s,"running",travelled * .15);
     } else if (!p.staminaDelay) p.stamina = Math.min(100, p.stamina + dt * (p.moving ? 5 : 12) * fit * (p.fatigue > 70 || cold ? .6 : 1));
   }
 
@@ -2544,7 +2643,7 @@ const Sim = (() => {
       z.cooldown -= dt; z.replan -= dt;
       z.flash = Math.max(0, z.flash - dt); z.stagger = Math.max(0, z.stagger - dt);
       z.alert = Math.max(0, z.alert - dt); z.swing = Math.max(0, (z.swing || 0) - dt);
-      const d = distance(z, p), sight = (s.quiet ? 2.6 : s.running ? 7.5 : 5.7) * vision;
+      const d = distance(z, p), sight = (s.quiet ? 2.6 * (1 - level(s,"sneaking") * .025) : s.running ? 7.5 : 5.7) * vision;
       const seen = d < sight && lineOfSight(s, z, p);
       const npcSeen = canTargetEva(npc) && distance(z, npc) < 3.8 && lineOfSight(s, z, npc);
       const victim = npcSeen && (!seen || distance(z, npc) < d) ? npc : p;
@@ -2725,6 +2824,7 @@ const Sim = (() => {
     drainLight(s, minutes);
     healFracture(s, minutes);
     updateDoorLure(s, dt);
+    updateFungalAlert(s);
     updateEnemies(s, dt);
     updateNpc(s, dt);
     updateNeeds(s, dt);
@@ -2924,7 +3024,7 @@ const Sim = (() => {
 
   function snapshotZone(s) {
     const a = s.atmosphere;
-    return {booksStocked:s.world.booksStocked, mapRevision:Regions.mapRevision,ledgerRevision:Chronicle.revision,atmosphere:{...a,pending:a.pending?{...a.pending}:null,alarm:a.alarm?{...a.alarm}:null},
+    return {booksStocked:s.world.booksStocked, mapRevision:Regions.mapRevision,ledgerRevision:Chronicle.revision,fieldRevision:FieldStories.revision,atmosphere:{...a,pending:a.pending?{...a.pending}:null,alarm:a.alarm?{...a.alarm}:null},
       waypoint:s.waypoint,mapPins:s.mapPins.map(pin => ({...pin})),npc:{...s.world.npc,path:[],moving:false},
       objects:s.world.objects,enemies:s.world.enemies.map(({stats,path,...enemy}) => ({...enemy,path:[]})),
       explored:Array.from(s.world.explored),rng:s.world.rng.state()};
@@ -2936,6 +3036,7 @@ const Sim = (() => {
       region:s.world.region, regionStates:s.regionStates,
       elapsed: s.elapsed, minutes: s.minutes, mode: s.mode, quiet: s.quiet, kills: s.kills, serial: s.serial, controlStart: s.controlStart,
       guideStep:s.guideStep, firstSleep:s.firstSleep, pinStory:s.pinStory, playtest:s.playtest,
+      fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
@@ -2953,6 +3054,7 @@ const Sim = (() => {
     const supportedMap = data?.mapRevision === Regions.mapRevision ||
       region !== Regions.cavern && (data?.mapRevision === undefined || data.mapRevision === 2);
     return data && Object.hasOwn(Regions.definitions, region) && supportedMap &&
+      (data.fieldRevision === undefined || data.fieldRevision === FieldStories.revision) &&
       (data.ledgerRevision === undefined || [1,2,3,4,Chronicle.revision].includes(data.ledgerRevision)) &&
       Array.isArray(data.objects) && data.objects.length <= 1000 &&
       Array.isArray(data.enemies) && data.enemies.length <= 200 && Array.isArray(data.explored) && data.explored.length === mapSize &&
@@ -3046,10 +3148,17 @@ const Sim = (() => {
       return legacy && utilityIds.has(o.id) || data.region === undefined && o.action === "travel" ||
         region === "ridge" && data.mapRevision !== Regions.mapRevision && ["exit-" + Regions.cavern,"cave-gear"].includes(o.id) ||
         Chronicle.isFixture(o) && (ledgerVersion === 0 || ledgerVersion === 1 && entry?.extra || ledgerVersion < (entry?.added ?? 0)) ||
-        oldMap && Atmosphere.isFixture(o);
+        data.fieldRevision === undefined && FieldStories.isFixture(o) || oldMap && Atmosphere.isFixture(o);
     };
     const validTimer = (until, recipe) => Number.isFinite(until) && until > 0 && until <= data.minutes + recipe.minutes;
     const validStation = (o, original) => {
+      if (FieldStories.isFixture(original)) {
+        if (o.solid || !o.active || o.building !== original.building) return false;
+        if (original.action === "mushroom") return o.species === original.species && o.colony === original.colony &&
+          typeof o.harvested === "boolean";
+        return o.scene === original.scene && o.line === original.line && o.reward === original.reward &&
+          typeof o.read === "boolean" && typeof o.claimed === "boolean" && (!o.claimed || o.read && o.reward);
+      }
       if (original && Chronicle.isFixture(original)) {
         if (o.solid || o.building !== original.building || o.record !== original.record || o.delivery !== original.delivery) return false;
         if (o.action !== "loot") return o.active;
@@ -3059,7 +3168,9 @@ const Sim = (() => {
       if (o.action === "travel") return o.active && !o.solid;
       if (o.kind === "forage") return o.resource === original?.resource && (o.forageAt === undefined ||
         validTimer(o.forageAt, {minutes:Data.wildResources[o.resource].recovery}));
-      if (o.kind === "fish") return o.fishUntil == null || validTimer(o.fishUntil, {minutes:Data.fishingMinutes});
+      if (o.kind === "fish") return (o.fishUntil == null || validTimer(o.fishUntil, {minutes:Data.fishingMinutes})) &&
+        (o.fishStock === undefined || Number.isInteger(o.fishStock) && o.fishStock >= 0 && o.fishStock <= Data.fishingStock.capacity) &&
+        (o.fishStock === 0 ? validTimer(o.fishRecovery,{minutes:Data.fishingStock.recovery}) : o.fishRecovery === undefined);
       if (isBarrier(o)) {
         const tile = World.tileAt(s.world, o.x, o.y);
         return o.action === "door" && !o.solid && tile && !tile.building && !tile.baseSolid && ["x", "y"].includes(o.axis);
@@ -3110,6 +3221,20 @@ const Sim = (() => {
         }) || !s.world.objects.every(o => savedIds.has(o.id) || missingLegacyFixture(o))) throw new Error("Invalid world data.");
     if (!data.enemies.every(z => validPosition(z) && Data.infected[z.kind] && Number.isFinite(z.hp) && z.hp >= 0 && z.hp <= 88)) throw new Error("Invalid infected data.");
     for (const key of ["elapsed", "minutes", "kills", "serial", "nextEvent"]) if (!Number.isFinite(data[key]) || data[key] < 0) throw new Error("Invalid game time or progress.");
+    const pending = data.fungalAlert;
+    if (pending != null) {
+      const zone = pending.region === region ? data : regionStates[pending.region];
+      if (!zone || !Number.isFinite(pending.due) || pending.due < 0 || pending.due > data.elapsed + FieldStories.mushroom.warning ||
+          !zone.objects.some(o => o.id === pending.id && o.action === "mushroom" && o.colony === "active" && o.harvested)) {
+        throw new Error("Invalid fungal alert.");
+      }
+      s.fungalAlert = {region:pending.region,id:pending.id,due:pending.due};
+    }
+    if (data.nextFungalAlert !== undefined) {
+      if (!Number.isFinite(data.nextFungalAlert) || data.nextFungalAlert < 0 ||
+          data.nextFungalAlert > data.elapsed + FieldStories.mushroom.cooldown) throw new Error("Invalid fungal cooldown.");
+      s.nextFungalAlert = data.nextFungalAlert;
+    }
     const gear = Object.fromEntries(Object.keys(s.player.gear).map(slot => [slot, null]));
     for (const slot of Object.keys(gear)) {
       const item = p.gear?.[slot];
@@ -3262,7 +3387,7 @@ const Sim = (() => {
     threats, notify, level, addXp, moodles, sleep, unstick, season, snapshot, restore, distance, lineOfSight,
     vehicle, enterVehicle, exitVehicle, refuel, repairVehicle, vehicleRepairProblem, vehicleRepairAmount, brake, canListen, listenAtDoor,
     destination, markDestination, markStation, exploredTile, saveMapPin, markPin, removePin,
-    travel, travelProblem, wildProblem, useWild, sceneProblem, resolveScene, dispatchProblem, sendDispatch, readDispatchReport, touchFungus, inspectCrib, armWatch, waitWithWatch, isFurniture, dismantleFurniture, moonlight,
+    travel, travelProblem, knownMushrooms, isMushroom, itemName, mushroomProblem, harvestMushroom, readFieldNote, wildProblem, useWild, sceneProblem, resolveScene, dispatchProblem, sendDispatch, readDispatchReport, touchFungus, inspectCrib, armWatch, waitWithWatch, isFurniture, dismantleFurniture, moonlight,
     resumeEncounterWarning,
     minutesToRain, gridPower, mainsWater, hasPower, useTap, useGenerator, isNight, rainBottles, rainDraw, boilingMinutes, startBoiling, collectBoiledWater,
     fireBatch, startFireBatch, collectCookedFood, sow, waterGarden, gardenYield, harvestGarden, evaAtShelter, toggleGardenHelp};

@@ -2,10 +2,15 @@
 
 const Data = (() => {
   const items = {
+    byteplush:{name:"Byte plush",group:"Equipment",weight:.2,icon:"badge",detail:"A repaired mascot from the computer shop. Keep it or leave it somewhere safe."},
+    pantrycap:{name:"Pantrycap",group:"Food",weight:.08,use:"food",nutrition:16,perish:1.5,icon:"food"},
+    mushroommeal:{name:"Roasted Pantrycaps",group:"Food",weight:.13,use:"food",nutrition:38,perish:.8,icon:"food"},
+    bitterfold:{name:"Bitterfold",group:"Food",weight:.08,use:"food",toxic:true,perish:1.5,icon:"food"},
     raffletrophy:{name:"Golden Raffle Trophy",group:"Equipment",weight:.35,icon:"badge",
       detail:"Congratulations. You survived the raffle. The winner didn't."},
     bat: {combat:"blunt", name:"Wooden bat", group:"Weapons", weight:1.4, damage:25, range:1.4, delay:.55, effort:6, noise:3, wear:.6, icon:"bat"},
     pipe: {combat:"blunt", name:"Steel pipe", group:"Weapons", weight:1.8, damage:31, range:1.4, delay:.68, effort:8, noise:4, wear:.35, icon:"bat"},
+    carvedspear:{combat:"reach",name:"Carved spear",group:"Weapons",weight:1.15,damage:31,range:1.9,delay:.64,effort:6,noise:2.5,wear:1.4,icon:"bat"},
     spear: {combat:"reach", name:"Improvised spear", group:"Weapons", weight:1.2, damage:34, range:1.9, delay:.64, effort:6, noise:2.5, wear:1.6, icon:"bat"},
     axe: {combat:"heavy", name:"Axe", group:"Weapons", weight:2.2, damage:43, range:1.4, delay:.78, effort:10, noise:5, wear:.45, icon:"bat"},
     pistol: {combat:"firearm", name:"Pistol", group:"Weapons", weight:.9, damage:62, range:7, delay:.68, effort:1, noise:20, wear:.25, firearm:true, icon:"aim"},
@@ -92,6 +97,8 @@ const Data = (() => {
     {id:"bandage",name:"Tear cloth",out:"bandage",qty:2,inputs:{cloth:1},desc:"Makes two clean bandages."},
     {id:"splint",name:"Make a splint",out:"splint",qty:1,inputs:{wood:1,cloth:1},desc:"A rigid brace that helps a broken leg heal."},
     {id:"spear",name:"Improvised spear",out:"spear",qty:1,inputs:{wood:1,tape:1},desc:"Longer reach with faster wear."},
+    {id:"carvedspear",name:"Carve a spear",out:"carvedspear",qty:1,inputs:{wood:1},tool:"knife",skill:"carving",
+      desc:"Use a carried kitchen knife and a workbench. Carving skill improves starting condition."},
     {id:"planks",name:"Reclaim planks",out:"wood",qty:2,inputs:{scrap:2},desc:"Turn salvaged material into planks."},
     {id:"rainbarrel",name:"Rain collector",build:"barrel",inputs:{wood:3,scrap:2,tape:1},desc:"Collects rainwater for boiling at a campfire."},
     {id:"crate",name:"Storage crate",build:"crate",inputs:{wood:2,nails:4},desc:"A container for storing supplies."},
@@ -207,6 +214,19 @@ const Data = (() => {
   const skillMax = 10;
   const skillXp = level => 12 * level * level;
   const skills = {
+    running:{name:"Running",desc:"Reduces stamina spent on sprints. Practice by running a real distance."},
+    carving:{name:"Carving",desc:"Carve spears at a workbench. Practice produces sturdier starting equipment."},
+    nimble:{name:"Nimble",desc:"Move more quickly while sneaking near a visible infected. Practice by repositioning."},
+    electrical:{name:"Electrical",desc:"Helps stretch generator fuel. Practice by fixing the shelter radio."},
+    lightfooted:{name:"Lightfooted",desc:"Reduces footstep noise. Practice moving near infected."},
+    axe:{name:"Axe",desc:"Reduces swing recovery with axes. Practice by landing hits."},
+    long_blunt:{name:"Long Blunt",desc:"Reduces swing recovery with bats, pipes and other long blunt weapons."},
+    short_blunt:{name:"Short Blunt",desc:"Reduces swing recovery with compact blunt weapons."},
+    long_blade:{name:"Long Blade",desc:"Reduces swing recovery with long blades."},
+    short_blade:{name:"Short Blade",desc:"Reduces swing recovery with knives."},
+    spear:{name:"Spear",desc:"Reduces swing recovery with thrusting weapons."},
+    maintenance:{name:"Maintenance",desc:"Reduces equipment wear. Practice by using or repairing worn weapons."},
+    tailoring:{name:"Tailoring",desc:"Restores more clothing condition per mend. Practice by mending damaged clothing."},
     combat:{name:"Combat", desc:"More damage with every weapon."},
     marksmanship:{name:"Marksmanship", desc:"Improves firearm accuracy. Earn XP by firing at infected, with extra XP for hits."},
     mechanics:{name:"Mechanics", desc:"Restores more vehicle condition per patch. Earn XP by repairing damaged vehicles."},
@@ -219,6 +239,15 @@ const Data = (() => {
     cooking:{name:"Cooking", desc:"Food cooks faster. Grows by collecting campfire batches."},
     foraging:{name:"Foraging", desc:"Bigger yields from foraging spots. Grows by gathering."},
     fishing:{name:"Fishing", desc:"Fish bite sooner. Grows by catching fish."}
+  };
+  const weaponSkills = {axe:"axe",hatchet:"axe",bat:"long_blunt",pipe:"long_blunt",golfclub:"long_blunt",
+    crowbar:"long_blunt",shovel:"long_blunt",fryingpan:"short_blunt",wrench:"short_blunt",rollingpin:"short_blunt",
+    machete:"long_blade",knife:"short_blade",spear:"spear",carvedspear:"spear",broom:"spear"};
+  const skillGroups = {
+    "Physical & movement":["fitness","strength","running","lightfooted","nimble","sneaking"],
+    "Combat & equipment":["combat","marksmanship","axe","long_blunt","short_blunt","long_blade","short_blade","spear","maintenance"],
+    "Craft & care":["crafting","medical","mechanics","tailoring","electrical","carving","cooking"],
+    "Food & fieldwork":["gardening","foraging","fishing"]
   };
   // Seasons last `seasonDays` days each. `chill` lowers the outdoor body-temperature target; `grow` scales crop growth.
   const seasonDays = 7;
@@ -284,12 +313,14 @@ const Data = (() => {
   const waterBatch = {name:"Boil water", inputs:{rainwater:2,wood:1}, product:"water", qty:2, minutes:24};
   const fireRecipes = {
     water:waterBatch,
+    caps:{name:"Roast Pantrycaps",inputs:{pantrycap:2,wood:1},product:"mushroommeal",qty:1,minutes:16,identify:true},
     stew:{name:"Cook potato stew", inputs:{potato:2,water:1,wood:1}, product:"stew", qty:2, minutes:28},
     dry:{name:"Dry radishes", inputs:{radish:2,wood:1}, product:"dried", qty:1, minutes:20},
     fish:{name:"Grill fish", inputs:{rawfish:1,wood:1}, product:"grilledfish", qty:1, minutes:18}
   };
   const wildResources = {berries:{qty:2,recovery:720},apple:{qty:2,recovery:1440},bait:{qty:2,recovery:180}};
   const fishingMinutes = 24;
+  const fishingStock = {capacity:3,recovery:960};
   const garden = {water:72, minMoisture:18, rainRate:1.12, emptyDryRate:.25, dutyInterval:15, shelterRange:6, collectorRange:4};
   const crops = {
     radish:{name:"Radishes", seed:"radishseed", product:"radish", qty:3, minutes:84, dryRate:.55},
@@ -335,6 +366,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,seasons,seasonDays,fracture,
-    rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,garden,crops,supplyCache,story,saveVersion:1};
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+    rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

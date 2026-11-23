@@ -286,12 +286,26 @@
     if (afterlife) Afterlife.action(afterlife,kind);
   }
 
-  function start() {
-    wakeSound();
-    const preset = $("difficulty").value, role = $("role").value, startPoint = $("start-point").value;
+  function confirmNewRun() {
+    return $("continue-btn").hidden ||
+      window.confirm("Start a new run and replace the current save? Export it first if you want to keep it.");
+  }
+
+  function start(longHaul = false) {
+    const preset = longHaul ? "longhaul" : $("difficulty").value;
+    const role = $("role").value, startPoint = longHaul ? "shelter" : $("start-point").value;
     const profile = survivorProfile("setup");
     const seedInput = $("world-seed"), enteredSeed = seedInput.value.trim();
     if (enteredSeed && !/^\d{1,9}$/.test(enteredSeed)) { seedInput.reportValidity(); return; }
+    if (!confirmNewRun()) return;
+    wakeSound();
+    if (longHaul) {
+      $("difficulty").value = preset;
+      $("start-point").value = startPoint;
+      $("guide-enabled").checked = true;
+      write(guideKey, "1");
+      setNavigation("locations");
+    }
     const seed = enteredSeed ? Number(enteredSeed) : Math.floor(Math.random()*1000000000);
     const run = Sim.createControl(preset, role, startPoint, preset === "custom" ? customRules : undefined, {...profile,seed});
     run.difficultyOptions = Sim.difficultyOptions(run, savedAssists());
@@ -304,17 +318,8 @@
     cue(170, 86, .3, .07);
   }
 
-  function startLongHaul() {
-    if (!$("continue-btn").hidden && !window.confirm("Start a new challenge? Your current run will move to the backup slot.")) return;
-    $("difficulty").value = "longhaul";
-    $("start-point").value = "shelter";
-    $("guide-enabled").checked = true;
-    write(guideKey, "1");
-    setNavigation("locations");
-    start();
-  }
-
   function startRecommended() {
+    if (!confirmNewRun()) return;
     const skip = read(skipKey);
     wakeSound();
     setNavigation("locations");
@@ -558,13 +563,15 @@
   }
 
   function skillsHtml() {
-    const rows = Object.entries(Data.skills).map(([id, skill]) => {
+    const rows = Object.fromEntries(Object.entries(Data.skills).map(([id, skill]) => {
       const xp = state.player.skills[id] ?? 0, lv = Sim.level(state, id), max = Data.skillMax;
       const floor = Data.skillXp(lv), next = Data.skillXp(lv + 1);
       const detail = lv >= max ? " Maxed." : " " + Math.round((xp - floor) / (next - floor) * 100) + "% to level " + (lv + 1) + ".";
-      return '<div class="effect-row"><b>' + esc(skill.name) + " · LV " + lv + "</b><p>" + esc(skill.desc) + detail + "</p></div>";
-    }).join("");
-    return '<div style="margin-top:14px"><div class="section-label">SKILLS</div>' + rows + "</div>";
+      return [id, '<div class="effect-row"><b>' + esc(skill.name) + " · LV " + lv + "</b><p>" + esc(skill.desc) + detail + "</p></div>"];
+    }));
+    return '<div style="margin-top:14px"><div class="section-label">SKILLS</div>' +
+      Object.entries(Data.skillGroups).map(([group,ids]) =>
+        '<details><summary>' + esc(group) + '</summary>' + ids.map(id => rows[id]).join("") + '</details>').join("") + "</div>";
   }
 
   function conditions() {
@@ -596,6 +603,12 @@
     return includeDecor || !choices.some(o => !o.decor) ? choices : choices.filter(o => !o.decor);
   }
 
+  function guidedBat(choices) {
+    if (state.guideStep !== 0 || !$("guide-enabled").checked) return null;
+    return choices.find(o => o.kind === "drop" && !o.corpse &&
+      o.loot.length === 1 && o.loot[0].id === "bat");
+  }
+
   function interactionLabel(o) {
     if (Sim.isFurniture(o)) return "Furniture";
     if (o.kind === "car") return "Vehicle";
@@ -605,7 +618,7 @@
     if (o.action === "bed") return state.player.fatigue >= 35 ? "Sleep" : "Rest";
     return ({bed:"Rest", barrel:"Collector", campfire:"Campfire", radio:"Radio", garden:"Garden", tap:"Tap", generator:"Generator",
       harvest:"Chop", dismantle:"Salvage", workbench:"Build", travel:"Cross", spring:"Fill", forage:"Forage", fish:"Fish",
-      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",crib:"Look"}[o.action] || "Use");
+      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read",crib:"Look"}[o.action] || "Use");
   }
 
   function canTalk() {
@@ -726,12 +739,13 @@
     $("sneak-btn").disabled = !active() || Boolean(car);
     const choices = active() && !car ? nearbyObjects() : [];
     const o = choices[0], talk = !car && canTalk();
+    const bat = guidedBat(choices);
     const exit = active() && car && nearbyExit();
     const multiple = choices.length + Number(talk) > 1 && !taskTarget(o);
     const context = car ? (exit ? "Cross" : "Exit") : multiple ? "Nearby" : o ? interactionLabel(o) : talk ? "Talk" : "Use";
-    $("context-label").textContent = context;
-    $("touch-use-label").textContent = car ? context : "Use";
-    $("touch-use-icon").setAttribute("href", exit || o?.action === "travel" ? "#map" : car ? "#exit" : "#search");
+    $("context-label").textContent = bat ? "Take bat" : context;
+    $("touch-use-label").textContent = bat ? "Take bat" : car ? context : "Use";
+    $("touch-use-icon").setAttribute("href", !bat && (exit || o?.action === "travel") ? "#map" : car ? "#exit" : "#search");
     $("touch-use").classList.toggle("ready", Boolean(car || talk || o));
     setHtml("objectives", objectiveHtml());
     $("quest-count").textContent = objectives().filter(o => o.done).length + " / 4";
@@ -858,6 +872,8 @@
     const book = Data.skillBooks[item.id];
     if (book) parts.push((state.player.readBooks?.includes(item.id) ? "Studied" : "+24 XP") + " · " + esc(Data.skills[book.skill].name));
     if (item.id === "flashlight") parts.push(item.charge > 0 ? Math.ceil(item.charge) + " game min of light" : "Empty battery");
+    if (Sim.isMushroom(item.id) && !Sim.knownMushrooms(state)) return parts.concat("Study the foraging guide to identify it.").join(" · ");
+    if (d.toxic) parts.push("Toxic · Do not eat");
     if (d.nutrition) parts.push("+" + d.nutrition + " food" + (d.hydration ? " · +" + d.hydration + " thirst relief" : ""));
     if (d.perish) {
       const freshness = Sim.freshMinutes(state, item);
@@ -871,19 +887,19 @@
   function matches(item) {
     const d = Data.items[item.id];
     const category = bagTab === "all" || d.group === bagTab || bagTab === "pinned" && state.player.pinned.includes(item.id);
-    return category && d.name.toLowerCase().includes(bagFilter.trim().toLowerCase());
+    return category && Sim.itemName(state,item.id).toLowerCase().includes(bagFilter.trim().toLowerCase());
   }
 
   const itemInRecipe = (recipe, id) => Object.hasOwn(recipe.inputs, id) || (recipe.out || recipe.product) === id;
   const hasRecipes = id => Data.recipes.some(recipe => itemInRecipe(recipe, id)) ||
-    Object.values(Data.fireRecipes).some(recipe => itemInRecipe(recipe, id));
+    Object.values(Data.fireRecipes).some(recipe => (!recipe.identify || Sim.knownMushrooms(state)) && itemInRecipe(recipe, id));
 
   function inventoryItems(store) {
     const current = Sim.weapon(state);
     const bag = state.player.bag;
     const ordered = bag.map((item, index) => ({item, index})).filter(({item}) => matches(item)).sort((a, b) =>
       Number(state.player.pinned.includes(b.item.id)) - Number(state.player.pinned.includes(a.item.id)) ||
-      Data.items[a.item.id].name.localeCompare(Data.items[b.item.id].name));
+      Sim.itemName(state,a.item.id).localeCompare(Sim.itemName(state,b.item.id)));
     return ordered.map(({item, index}) => {
       const d = Data.items[item.id], equipped = current === item;
       const worn = d.slot && Sim.wornItem(state,d.slot) === item;
@@ -892,7 +908,7 @@
         d.damage ? equipped ? "Unequip" : "Equip" : d.slot ? worn ? "Remove" : "Equip" :
         ({book:state.player.readBooks?.includes(item.id) ? "Studied" : "Read", food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take"}[d.use] || "");
       return '<div class="item-row bag-item ' + (equipped || worn ? "equipped-item" : "") + '"><div><div class="item-top">' +
-        itemIcon(item.id) + "<b>" + esc(d.name) + " ×" + item.qty + '</b></div><div class="item-meta">' + itemDescription(item) + '</div></div><div class="item-actions">' +
+        itemIcon(item.id) + "<b>" + esc(Sim.itemName(state,item.id)) + " ×" + item.qty + '</b></div><div class="item-meta">' + itemDescription(item) + '</div></div><div class="item-actions">' +
         (useLabel ? button(useLabel, (equipped ? "unequip-" : "use-") + index, (d.use === "food" && Sim.isSpoiled(state,item)) || (d.use === "book" && state.player.readBooks?.includes(item.id)), "primary") : "") +
         (store ? button(item.qty > 1 ? "Store stack" : "Store", "store-" + index) : "") + button("Drop", "drop-" + index) +
         (hasRecipes(item.id) ? button("Recipes", "recipes-" + item.id) : "") +
@@ -908,7 +924,7 @@
         if (!matches(item)) return;
         const d = Data.items[item.id], room = Sim.roomFor(state, item.id), ref = objectIndex(o) + "-" + index;
         const equip = d.damage || d.slot && state.player.gear[d.slot] !== item.id || d.use === "backpack" && !state.player.backpack;
-        result.push('<div class="item-row bag-item"><div><div class="item-top">' + itemIcon(item.id) + "<b>" + esc(d.name) + " ×" + item.qty +
+        result.push('<div class="item-row bag-item"><div><div class="item-top">' + itemIcon(item.id) + "<b>" + esc(Sim.itemName(state,item.id)) + " ×" + item.qty +
           '</b></div><div class="item-meta">' + esc(o.name) + " · " + itemDescription(item) +
           (room < item.qty ? " · " + (room ? room + " will fit" : "No room") : "") + '</div></div><div class="item-actions">' +
           button("Take", "take-" + ref, !room, "primary") + (item.qty > 1 ? button("Take stack", "all-" + ref, !room) : "") +
@@ -1016,7 +1032,7 @@
       const control = $("belt-" + index), d = Data.items[id];
       const item = id && equipped.id === id ? equipped : Sim.beltItem(state,id);
       const on = Boolean(item && (item === lamp || item === equipped));
-      const label = !id ? "Set slot" : !item ? "Empty" : d.damage && !on ? "Equip weapon" : d.name;
+      const label = !id ? "Set slot" : !item ? "Empty" : d.damage && !on ? "Equip weapon" : Sim.itemName(state,id);
       const info = !id ? "+" : !item ? "" : id === "flashlight" ? (on ? "ON · " : "") +
         Math.ceil(item.charge / Data.flashlight.capacity * 100) + "%" : d.damage ? on ? Math.round(item.condition ?? 100) + "%" : "" : "×" + itemCount(id);
       $("belt-label-" + index).textContent = label;
@@ -1039,7 +1055,7 @@
       const options = id && !carried.includes(id) ? [...carried, id] : carried;
       return '<label for="belt-choice-' + slot + '">Slot ' + (slot + 1) + '<select id="belt-choice-' + slot + '" data-belt-slot="' + slot + '">' +
         '<option value="">Empty</option>' + options.map(item => '<option value="' + item + '"' + (item === id ? " selected" : "") + '>' +
-        esc(Data.items[item].name) + (carried.includes(item) ? "" : " (unavailable)") + "</option>").join("") + "</select></label>";
+        esc(Sim.itemName(state,item)) + (carried.includes(item) ? "" : " (unavailable)") + "</option>").join("") + "</select></label>";
     }).join("");
     show("Quick belt", '<p>Assign equipment or supplies. Use the numbered buttons or keys 1–4 while playing.</p><div class="rules-grid belt-settings">' + slots +
       '</div><p id="belt-status" role="status"></p>' + button("Back to Gear", "gear-open"), "belt");
@@ -1073,7 +1089,7 @@
         button(item === current ? "Unequip" : equipped ? "Equipped" : worn ? "Remove" : "Equip",
           (item === current ? "unequip-" : "equip-") + index, equipped && item !== current, worn || equipped ? "" : "primary") +
         (needsRepair ? button(recipe.mend ? "Mend" : "Repair", "repairitem-" + index, Boolean(repairProblem)) +
-          '<div class="item-meta">' + (repairProblem ? "Need " + esc(repairProblem) : "+" + Sim.repairAmount(state) +
+          '<div class="item-meta">' + (repairProblem ? "Need " + esc(repairProblem) : "+" + Sim.repairAmount(state,item) +
             " condition max · " + (recipe.mend ? "1 cloth" : "1 scrap") + " · 1 tape") + '</div>' : "") + "</div></div>";
       (d.damage ? weapons : equipment).push(row);
     });
@@ -1151,7 +1167,7 @@
     const recipes = Data.recipes.filter(recipe => !craftIngredient || itemInRecipe(recipe, craftIngredient))
       .sort((a, b) => Number(Boolean(Sim.recipeProblem(state, a))) - Number(Boolean(Sim.recipeProblem(state, b))));
     const campfire = Sim.nearby(state).find(o => o.kind === "campfire");
-    const fires = craftIngredient ? Object.values(Data.fireRecipes).filter(recipe => itemInRecipe(recipe, craftIngredient)) : [];
+    const fires = craftIngredient ? Object.values(Data.fireRecipes).filter(recipe => (!recipe.identify || Sim.knownMushrooms(state)) && itemInRecipe(recipe, craftIngredient)) : [];
     const requirements = inputs => Object.entries(inputs).map(([id, qty]) => '<div class="' + (Sim.available(state, id) < qty ? "missing" : "") + '">' +
       esc(Data.items[id].name) + " · " + Sim.available(state, id) + " / " + qty + "</div>").join("");
     show(craftIngredient ? "Recipes · " + Data.items[craftIngredient].name : "Craft and build", "<p>Craft with carried supplies and searched containers within reach.</p>" +
@@ -1201,6 +1217,12 @@
     const evaRegion = Object.keys(state.regionStates).find(id => state.regionStates[id].npc.mode !== "away");
     const evaStatus = eva === "away" ? "stayed in " + (Regions.definitions[evaRegion]?.name ?? "Cold Vale") :
       {injured:"needs help at the clinic",follow:"is following you",wait:"is waiting",refuge:"is at the shelter",dead:"has died"}[eva];
+    const notes = [state.world, ...Object.values(state.regionStates)].flatMap(zone => zone.objects)
+      .filter(o => o?.action === "field-note" && o.read && Object.hasOwn(FieldStories.byLine,o.line));
+    const fieldNotes = notes.length ? '<details><summary>Field notes · ' + notes.length + '</summary>' +
+      notes.map(o => '<p><b>' + esc(o.name) + '</b><br>' + esc(FieldStories.byLine[o.line].text) +
+        (FieldStories.noteDetails[o.id.slice("field-note-".length)] ?
+          '<br>' + esc(FieldStories.noteDetails[o.id.slice("field-note-".length)]) : "") + '</p>').join("") + '</details>' : "";
     show("Survival journal", '<div class="item-actions story-nav">' +
       button("Field ledger", "field-ledger", false, "primary") +
       button("Outbreak log · " + knownStory().length + "/" + Object.keys(Data.story).length, "outbreak-log", false, "primary") +
@@ -1211,7 +1233,7 @@
       button("Playtest report", "playtest", state.mode === "menu") +
       '</div><div class="waypoint-actions">' +
       landmarks().map(([id,label]) => button("Mark " + esc(label), "mark-" + id, !active())).join("") +
-      '</div><div class="objectives">' + objectiveHtml() + '</div><p>These tasks are optional. Keep exploring after you repair the radio.</p>' +
+      '</div>' + fieldNotes + '<div class="objectives">' + objectiveHtml() + '</div><p>These tasks are optional. Keep exploring after you repair the radio.</p>' +
       '<div class="stats-summary"><span>DAY ' + day() + "</span><span>" + state.kills + " INFECTED KILLED</span><span>SEED " + state.seed + "</span></div>" +
       '<p>Eva · ' + esc(evaStatus) + '</p><div class="item-actions">' +
       button("Water for the shelter" + (state.flags.water ? " ✓" : ""), "water-project", false, "primary") +
@@ -1579,7 +1601,7 @@
     const warm = button("Recover stamina", "context-" + id);
     if (!batch) {
       show("Campfire", '<section class="water-panel"><p>Choose a batch. Each campfire can prepare one at a time.</p><div class="recipe-list">' +
-        Object.entries(Data.fireRecipes).map(([key, recipe]) => {
+        Object.entries(Data.fireRecipes).filter(([,recipe]) => !recipe.identify || Sim.knownMushrooms(state)).map(([key, recipe]) => {
           const missing = Sim.recipeProblem(state, recipe);
           const action = key === "water" ? "boil-" + id : "cook-" + id + "-" + key;
           return '<article class="recipe"><h3>' + Data.items[recipe.product].name + " ×" + recipe.qty + "</h3><p>" +
@@ -1657,6 +1679,24 @@
     if (o.action === "garden") { gardenPanel(o, id); return; }
     if (o.action === "campfire" || o.action === "barrel" && o.rawRain) { stationPanel(o, id); return; }
     const result = feedback ? '<p class="bag-feedback" role="status">' + esc(feedback) + "</p>" : "";
+    if (o.action === "field-note") {
+      if (Sim.readFieldNote(state,o)) save();
+      return;
+    }
+    if (o.action === "mushroom") {
+      const name = Sim.itemName(state,o.species);
+      const conditions = {
+        normal:"The ground around the caps is still.",
+        dormant:"Dry filaments run under the caps. They are still.",
+        active:"Low filaments pulse and snap. Picking these caps may draw nearby infected."
+      };
+      const problem = Sim.mushroomProblem(state,o);
+      show(o.name, '<p>' + esc(name) + ' · ' + conditions[o.colony] + '</p>' + result +
+        (problem ? '<p class="item-meta">' + esc(problem) + '</p>' : '') +
+        button("Harvest", "mushroom-" + id, Boolean(problem), o.colony === "active" ? "danger" : "primary") +
+        " " + button("Back away", "resume"), "object-" + id);
+      return;
+    }
     if (o.action === "fungus") {
       show(o.name, '<p>' + (state.atmosphere.awake ? "The filaments are torn. The room has already stirred." :
         "The damp threads run under the wall. Touching or stepping on them can wake infected in the next room. There is clear ground around them.") +
@@ -1759,12 +1799,13 @@
       return;
     }
     const choices = nearbyObjects(), talk = canTalk();
-    if (useClosest === true && choices.length) {
-      const closest = choices.reduce((a, b) => Sim.distance(state.player, a) <= Sim.distance(state.player, b) ? a : b);
+    const bat = guidedBat(choices);
+    if (bat || useClosest === true && choices.length) {
+      const closest = bat || choices.reduce((a, b) => Sim.distance(state.player, a) <= Sim.distance(state.player, b) ? a : b);
       if (closest.kind === "drop" && !closest.corpse && closest.loot?.length === 1) {
         const {id} = closest.loot[0], qty = Sim.collect(state, closest, 0, true);
         if (qty) {
-          Sim.notify(state, "Took " + qty + " × " + Data.items[id].name + ".");
+          Sim.notify(state, "Took " + qty + " × " + Sim.itemName(state,id) + ".");
           save();
         }
         updateHud();
@@ -1862,7 +1903,7 @@
       const store = kind === "store" ? storageTarget() : null;
       if (kind === "store" && !store) return;
       changed = Sim.drop(state, index, store || false, Boolean(store));
-      if (changed) Sim.notify(state, (store ? "Stored " : "Dropped ") + changed + " × " + Data.items[item.id].name + ".");
+      if (changed) Sim.notify(state, (store ? "Stored " : "Dropped ") + changed + " × " + Sim.itemName(state,item.id) + ".");
     } else if (kind === "pin" && item) {
       const position = p.pinned.indexOf(item.id);
       if (position >= 0) p.pinned.splice(position, 1);
@@ -2082,6 +2123,12 @@
       if (kind === "wild" && dialogView === "object-" + index) {
         if (Sim.useWild(state, o)) close();
         else if (o?.active) objectPanel(o, state.notice?.text);
+        updateHud();
+        return;
+      }
+      if (kind === "mushroom" && dialogView === "object-" + index) {
+        if (Sim.harvestMushroom(state,o)) close();
+        else if (o?.active) objectPanel(o,state.notice?.text);
         updateHud();
         return;
       }
@@ -2310,7 +2357,7 @@
 
   const handlers = {
     "opening-btn":opening, "intro-btn":startLesson, "lesson-exit":endLesson, "afterlife-exit":endAfterlife,
-    "start-btn": start, "recommended-btn": startRecommended, "longhaul-btn": startLongHaul, "continue-btn": resumeSaved, "rules-btn": () => worldRulesEditor(),
+    "start-btn": () => start(), "recommended-btn": startRecommended, "longhaul-btn": () => start(true), "continue-btn": resumeSaved, "rules-btn": () => worldRulesEditor(),
     "setup-assists": () => difficultyPanel(), "map-btn": () => map(), "journal-btn": diary, "diary-btn": diary,
     "help-btn": help, "pause-btn": pause, "search-btn": nearbyAction, "attack-btn": () => strike(),
     "shove-btn": shoveOrBrake, "pack-btn": bag, "gear-btn": gear, "craft-btn": crafting,

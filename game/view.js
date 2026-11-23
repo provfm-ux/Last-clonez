@@ -927,6 +927,20 @@ const View = (() => {
       poly([[sx-10,sy-1],[sx+2,sy-1],[sx+2,sy-5],[sx+11,sy+1],[sx+2,sy+7],[sx+2,sy+3],[sx-10,sy+3]],"#f7dfab");
       return;
     }
+    if (o.action === "mushroom") {
+      if (o.harvested) return;
+      const cap = ["#c1a589","#8b6d55","#694d3e"];
+      f(-.17,-.12,0,.12,.12,5,cream);
+      f(-.25,-.20,5,.28,.28,4,cap);
+      f(.13,.06,0,.10,.10,3,cream);
+      f(.07,0,3,.22,.22,3,cap);
+      if (o.colony === "active") {
+        const glow = state.reduceFlicker || Math.floor(state.elapsed * 2) % 2 === 0 ? "#e8ac78" : "#a88767";
+        line(p(x-.38,y-.01,1),p(x-.08,y+.18,1),glow,2);
+        line(p(x+.27,y-.24,1),p(x+.38,y+.21,1),glow,2);
+      }
+      return;
+    }
     if (kind === "forage") {
       shadow(x,y,17,6);
       if (o.resource === "bait") {
@@ -1600,6 +1614,7 @@ const View = (() => {
   const weaponArt = {
     bat: [[1,0,4,2,woodGrip],[5,-1,8,3,woodGrip],[6,-1,6,1,lightWood]],
     pipe: [[1,-1,11,2,steel],[10,-2,3,4,darkSteel],[11,-1,2,2,lightSteel]],
+    carvedspear: [[1,0,12,1,lightWood],[11,-1,3,3,lightWood],[14,0,2,1,lightWood]],
     spear: [[1,0,12,1,lightWood],[12,-1,3,3,steel],[15,0,1,1,lightSteel]],
     axe: [[1,0,10,2,woodGrip],[8,-3,4,4,darkSteel],[11,-4,2,5,lightSteel]],
     pistol: [[1,-2,7,2,darkSteel],[2,-3,6,1,steel],[2,0,2,3,darkSteel]],
@@ -2579,7 +2594,7 @@ const View = (() => {
           if (!index) {
             const batch = o.kind === "campfire" ? Sim.fireBatch(state, o) : null;
             let label = o.name;
-            if (o.kind === "drop" && !o.corpse && o.loot.length === 1) label = Data.items[o.loot[0].id].name;
+            if (o.kind === "drop" && !o.corpse && o.loot.length === 1) label = Sim.itemName(state,o.loot[0].id);
             if (o.action === "travel") label = "Crossing · " + o.name;
             else if (o.action === "door" && o.kind !== "fence") label = o.boards ? "Barricade · " + o.boards :
               o.broken ? "Broken " + o.kind : o.locked ? "Locked door" : o.latched ? "Latched window" : o.open ? "Close" : "Open";

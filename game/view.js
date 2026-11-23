@@ -1464,6 +1464,7 @@ const View = (() => {
       rect(24,40,3,2,shirt); rect(28,41,3,2,skinDark); rect(29,39,3,2,hair);
     } else {
       const strike = pose === "strike" || pose === "chase";
+      const ready = pose === "ready";
       const running = pose === "run";
       const crouch = pose === "rest" ? 7 : pose === "sneak" ? 4 : running ? 1 : 0;
       const lean = pose === "hurt" ? -3 : strike ? [-2,1,3][gesture] : running ? 4 : pose === "sneak" ? 2 : 0;
@@ -1520,8 +1521,8 @@ const View = (() => {
         rect(x-3,hip-4,2,1,jacketLight);
       }
 
-      const handX = Math.min(32,strike ? x+[6,13,11][gesture] : x+(profile ? 5 : 8)-armSwing);
-      const handY = strike ? y+[4,6,3][gesture] : Math.min(41,y+14+swing-(running ? 3 : 0));
+      const handX = Math.min(32,strike ? x+[6,13,11][gesture] : x+(ready ? 11 : profile ? 5 : 8)-armSwing);
+      const handY = strike ? y+[4,6,3][gesture] : ready ? y+5 : Math.min(41,y+14+swing-(running ? 3 : 0));
       const elbow = strike ? x+7 : x+(profile ? 4 : 7) - (running ? swing * 2 : 0);
       shape([[x+3,y],[x+7,y],[elbow+2,y+6],[handX+2,handY-1],
         [handX+2,handY+3],[handX-2,handY+3],[elbow-2,y+9],[x+2,y+3]],ink);
@@ -1666,10 +1667,13 @@ const View = (() => {
   let zombieAtlas, mirroredZombieAtlas;
   const zombieWidth = 24, zombieHeight = 40;
 
-  function drawZombieSprite(zombie, x, y, scale, facesLeft, stride, clock) {
+  function drawZombieSprite(zombie, x, y, scale, direction, stride, clock) {
     if (!zombieAtlasLink?.href || typeof Image !== "function") return false;
-    // Idle, walk, attack and hit rows. Each of the seven outfits has four frames.
-    const columns = 28, rows = 4, width = zombieWidth, height = zombieHeight;
+    // Five views per pose, with the three side-facing views mirrored in the cache.
+    const viewCount = 5, columns = 28, rows = 4 * viewCount, width = zombieWidth, height = zombieHeight;
+    const back = (direction & 2) !== 0, axial = (direction & 4) !== 0;
+    const facesLeft = (direction & 1) !== 0;
+    const view = axial ? (back ? 4 : 0) : direction & 8 ? 2 : back ? 3 : 1;
     if (!zombieAtlas) {
       zombieAtlas = new Image();
       zombieAtlas.src = zombieAtlasLink.href;
@@ -1703,7 +1707,7 @@ const View = (() => {
       frame = Math.floor(stride * 4);
     }
     const column = outfit * 4 + frame;
-    ctx.drawImage(atlas, (facesLeft ? columns - 1 - column : column) * width, row * height, width, height,
+    ctx.drawImage(atlas, (facesLeft ? columns - 1 - column : column) * width, (row * viewCount + view) * height, width, height,
       Math.round(x - width / 2 * scale), Math.round(y - (height - 2) * scale),
       Math.round(width * scale), Math.round(height * scale));
     return true;
@@ -1720,21 +1724,24 @@ const View = (() => {
     const frameIndex = moving ? Math.floor(stride.phase * 6) : 0;
     const step = [0, 1, 1, 0, -1, -1][frameIndex] * (running ? 2 : 1);
     const lift = [0, -1, 0, 0, 1, 0][frameIndex];
+    const swing = isPlayer && a.swing > 0 ? state.swingVisual : null;
+    const heldId = isPlayer ? swing?.weapon ?? Sim.weapon(state).id : null;
+    const ready = isPlayer && !moving && !(a.swing > 0) && state.target?.hp > 0 && Object.hasOwn(weaponArt,heldId);
     const pose = !alive ? "dead" : a.flash > 0 ? "hurt" : a.swing > 0 || a.windup > 0 ? "strike" :
       isPlayer && a.resting ? "rest" : isPlayer && state.quiet ? "sneak" :
-      running ? "run" : moving ? a.stats && a.alert > 0 ? "chase" : "walk" : "idle";
+      running ? "run" : moving ? a.stats && a.alert > 0 ? "chase" : "walk" : ready ? "ready" : "idle";
     const gesture = pose === "strike" ? a.swing > .125 ? 0 : a.swing > .06 ? 2 : 1 :
       pose === "idle" && isPlayer ? Math.floor(clock * 2) % 2 : 0;
-    const swing = isPlayer && a.swing > 0 ? state.swingVisual : null;
-    const dx = swing?.dx ?? a.headingX ?? (a.face < 0 ? -1 : 1), dy = swing?.dy ?? a.headingY ?? 0;
+    const dx = ready ? state.target.x - a.x : swing?.dx ?? a.headingX ?? (a.face < 0 ? -1 : 1);
+    const dy = ready ? state.target.y - a.y : swing?.dy ?? a.headingY ?? 0;
     const across = dx - dy, depth = dx + dy;
     // Convert to screen-space before selecting the eight directional poses.
     const screenX = Math.abs(across) * halfW, screenY = Math.abs(depth) * halfH;
-    const axial = isPlayer && screenX <= screenY * .414;
-    const profile = isPlayer && !axial && screenY <= screenX * .414;
+    const axial = screenX <= screenY * .414;
+    const profile = !axial && screenY <= screenX * .414;
     const direction = Number(across < 0) + 2 * Number(depth < 0 && !profile) +
       4 * Number(axial) + 8 * Number(profile);
-    const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, stride.phase, clock);
+    const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, direction, stride.phase, clock);
     if (!imported) {
       const palette = isPlayer ? survivorPalette(a) : null;
       const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : palette.jacket) :
@@ -1747,10 +1754,9 @@ const View = (() => {
       ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
         Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
       if (isPlayer && frame.grip) {
-        const id = swing?.weapon ?? Sim.weapon(state).id;
-        const phase = swing ? (id === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
-          a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : 6;
-        drawHeldWeapon(id, left + Math.round(frame.grip[0] * scale), top + Math.round(frame.grip[1] * scale), dx < dy ? -1 : 1, phase);
+        const phase = swing ? (heldId === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
+          a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : pose === "ready" ? (heldId === "pistol" ? 4 : 0) : 6;
+        drawHeldWeapon(heldId, left + Math.round(frame.grip[0] * scale), top + Math.round(frame.grip[1] * scale), dx < dy ? -1 : 1, phase);
       }
     }
     if (alive && (a.windup > 0 || a.stats && a.alert > 0)) {

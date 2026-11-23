@@ -3,15 +3,15 @@ extends SceneTree
 const CELL := Vector2i(24, 40)
 const FRAME_COUNT := 4
 const POSE_COUNT := 4
+const VIEW_COUNT := 5
 const INK := Color("#171c1b")
 const BOOT := Color("#242927")
-const SKIN := Color("#b9b690")
-const SKIN_SHADE := Color("#686f54")
+const SKINS := ["#b9b690", "#a8a17b", "#b1b498", "#b7a087", "#adab76", "#aab0a2", "#c2b890"]
 const BLOOD := Color("#69292a")
 const COATS := ["#647b68", "#816f54", "#657e87", "#795355", "#777c52", "#665e74", "#899190"]
 const TROUSERS := ["#46514b", "#4c4940", "#3c4c52", "#4e4344", "#4d5140", "#41434e", "#4b5255"]
 const HAIR := ["#3e4032", "#5e503e", "#464539", "#514145", "#4f513a", "#414140", "#696b5e"]
-var atlas := Image.create_empty(CELL.x * COATS.size() * FRAME_COUNT, CELL.y * POSE_COUNT, false, Image.FORMAT_RGBA8)
+var atlas := Image.create_empty(CELL.x * COATS.size() * FRAME_COUNT, CELL.y * POSE_COUNT * VIEW_COUNT, false, Image.FORMAT_RGBA8)
 var origin := Vector2i.ZERO
 
 func _initialize() -> void:
@@ -20,11 +20,15 @@ func _initialize() -> void:
 		printerr("Pass the output PNG path after --.")
 		quit(2)
 		return
-	for row in range(POSE_COUNT):
-		for variant in range(COATS.size()):
-			for frame in range(FRAME_COUNT):
-				origin = Vector2i((variant * FRAME_COUNT + frame) * CELL.x, row * CELL.y)
-				draw_infected(variant, row, frame)
+	for pose in range(POSE_COUNT):
+		for view in range(VIEW_COUNT):
+			for variant in range(COATS.size()):
+				for frame in range(FRAME_COUNT):
+					origin = Vector2i((variant * FRAME_COUNT + frame) * CELL.x, (pose * VIEW_COUNT + view) * CELL.y)
+					if view == 2:
+						draw_infected(variant, pose, frame)
+					else:
+						draw_facing_infected(variant, pose, frame, view)
 	var result := atlas.save_png(args[0])
 	if result != OK:
 		printerr("Unable to write infected atlas: ", result)
@@ -69,8 +73,7 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 	var coat := Color(COATS[variant])
 	var pants := Color(TROUSERS[variant])
 	var hair := Color(HAIR[variant])
-	var skin := [SKIN, Color("#a8a17b"), Color("#b1b498"), Color("#b7a087"),
-		Color("#adab76"), Color("#aab0a2"), Color("#c2b890")][variant] as Color
+	var skin := Color(SKINS[variant])
 	var walk := pose == 1
 	var attack := pose == 2
 	var hurt := pose == 3
@@ -156,3 +159,95 @@ func draw_infected(variant: int, pose: int, frame: int) -> void:
 		6: # Rolled sleeve and split shirt
 			shape(body, [[-2,5],[1,4],[2,6],[0,7],[-2,7]], Color("#aaa99a"))
 			pixel(body, 3, 10, Color("#bbad93"))
+
+# The front and rear families share joints while the offset and material planes
+# turn the head, shoulders and reach into the two three-quarter views.
+func draw_facing_infected(variant: int, pose: int, frame: int, view: int) -> void:
+	var back := view >= 3
+	var diagonal := view == 1 or view == 3
+	var coat := Color(COATS[variant])
+	var pants := Color(TROUSERS[variant])
+	var hair := Color(HAIR[variant])
+	var skin := Color(SKINS[variant])
+	var striding := pose == 1
+	var stride := ([0, 1, 0, -1][frame] as int) if striding else 0
+	var lunging := pose == 2 and frame >= 2
+	var recoil := pose == 3 and frame < 2
+	var mass := [0, 1, 0, -1, 2, -1, 0][variant] as int
+	var bob := int(frame == 1 or frame == 3)
+	var lean := (2 if lunging else -1 if recoil else 0) if diagonal else 0
+	var body := Vector2i(12 + lean, 12 + bob + int(lunging) - int(recoil) + int(variant == 3))
+	var offset := int(diagonal)
+	var left_foot := Vector2i(8 - offset, 36 - maxi(0, stride) * 2)
+	var right_foot := Vector2i(15 - offset, 36 - maxi(0, -stride) * 2)
+	leg(Vector2i(8,25), Vector2i(8 - stride,31),left_foot,pants.darkened(.26))
+	leg(Vector2i(15,25), Vector2i(15 + stride,32),right_foot,pants)
+
+	var shoulder := 5 + mass
+	var reach := (3 if diagonal else 0) + (3 if lunging else 0)
+	var shoulder_y := 2
+	var hand_y := 8 + (1 if back else 3) - (4 if lunging else 0)
+	shape(body, [[-shoulder,shoulder_y],[-shoulder-2,4],[-shoulder-2+reach-stride,hand_y+2],
+		[-shoulder+1+reach-stride,hand_y+2],[-shoulder+3,7],[-shoulder+3,3]], INK)
+	shape(body, [[-shoulder-1,5],[-shoulder+1,4],[-shoulder+1+reach-stride,hand_y],
+		[-shoulder-1+reach-stride,hand_y+1]], coat.darkened(.24))
+	pixel(body, -shoulder+reach-stride, hand_y+1, skin.darkened(.22))
+
+	shape(body, [[-shoulder,0],[-2,-2],[3,-2],[shoulder,0],[shoulder+1,4],
+		[shoulder,11],[3,14],[-4,14],[-shoulder-1,10],[-shoulder-1,4]], INK)
+	shape(body, [[-shoulder+1,0],[-2,-1],[3,-1],[shoulder-1,0],[shoulder,4],
+		[shoulder-1,11],[2,13],[-4,13],[-shoulder,10],[-shoulder,4]], coat)
+	shape(body, [[-shoulder+1,1],[-2,0],[3-offset,0],[4-offset,2],[0,4],[-shoulder+1,3]], coat.lightened(.25))
+	shape(body, [[shoulder-2,3],[shoulder,4],[shoulder-1,11],[2,13],[-4,13],
+		[-3,11],[2-offset,9]], coat.darkened(.29))
+	if back:
+		shape(body, [[-3,4],[2,3],[3,4],[0,5],[-3,5]], coat.darkened(.18))
+		pixel(body, mass, 8, coat.lightened(.16))
+	else:
+		shape(body, [[-2,1],[2,1],[2,3],[0,4],[-1,3]], skin.darkened(.32))
+		shape(body, [[-2,4],[0,4],[1,6],[-1,8],[-2,7]], BLOOD)
+		pixel(body, -1, 5, BLOOD.lightened(.17))
+		if variant == 2 or variant == 4:
+			pixel(body, 3, 4, Color("#b9ae86"))
+			pixel(body, 4, 4, Color("#b9ae86"))
+	pixel(body, -3, 10, coat.lightened(.23))
+	pixel(body, 0, 12, Color("#655344"))
+
+	var hand_x := mini(10, shoulder + reach + stride)
+	shape(body, [[shoulder-2,2],[shoulder+1,2],[shoulder+3,5],[hand_x+1,hand_y-1],
+		[hand_x+1,hand_y+3],[hand_x-2,hand_y+3],[shoulder-1,7]], INK)
+	shape(body, [[shoulder-1,3],[shoulder+1,3],[shoulder+2,5],[hand_x,hand_y-1],
+		[hand_x-1,hand_y+1],[shoulder,7]], coat.darkened(.13))
+	pixel(body, hand_x, hand_y, skin)
+	pixel(body, hand_x-1, hand_y+1, skin.darkened(.22))
+
+	var head := body + Vector2i(offset + int(lunging),-5 + int(variant == 1) + int(lunging))
+	shape(head,[[-4,-2],[-2,-4],[2,-4],[4,-2],[5,1],[4,4],[2,6],[-2,6],[-4,4],[-5,1]],INK)
+	shape(head,[[-4,-1],[-2,-3],[2,-3],[4,-1],[4,2],[3,4],
+		[1,5],[-2,5],[-4,3]],hair)
+	pixel(head,-2,-2,hair.lightened(.28))
+	pixel(head,-1,-2,hair.lightened(.28))
+	if variant == 1:
+		pixel(head,-3,-1,coat.lightened(.15))
+		pixel(head,-2,-3,coat)
+	if variant == 5:
+		shape(head,[[-4,-2],[-2,-5],[2,-5],[4,-3],[4,-1],[-4,-1]],Color("#514659"))
+	if back and not diagonal:
+		pixel(head,-1,4,skin.darkened(.25))
+		pixel(head,0,4,skin.darkened(.25))
+	else:
+		var face_left := 1 if back else -2 if diagonal else -3
+		shape(head, [[face_left,0],[3,0],[4,2],[2,5],[face_left,4]],skin.darkened(.26))
+		pixel(head,3,2,INK)
+		pixel(head,3,1,skin.lightened(.14))
+		pixel(head,2,4,BLOOD)
+		if not back:
+			pixel(head,face_left,1,INK)
+			pixel(head,face_left+1,2,skin)
+			pixel(head,1,4,BLOOD.darkened(.25))
+			if not diagonal:
+				pixel(head,-2,2,INK)
+				pixel(head,2,2,INK)
+				pixel(head,0,1,skin.lightened(.18))
+				pixel(head,0,4,INK)
+				pixel(head,1,5,skin.lightened(.12))

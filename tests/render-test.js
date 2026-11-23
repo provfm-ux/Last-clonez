@@ -53,7 +53,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
 const mkCanvas = () => ({width: 0, height: 0, getContext: () => mk(), getBoundingClientRect: () => ({left: 0, top: 0, width: 1280, height: 720}), style: {}, clientWidth: 160});
 const worldCanvas = mkCanvas();
 const context = {console, Math: Object.assign(Object.create(Math), {random: (() => { let s = 3; return () => (s = s * 16807 % 2147483647) / 2147483647; })()}), Date, JSON, structuredClone, devicePixelRatio: 1,
-  Image: class { naturalWidth = 672; naturalHeight = 160; },
+  Image: class { naturalWidth = 672; naturalHeight = 800; },
   ResizeObserver: class { observe() {} }, document: {getElementById: id => id === "world" ? worldCanvas : id === "micro-zombie-atlas" ? {href:"micro-zombies.png"} : mkCanvas(), createElement: () => mkCanvas()}};
 context.globalThis = context.window = context; vm.createContext(context);
 let source = ""; for (const f of files) source += fs.readFileSync(path.join(dir, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;
@@ -143,9 +143,16 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   z.headingX = -1;
   const hit = pose();
   check("dark pixel: infectado anima e espelha a mesma variante",
-    idle?.[1] === 0 && walk?.[1] === 40 && step?.[0] === walk[0] + 24 &&
-    attack?.[1] === 80 && hit?.[1] === 120 && hit[0] === 648 - idle[0] &&
+    idle?.[1] === 40 && walk?.[1] === 240 && step?.[0] === walk[0] + 24 &&
+    attack?.[1] === 440 && hit?.[1] === 720 && hit[0] === 648 - idle[0] &&
     idle[5] === walk[5] && step[5] === attack[5] && attack[5] === hit[5]);
+  Object.assign(z,{moving:false,flash:0,windup:0});
+  const views = [[1,1],[1,0],[1,-1],[0,-1],[-1,-1]].map(([headingX,headingY]) => {
+    Object.assign(z,{headingX,headingY});
+    return pose()?.[1];
+  });
+  check("dark pixel: infectado tem vistas distintas de frente, costas, perfil e três quartos",
+    views.every((row,index) => row === index * 40));
 }
 {
   const d = Sim.createControl("survival", "carer", "shelter");
@@ -255,6 +262,12 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
     return heldWeapon;
   });
   check("dark pixel: cada arma equipada tem um sprite distinto", sprites.every(Boolean) && new Set(sprites).size === weapons.length);
+  const carry = heldWeapon;
+  run.target = {hp:1,x:run.player.x+.5,y:run.player.y};
+  View.render(run, 0, 1 / 60);
+  check("dark pixel: arma empunhada ao apontar tem pose diferente de transporte",
+    run.target && heldWeapon && heldWeapon !== carry);
+  run.target = null;
   run.swingVisual = {weapon:"bat", dx:1, dy:0};
   run.player.swing = .17;
   View.render(run, 0, 1 / 60);

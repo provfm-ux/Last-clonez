@@ -172,8 +172,14 @@ for (const [mode, expected] of [["training", false], ["survival", true]]) {
   for (let i = 0; i < 150; i++) { Sim.tick(a, .033, run); Sim.tick(b, .033, run); }
   check("fitness: ganha XP a correr", a.player.skills.fitness > 0, a.player.skills.fitness.toFixed(2));
   check("fitness 10 gasta menos stamina", b.player.stamina > a.player.stamina, b.player.stamina.toFixed(1) + " vs " + a.player.stamina.toFixed(1)); }
-{ const s = fresh("training"); s.quiet = true; for (let i = 0; i < 300; i++) { s.quiet = true; Sim.tick(s, .033, {x: 1, y: 0, run: false}); }
-  check("sneaking: ganha XP a andar furtivamente", s.player.skills.sneaking > 0, s.player.skills.sneaking.toFixed(2)); }
+{ const s = fresh("training"); s.quiet = true;
+  const p = s.player;
+  const infected = World.infected(s.world,"practice-threat",p.x + 3,p.y,"walkers",context.Level.seeded(12));
+  infected.dormant = true;
+  s.world.enemies = [infected];
+  Sim.tick(s,.1,{x:1,y:0,run:false});
+  check("sneaking: moving near an infected earns XP", p.skills.sneaking > 0 && p.skills.lightfooted > 0);
+}
 { const s = fresh("training"), p = s.player;
   check("moodles: nenhum estado num jogo novo", Sim.moodles(s).length === 0, JSON.stringify(Sim.moodles(s).map(m => m.id)));
   p.hunger = 10; p.fatigue = 90; p.hp = 50; const m = Sim.moodles(s);
@@ -1148,6 +1154,123 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   reload();
   check("Easy 30 Days: clear, resupply, return to new walkers, sustain the off-grid shelter, survive and reload",
     s.longHaul.complete && Sim.longHaulGoals(s).every(goal => goal.done));
+}
+
+// Field expansion: five generated starts, path validation and saved fungal state.
+{
+  const field = context.FieldStories;
+  const roundtrip = s => Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  const starter = seed => Sim.createControl("training","carer","shelter",undefined,{seed});
+  const seen = new Set();
+  for (const seed of [1,2,17,42,88]) {
+    const s = starter(seed);
+    const fixtures = s.world.objects.filter(field.isFixture);
+    const loaded = roundtrip(s);
+    check("field content is deterministic and walkable, seed " + seed, fixtures.length > 0 &&
+      World.clear(s.world,s.player.x,s.player.y,.18) &&
+      fixtures.every(o => !o.solid && World.clear(s.world,o.x,o.y,.28) &&
+        World.route(s.world,s.player.x,s.player.y,o.x,o.y,0,true).length &&
+        loaded.world.objects.some(copy => copy.id === o.id && copy.x === o.x && copy.y === o.y)));
+    for (const o of fixtures) if (o.action === "mushroom") seen.add(o.species + ":" + o.colony);
+  }
+  check("mushroom species independent of colonization", ["pantrycap","bitterfold"].every(id =>
+    seen.has(id + ":normal") && seen.has(id + ":active")));
+  const samples = [1,2,17,42,88].map(starter);
+  const s = samples.find(run => run.world.objects.some(o => o.action === "mushroom" && o.colony === "active"));
+  const patch = s.world.objects.find(o => o.action === "mushroom" && o.colony === "active");
+  Object.assign(s.player,{x:patch.x,y:patch.y});
+  const initialXp = s.player.skills.foraging;
+  check("active patch warns once and grants foraging XP", Sim.harvestMushroom(s,patch) &&
+    !Sim.harvestMushroom(s,patch) && s.fungalAlert.due === field.mushroom.warning &&
+    s.player.skills.foraging === initialXp + 3 && Sim.itemName(s,patch.species) === "Unidentified mushroom");
+  const loaded = roundtrip(s);
+  const savedPatch = loaded.world.objects.find(o => o.id === patch.id);
+  check("pending warning and harvest persist", savedPatch.harvested && loaded.fungalAlert.id === patch.id);
+  const blocked = roundtrip(s);
+  const blockTile = blocked.world.tiles.find(t => !t.solid && Math.hypot(t.x+.5-patch.x,t.y+.5-patch.y) > 8 &&
+    Math.hypot(t.x+.5-patch.x,t.y+.5-patch.y) < field.mushroom.range && t.x > 1 && t.y > 1 &&
+    t.x < blocked.world.width-2 && t.y < blocked.world.height-2);
+  const trapped = World.infected(blocked.world,"blocked-mushroom",blockTile.x+.5,blockTile.y+.5,"walkers",context.Level.seeded(8));
+  const answeringPoint = World.route(blocked.world,patch.x,patch.y,blocked.world.start.x,blocked.world.start.y,0,true)
+    .find(point => Sim.distance(point,patch) > 6 && Sim.distance(point,patch) < 10 &&
+      World.route(blocked.world,point.x,point.y,patch.x,patch.y).length);
+  const answering = World.infected(blocked.world,"answering-mushroom",answeringPoint.x,answeringPoint.y,"walkers",context.Level.seeded(9));
+  for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+    const tile = World.tileAt(blocked.world,trapped.x+dx,trapped.y+dy);
+    tile.solid = true;
+    tile.kind = "wall";
+  }
+  blocked.world.enemies = [trapped,answering];
+  Object.assign(blocked.player,blocked.world.start);
+  blocked.fungalAlert.due = 0;
+  Sim.tick(blocked,.033);
+  check("only existing infected with a walkable route answer the patch", trapped.alert === 0 &&
+    answering.alert > 0 && answering.chaseX === patch.x && answering.chaseY === patch.y &&
+    blocked.world.enemies.length === 2);
+  loaded.mode = "menu";
+  Sim.tick(loaded,8);
+  check("paused game does not advance fungal countdown", loaded.elapsed === 0 && loaded.fungalAlert.due === 4);
+  loaded.mode = "play";
+  loaded.world.enemies = [];
+  run(loaded,125);
+  check("no nearby infected means no spawned horde", loaded.world.enemies.length === 0 &&
+    !loaded.fungalAlert && loaded.nextFungalAlert > loaded.elapsed);
+  const another = loaded.world.objects.find(o => o.action === "mushroom" && o.id !== patch.id);
+  Object.assign(another,{colony:"active"});
+  Object.assign(loaded.player,{x:another.x,y:another.y});
+  check("cooldown consumes harvest without queuing a later alert", Sim.harvestMushroom(loaded,another) &&
+    another.harvested && !loaded.fungalAlert);
+  loaded.player.skills.foraging = Data.skillXp(2);
+  check("Foraging identifies the carried species", Sim.itemName(loaded,patch.species) === Data.items[patch.species].name);
+  loaded.player.bag.push({id:"bitterfold",qty:1,born:loaded.minutes},{id:"pantrycap",qty:1,born:loaded.minutes});
+  loaded.player.hunger = 60;
+  check("toxic and edible mushrooms have distinct effects without attracting infected",
+    Sim.use(loaded,loaded.player.bag.findIndex(i => i.id === "bitterfold")) && loaded.player.sick >= 45 &&
+    loaded.player.hunger === 60 && Sim.use(loaded,loaded.player.bag.findIndex(i => i.id === "pantrycap")) &&
+    loaded.player.hunger > 60 && !loaded.fungalAlert);
+  const hint = samples.flatMap(run => run.world.objects.map(note => ({run,note}))).find(({note}) => note.action === "field-note" && note.reward);
+  const {run: storyRun,note} = hint;
+  Object.assign(storyRun.player,{x:note.x,y:note.y});
+  const rewardBefore = Sim.quantity(storyRun.player.bag,note.reward);
+  check("field notes are recorded and reward exactly once", Sim.readFieldNote(storyRun,note) && note.read && note.claimed &&
+    Sim.readFieldNote(storyRun,note) && Sim.quantity(storyRun.player.bag,note.reward) === rewardBefore + 1 &&
+    roundtrip(storyRun).world.objects.find(o => o.id === note.id).claimed);
+}
+
+{
+  const getCrafted = xp => {
+    const s = fresh("training"), p = s.player;
+    const bench = s.world.objects.find(o => o.action === "workbench");
+    p.skills.carving = xp;
+    p.bag.push({id:"wood",qty:1});
+    const failed = !Sim.craft(s,"carvedspear") && Sim.quantity(p.bag,"wood") === 1;
+    p.bag.push({id:"knife",qty:1,condition:100,uid:"carving-knife"});
+    Object.assign(p,{x:bench.x,y:bench.y});
+    const crafted = Sim.craft(s,"carvedspear");
+    return {failed,crafted,condition:p.bag.find(i => i.id === "carvedspear")?.condition,
+      practiced:p.skills.carving === xp+5,spent:!Sim.quantity(p.bag,"wood") && Sim.quantity(p.bag,"knife") === 1};
+  };
+  const low = getCrafted(0), high = getCrafted(Data.skillXp(10));
+  check("carving requires the tool, consumes wood and improves spear condition", low.failed && low.crafted &&
+    low.practiced && low.spent && high.crafted && high.condition > low.condition);
+  for (const [weapon,family] of [["axe","axe"],["bat","long_blunt"],["wrench","short_blunt"],["machete","long_blade"],
+    ["knife","short_blade"],["spear","spear"]]) {
+    const swing = xp => {
+      const s = fresh("training"), p = s.player;
+      p.bag.push({id:weapon,qty:1,condition:100,uid:"family-weapon"});
+      Sim.use(s,p.bag.length-1);
+      p.skills[family] = xp;
+      p.skills.maintenance = xp;
+      const infected = World.infected(s.world,"training-hit",p.x+.4,p.y,"walkers",context.Level.seeded(4));
+      s.world.enemies.push(infected);
+      const hit = Sim.attack(s,infected);
+      return {hit,delay:p.cooldown,condition:Sim.weapon(s).condition,xp:p.skills[family]-xp,maintenance:p.skills.maintenance-xp};
+    };
+    const low = swing(0), high = swing(Data.skillXp(10));
+    check(family + ": successful attacks award XP and reduce family recovery at high level",
+      low.hit && high.hit && low.xp === 1.5 && low.maintenance > 0 && high.delay < low.delay &&
+      high.condition > low.condition);
+  }
 }
 
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>

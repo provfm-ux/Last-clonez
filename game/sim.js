@@ -321,6 +321,62 @@ const Sim = (() => {
     }
   }
 
+  const routeCrate = o => o.id.startsWith("coverage-route-");
+  const routeCrateLimit = 10;
+
+  function stockTravelRoutes(world, rules, difficulty) {
+    world.routeCoverage = true;
+    world.basePopulation = world.initialPopulation;
+    if (world.underground || world.region === "cinema" || world.generator < 3) return;
+    const exits = world.objects.filter(o => o.action === "travel");
+    const doors = world.buildings.map(b => b.door).filter(Boolean);
+    const connected = [world.start];
+    const paths = exits.map(exit => World.route(world,world.start.x,world.start.y,exit.x,exit.y,1,true));
+    // Connect each group of nearby buildings to the network. Crossings get their own paths.
+    for (const door of doors) {
+      const nearest = connected.reduce((a,b) => coverageDistance(a,door)<=coverageDistance(b,door) ? a : b);
+      if (coverageDistance(nearest,door)>15) paths.push(World.route(world,nearest.x,nearest.y,door.x,door.y,1,true));
+      connected.push(door);
+    }
+    const rng = Level.seeded((world.seed ^ 0x19cdb432) >>> 0);
+    const loot = world.objects.filter(o => o.active && o.action === "loot" && o.loot?.length);
+    const occupied = new Set(world.objects.map(o => Math.floor(o.x)+":"+Math.floor(o.y)));
+    const buffer = world.region === Regions.home ? 34 : 18;
+    const patrolLimit = difficulty === "longhaul" || !rules.count ? 0 : Math.min(6,Math.ceil(world.enemies.length*.3));
+    let crates = 0, patrols = 0;
+    const stops = new Map();
+    for (const path of paths) for (let i=8;i<path.length-5;i+=8) {
+      const point = path[i], tile = World.tileAt(world,point.x,point.y);
+      if (!tile || tile.building || point.x>=world.width-1 || point.y>=world.height-1 || coverageDistance(point,world.start)<=12 ||
+          !World.clear(world,point.x,point.y,.28)) continue;
+      stops.set(tile.x+":"+tile.y,{point,tile});
+    }
+    // Fill the longest gaps first so intersecting routes can share a cache or patrol.
+    const scored = [...stops.entries()].map(([key,stop]) => ({key,...stop,
+      gap:loot.reduce((n,o)=>Math.min(n,coverageDistance(o,stop.point)),Infinity)}));
+    scored.sort((a,b)=>b.gap-a.gap);
+    for (const {key,point,tile} of scored) {
+      if (crates>=routeCrateLimit && patrols>=patrolLimit) break;
+      if (occupied.has(key)) continue;
+      if (crates<routeCrateLimit && !loot.some(o=>coverageDistance(o,point)<=12) &&
+          !world.enemies.some(z=>coverageDistance(z,point)<1.2)) {
+        const item = roadsideSupplies[Math.floor(rng()*roadsideSupplies.length)];
+        const crate = {id:"coverage-route-"+tile.x+"-"+tile.y,...point,zone:tile.zone,building:null,kind:"crate",
+          name:"Abandoned travel supplies",active:true,solid:false,action:"loot",searched:false,loot:[{id:item,qty:1}]};
+        world.objects.push(crate);
+        loot.push(crate);
+        occupied.add(key);
+        crates++;
+        continue;
+      }
+      if (patrols>=patrolLimit || coverageDistance(point,world.start)<=buffer ||
+          world.enemies.some(z=>coverageDistance(z,point)<=11)) continue;
+      world.enemies.push(World.infected(world,"route-"+tile.x+"-"+tile.y,point.x,point.y,rules.mix,rng,"route"));
+      patrols++;
+    }
+    world.initialPopulation = world.enemies.length;
+  }
+
   const dailyKeys = ["walker","runner","brute","attacks","hits","loot","gathered","crafted","cooked","crossings"];
   const reportLimit = 45;
   const runDay = minutes => Math.floor(minutes/1440)+1;
@@ -401,6 +457,7 @@ const Sim = (() => {
     stockStoneMaterials(world);
     stockPantry(world,rules);
     balanceExploration(world,difficulty);
+    stockTravelRoutes(world,rules,difficulty);
     const bag = [];
     for (const [id, qty] of [["bat", 1], ["bandage", 2], ["cloth", 2], ["food", 2], ["water", 2], ["jeans", 1], ["boots", 1]]) add(bag, id, qty);
     for (const [id,qty] of Object.entries(Data.roles[role]?.kit ?? {})) add(bag,id,qty);
@@ -3173,7 +3230,7 @@ const Sim = (() => {
 
   function snapshotZone(s) {
     const a = s.atmosphere;
-    return {booksStocked:s.world.booksStocked, coverage:s.world.coverage, mapRevision:Regions.mapRevision,ledgerRevision:Chronicle.revision,fieldRevision:FieldStories.revision,atmosphere:{...a,pending:a.pending?{...a.pending}:null,alarm:a.alarm?{...a.alarm}:null},
+    return {booksStocked:s.world.booksStocked, coverage:s.world.coverage, routeCoverage:s.world.routeCoverage, mapRevision:Regions.mapRevision,ledgerRevision:Chronicle.revision,fieldRevision:FieldStories.revision,atmosphere:{...a,pending:a.pending?{...a.pending}:null,alarm:a.alarm?{...a.alarm}:null},
       waypoint:s.waypoint,mapPins:s.mapPins.map(pin => ({...pin})),npc:{...s.world.npc,path:[],moving:false},
       objects:s.world.objects,enemies:s.world.enemies.map(({stats,path,...enemy}) => ({...enemy,path:[]})),
       explored:Array.from(s.world.explored),rng:s.world.rng.state()};
@@ -3206,6 +3263,7 @@ const Sim = (() => {
       region !== Regions.cavern && (data?.mapRevision === undefined || data.mapRevision === 2);
     return data && Object.hasOwn(Regions.definitions, region) && supportedMap &&
       (data.coverage === undefined || typeof data.coverage === "boolean") &&
+      (data.routeCoverage === undefined || typeof data.routeCoverage === "boolean") &&
       (data.fieldRevision === undefined || [1,2,FieldStories.revision].includes(data.fieldRevision)) &&
       (data.ledgerRevision === undefined || [1,2,3,4,Chronicle.revision].includes(data.ledgerRevision)) &&
       Array.isArray(data.objects) && data.objects.length <= 1000 &&
@@ -3241,6 +3299,8 @@ const Sim = (() => {
     s.regionStates = {...regionStates};
     s.ledger = Chronicle.restore(data.ledger,data.minutes);
     s.world.coverage = data.coverage === true;
+    s.world.routeCoverage = data.routeCoverage === true;
+    if (!s.world.routeCoverage) s.world.initialPopulation = s.world.basePopulation;
     if (Number.isFinite(data.minutes) && data.minutes >= 0) restoreDaily(s,data);
     if (typeof data.deathCause === "string" && data.deathCause.length <= 80) s.deathCause = data.deathCause;
     s.atmosphere = Atmosphere.restore(data.atmosphere,s.world,s.rules.hordes);
@@ -3299,7 +3359,7 @@ const Sim = (() => {
     const missingLegacyFixture = o => {
       const entry = Chronicle.entries[o.record];
       const ledgerVersion = data.ledgerRevision ?? 0;
-      return coverageCrate(o) && !s.world.coverage || legacy && utilityIds.has(o.id) || data.region === undefined && o.action === "travel" ||
+      return coverageCrate(o) && (!s.world.coverage || routeCrate(o) && !s.world.routeCoverage) || legacy && utilityIds.has(o.id) || data.region === undefined && o.action === "travel" ||
         region === "ridge" && data.mapRevision !== Regions.mapRevision && ["exit-" + Regions.cavern,"cave-gear"].includes(o.id) ||
         Chronicle.isFixture(o) && (ledgerVersion === 0 || ledgerVersion === 1 && entry?.extra || ledgerVersion < (entry?.added ?? 0)) ||
         data.fieldRevision === undefined && FieldStories.isFixture(o) || oldMap && Atmosphere.isFixture(o);

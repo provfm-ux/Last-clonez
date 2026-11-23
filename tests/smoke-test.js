@@ -1377,6 +1377,90 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   }
 }
 
+{
+  const {Expedition,Regions} = context;
+  for (const region of ["coldvale","ridge","ironworks","coast","fields","quarry","highmoor"]) {
+    let covered = true, quiet = 0;
+    for (const seed of [1,2,17,42,88]) {
+      const s = Sim.create(seed,"survival","carer",Expedition.generator,undefined,region), w = s.world;
+      const sites = w.buildings.map(b=>b.door).filter(door=>door && Sim.distance(door,w.start)>12);
+      const repeated = Sim.create(seed,"survival","carer",Expedition.generator,undefined,region).world;
+      const loot = w.objects.filter(o=>o.active && o.action==="loot" && o.loot?.length);
+      quiet += sites.filter(door=>!w.enemies.some(z=>Sim.distance(z,door)<=9)).length;
+      covered &&= sites.every(door=>loot.some(o=>Sim.distance(o,door)<=8)) &&
+        w.initialPopulation === w.enemies.length &&
+        JSON.stringify(w.enemies) === JSON.stringify(repeated.enemies) &&
+        w.objects.filter(o=>o.id.startsWith("coverage-")).every(o=>!o.solid && Sim.distance(o,w.start)>12 &&
+          World.clear(w,o.x,o.y,.28) && World.route(w,w.start.x,w.start.y,o.x,o.y,0,true).length);
+    }
+    check("coverage: five deterministic seeds with loot and infected near landmarks in "+region, covered && quiet <= (region==="coldvale" ? 2 : 0));
+  }
+  const s = Sim.create(17,"training","carer",Expedition.generator,undefined,"highmoor");
+  const crate = s.world.objects.find(o=>o.id.startsWith("coverage-"));
+  Object.assign(s.player,{x:crate.x,y:crate.y});
+  check("roadside loot is reachable and training stays free of infected",s.world.enemies.length===0 &&
+    Sim.collect(s,crate,0)===1 && s.daily.loot===1);
+  s.player.bag.push({id:"cloth",qty:1});
+  check("completed crafting counts as a daily activity",Sim.craft(s,"bandage") && s.daily.crafted===1);
+  s.minutes=1439.99;
+  Sim.tick(s,.03);
+  const snap = JSON.parse(JSON.stringify(Sim.snapshot(s)));
+  const loaded = Sim.restore(snap);
+  const crateAgain = loaded.world.objects.find(o=>o.id===crate.id);
+  check("daily summary closes at midnight and survives reload without refilling a crate",
+    loaded.daily.day===2 && loaded.daily.loot===0 && loaded.dailyHistory.length===1 &&
+    loaded.dailyHistory[0].day===1 && loaded.dailyHistory[0].loot===1 &&
+    loaded.dailyHistory[0].crafted===1 && crateAgain.loot.length===0);
+  delete snap.daily;
+  delete snap.dailyHistory;
+  delete snap.coverage;
+  snap.objects = snap.objects.filter(o=>!o.id.startsWith("coverage-"));
+  const old = Sim.restore(snap);
+  check("older saves keep the original scavenge state and start tracking on the current day",
+    old.daily.day===2 && old.dailyHistory.length===0 &&
+    !old.world.objects.some(o=>o.id.startsWith("coverage-")));
+}
+
+{
+  const {Expedition} = context;
+  let before = 0, after = 0, caches = 0, patrols = 0, valid = true;
+  for (const region of ["coldvale","ridge","ironworks","coast","fields","quarry","highmoor"]) {
+    for (const seed of [1,2,17,42,88]) {
+      const {world:w} = Sim.create(seed,"survival","carer",Expedition.generator,undefined,region);
+      const loot = w.objects.filter(o=>o.active && o.action==="loot" && o.loot?.length);
+      const isCache = o=>o.id.startsWith("coverage-route-");
+      const oldLoot = loot.filter(o=>!isCache(o)), oldEnemies = w.enemies.filter(z=>z.origin!=="route");
+      const newCaches = loot.filter(isCache);
+      const newPatrols = w.enemies.filter(z=>z.origin==="route");
+      caches += newCaches.length; patrols += newPatrols.length;
+      valid &&= newCaches.length<=10 && newPatrols.length<=6 && newCaches.every(o=>!o.solid &&
+        World.clear(w,o.x,o.y,.28) && World.route(w,w.start.x,w.start.y,o.x,o.y,0,true).length) &&
+        newPatrols.every(z=>World.clear(w,z.x,z.y,.28) && Sim.distance(z,w.start)>(region==="coldvale" ? 34 : 18));
+      for (const exit of w.objects.filter(o=>o.action==="travel")) {
+        const path = World.route(w,w.start.x,w.start.y,exit.x,exit.y,1,true);
+        for (const point of path) {
+          if (Sim.distance(point,w.start)<=12) continue;
+          const empty = (items,enemies) => !items.some(o=>Sim.distance(o,point)<=12) &&
+            !enemies.some(z=>Sim.distance(z,point)<=11);
+          before += Number(empty(oldLoot,oldEnemies));
+          after += Number(empty(loot,w.enemies));
+        }
+      }
+    }
+  }
+  check("travel routes: fewer stretches without loot or infected across five seeds",
+    valid && caches>0 && patrols>0 && after<before*.85, before+" → "+after+" tiles");
+  const setup = Sim.create(17,"training","carer",Expedition.generator,undefined,"highmoor");
+  const snap = JSON.parse(JSON.stringify(Sim.snapshot(setup)));
+  delete snap.routeCoverage;
+  snap.objects = snap.objects.filter(o=>!o.id.startsWith("coverage-route-"));
+  const restored = Sim.restore(snap);
+  check("pre-route saves retain earlier caches without re-stocking visited roads",
+    restored.world.coverage && !restored.world.routeCoverage && !restored.world.enemies.length &&
+    restored.world.objects.some(o=>o.id.startsWith("coverage-")) &&
+    !restored.world.objects.some(o=>o.id.startsWith("coverage-route-")));
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

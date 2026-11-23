@@ -310,7 +310,7 @@ const Chronicle = (() => {
 
   function restore(raw, minutes) {
     if (raw === undefined) return empty();
-    const invalid = () => { throw new Error("Invalid field ledger."); };
+    const invalid = () => { throw new Error("Invalid logbook."); };
     if (!raw || !raw.found || typeof raw.found !== "object" || Array.isArray(raw.found)) invalid();
     const validTime = n => Number.isFinite(n) && n >= 0 && n <= minutes;
     for (const [id, when] of Object.entries(raw.found)) {

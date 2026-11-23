@@ -262,6 +262,149 @@ const Sim = (() => {
     }
   }
 
+  const coverageCrate = o => o.id.startsWith("coverage-");
+  const coverageDistance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
+  const coverageOffsets = [[3,1],[-3,1],[2,4],[-2,4],[5,2],[-5,2],[1,6],[-1,6],[4,-2],[-4,-2]];
+  const roadsideSupplies = ["food","water","cloth","wood","bandage"];
+
+  function balanceExploration(world, difficulty) {
+    world.coverage = true;
+    if (world.underground || world.region === "cinema" || world.generator < 3) return;
+    const sites = world.buildings.map(b => b.door).filter(door => door && coverageDistance(door,world.start) > 12);
+    const rng = Level.seeded((world.seed ^ 0x74b39e17) >>> 0);
+    const ordered = sites.map(site => ({site,order:rng()})).sort((a,b) => a.order-b.order).map(({site}) => site);
+    const loot = world.objects.filter(o => o.active && o.action === "loot" && o.loot?.length);
+    const used = new Set(world.objects.map(o => Math.floor(o.x)+":"+Math.floor(o.y)));
+    const enemies = world.enemies;
+    const nearbyInfected = (enemy,site) => coverageDistance(enemy,site) <= 9;
+    const occupied = point => enemies.some(z => coverageDistance(z,point) < 1.2);
+    const candidate = (site, avoid, startBuffer = 12) => {
+      const offset = Math.floor(rng()*coverageOffsets.length);
+      for (let i=0; i<coverageOffsets.length; i++) {
+        const [dx,dy] = coverageOffsets[(i+offset)%coverageOffsets.length];
+        const x = Math.floor(site.x+dx)+.5, y = Math.floor(site.y+dy)+.5;
+        const t = World.tileAt(world,x,y), point = {x,y};
+        if (!t || x<=1 || y<=1 || x>=world.width-1 || y>=world.height-1 || t.building ||
+            used.has(t.x+":"+t.y) || !World.clear(world,x,y,.28) || occupied(point) ||
+            coverageDistance(world.start,point)<=startBuffer || avoid && coverageDistance(avoid,point)<2) continue;
+        if (World.route(world,world.start.x,world.start.y,x,y,0,true).length) return {t,x,y};
+      }
+      return null;
+    };
+    const infectedBuffer = world.region === Regions.home ? 34 : 18;
+    let moved = 0;
+    for (const site of ordered) {
+      let crate;
+      if (!loot.some(o => coverageDistance(o,site)<=8)) {
+        const point = candidate(site);
+        if (point) {
+          const {t,x,y} = point;
+          const item = roadsideSupplies[Math.floor(rng()*roadsideSupplies.length)];
+          crate = {id:"coverage-"+site.id,x,y,zone:t.zone,building:null,kind:"crate",name:"Roadside supplies",
+            active:true,solid:false,action:"loot",searched:false,loot:[{id:item,qty:1}]};
+          world.objects.push(crate);
+          loot.push(crate);
+          used.add(t.x+":"+t.y);
+        }
+      }
+      if (difficulty === "longhaul" || moved >= Math.ceil(enemies.length/3) || enemies.some(z=>nearbyInfected(z,site))) continue;
+      const point = candidate(site,crate,infectedBuffer);
+      if (!point) continue;
+      const donor = enemies.find(z => !z.dormant && z.origin !== "resident" &&
+        (world.region !== Regions.home || coverageDistance(z,world.start)>infectedBuffer) &&
+        ordered.every(other => !nearbyInfected(z,other) || nearbyInfected(point,other) ||
+          enemies.some(guard => guard !== z && nearbyInfected(guard,other))));
+      if (!donor) continue;
+      const {x,y} = point;
+      Object.assign(donor,{x,y,homeX:x,homeY:y,chaseX:x,chaseY:y});
+      moved++;
+    }
+  }
+
+  const routeCrate = o => o.id.startsWith("coverage-route-");
+  const routeCrateLimit = 10;
+
+  function stockTravelRoutes(world, rules, difficulty) {
+    world.routeCoverage = true;
+    world.basePopulation = world.initialPopulation;
+    if (world.underground || world.region === "cinema" || world.generator < 3) return;
+    const exits = world.objects.filter(o => o.action === "travel");
+    const doors = world.buildings.map(b => b.door).filter(Boolean);
+    const connected = [world.start];
+    const paths = exits.map(exit => World.route(world,world.start.x,world.start.y,exit.x,exit.y,1,true));
+    // Connect each group of nearby buildings to the network. Crossings get their own paths.
+    for (const door of doors) {
+      const nearest = connected.reduce((a,b) => coverageDistance(a,door)<=coverageDistance(b,door) ? a : b);
+      if (coverageDistance(nearest,door)>15) paths.push(World.route(world,nearest.x,nearest.y,door.x,door.y,1,true));
+      connected.push(door);
+    }
+    const rng = Level.seeded((world.seed ^ 0x19cdb432) >>> 0);
+    const loot = world.objects.filter(o => o.active && o.action === "loot" && o.loot?.length);
+    const occupied = new Set(world.objects.map(o => Math.floor(o.x)+":"+Math.floor(o.y)));
+    const buffer = world.region === Regions.home ? 34 : 18;
+    const patrolLimit = difficulty === "longhaul" || !rules.count ? 0 : Math.min(6,Math.ceil(world.enemies.length*.3));
+    let crates = 0, patrols = 0;
+    const stops = new Map();
+    for (const path of paths) for (let i=8;i<path.length-5;i+=8) {
+      const point = path[i], tile = World.tileAt(world,point.x,point.y);
+      if (!tile || tile.building || point.x>=world.width-1 || point.y>=world.height-1 || coverageDistance(point,world.start)<=12 ||
+          !World.clear(world,point.x,point.y,.28)) continue;
+      stops.set(tile.x+":"+tile.y,{point,tile});
+    }
+    // Fill the longest gaps first so intersecting routes can share a cache or patrol.
+    const scored = [...stops.entries()].map(([key,stop]) => ({key,...stop,
+      gap:loot.reduce((n,o)=>Math.min(n,coverageDistance(o,stop.point)),Infinity)}));
+    scored.sort((a,b)=>b.gap-a.gap);
+    for (const {key,point,tile} of scored) {
+      if (crates>=routeCrateLimit && patrols>=patrolLimit) break;
+      if (occupied.has(key)) continue;
+      if (crates<routeCrateLimit && !loot.some(o=>coverageDistance(o,point)<=12) &&
+          !world.enemies.some(z=>coverageDistance(z,point)<1.2)) {
+        const item = roadsideSupplies[Math.floor(rng()*roadsideSupplies.length)];
+        const crate = {id:"coverage-route-"+tile.x+"-"+tile.y,...point,zone:tile.zone,building:null,kind:"crate",
+          name:"Abandoned travel supplies",active:true,solid:false,action:"loot",searched:false,loot:[{id:item,qty:1}]};
+        world.objects.push(crate);
+        loot.push(crate);
+        occupied.add(key);
+        crates++;
+        continue;
+      }
+      if (patrols>=patrolLimit || coverageDistance(point,world.start)<=buffer ||
+          world.enemies.some(z=>coverageDistance(z,point)<=11)) continue;
+      world.enemies.push(World.infected(world,"route-"+tile.x+"-"+tile.y,point.x,point.y,rules.mix,rng,"route"));
+      patrols++;
+    }
+    world.initialPopulation = world.enemies.length;
+  }
+
+  const dailyKeys = ["walker","runner","brute","attacks","hits","loot","gathered","crafted","cooked","crossings"];
+  const reportLimit = 45;
+  const runDay = minutes => Math.floor(minutes/1440)+1;
+  const newDaily = day => ({day,...Object.fromEntries(dailyKeys.map(key=>[key,0]))});
+  const recordDaily = (s,key,count=1) => { s.daily[key] += count; };
+
+  function closeDaily(s) {
+    const day = runDay(s.minutes);
+    if (day === s.daily.day) return;
+    s.dailyHistory.push(s.daily);
+    if (s.dailyHistory.length > reportLimit) s.dailyHistory.shift();
+    s.daily = newDaily(day);
+    notify(s,"Day "+(day-1)+" complete. Your daily summary is in the journal.");
+  }
+
+  function restoreDaily(s, data) {
+    const day = runDay(data.minutes);
+    const valid = entry => entry && Number.isSafeInteger(entry.day) && entry.day >= 1 &&
+      dailyKeys.every(key=>Number.isSafeInteger(entry[key]) && entry[key]>=0 && entry[key]<=1e9);
+    const history = data.dailyHistory === undefined ? [] : data.dailyHistory;
+    if (!Array.isArray(history) || history.length>reportLimit ||
+        history.some((entry,i)=>!valid(entry) || entry.day>=day || i>0 && history[i-1].day>=entry.day) ||
+        data.daily !== undefined && (!valid(data.daily) || data.daily.day!==day)) throw new Error("Invalid daily summary.");
+    const copy = entry => ({day:entry.day,...Object.fromEntries(dailyKeys.map(key=>[key,entry[key]]))});
+    s.daily = data.daily === undefined ? newDaily(day) : copy(data.daily);
+    s.dailyHistory = history.map(copy);
+  }
+
   function create(seed, difficulty = "survival", role = "carer", generator = 2, options, region = Regions.home, profile) {
     const rules = Data.worldRules(difficulty, options);
     const world = World.build(seed, difficulty, generator, rules, region);
@@ -313,6 +456,8 @@ const Sim = (() => {
     FieldStories.place(world);
     stockStoneMaterials(world);
     stockPantry(world,rules);
+    balanceExploration(world,difficulty);
+    stockTravelRoutes(world,rules,difficulty);
     const bag = [];
     for (const [id, qty] of [["bat", 1], ["bandage", 2], ["cloth", 2], ["food", 2], ["water", 2], ["jeans", 1], ["boots", 1]]) add(bag, id, qty);
     for (const [id,qty] of Object.entries(Data.roles[role]?.kit ?? {})) add(bag,id,qty);
@@ -337,6 +482,8 @@ const Sim = (() => {
       s.waypoint = "";
       s.atmosphere.nextWave = Math.max(s.atmosphere.nextWave,360);
     }
+    s.daily = newDaily(runDay(s.minutes));
+    s.dailyHistory = [];
     s.weather = localWeather(s);
     explore(s);
     if (town) {
@@ -558,6 +705,7 @@ const Sim = (() => {
       return 0;
     }
     add(s.player.bag, item.id, amount, itemState(item));
+    recordDaily(s,"loot",amount);
     if (item.id === "housekey") notify(s, "Key tag: \u201c" + item.label + "\u201d. It opens that house.");
     item.qty -= amount;
     if (!item.qty) object.loot.splice(index, 1);
@@ -821,6 +969,7 @@ const Sim = (() => {
       if (recipe.skill) addXp(s,recipe.skill,5);
     }
     addXp(s, "crafting", 4);
+    recordDaily(s,"crafted");
     notify(s, recipe.repair || recipe.mend ? Data.items[repairItem.id].name + " repaired." : recipe.name + " completed.");
     return true;
   }
@@ -862,6 +1011,7 @@ const Sim = (() => {
     s.world.objects.push(structure);
     World.sync(s.world);
     addXp(s, recipe.skill ?? "crafting", 6);
+    recordDaily(s,"crafted");
     s.blueprint = null;
     notify(s, recipe.name + " built.");
     return true;
@@ -1204,6 +1354,7 @@ const Sim = (() => {
       }
       explore(next);
       notify(next, "Entered " + Regions.definitions[to].name + ". " + (to === Regions.home ? "The other routes are on your map." : Regions.definitions[to].detail));
+      recordDaily(next,"crossings");
       settleDispatch(next, true);
       if (next.atmosphere.pending) warnHorde(next);
       return next;
@@ -1574,7 +1725,7 @@ const Sim = (() => {
     s.ledger.found[o.record] = s.minutes;
     if (entry.reward) revealLedgerCache(s,Chronicle.cacheFor(o.record),entry.reward);
     if (entry.noise) noise(s,o.x,o.y,entry.noise);
-    notify(s, entry.noise ? entry.title + " recorded. The sound may draw infected." : entry.title + " added to your field ledger.", Boolean(entry.noise));
+    notify(s, entry.noise ? entry.title + " recorded. The sound may draw infected." : entry.title + " added to your logbook.", Boolean(entry.noise));
     return true;
   }
 
@@ -1582,7 +1733,7 @@ const Sim = (() => {
     if (desk?.action !== "ledger-desk" || !onFootAt(s,desk)) return "Use the civil defence desk in Cold Vale.";
     if (!Object.hasOwn(Chronicle.routes,id)) return "Unknown relay.";
     if (s.ledger.dispatch) return "The reserve circuit has already been used.";
-    if (Chronicle.core.some(key => !Chronicle.has(s.ledger,key))) return "Verify the records from all five areas. See your field ledger.";
+    if (Chronicle.core.some(key => !Chronicle.has(s.ledger,key))) return "Verify the records from all five areas. See your logbook.";
     if (!Chronicle.ready(s.ledger,id)) return "Verify this outlet in the field before sending.";
     return "";
   }
@@ -1598,7 +1749,7 @@ const Sim = (() => {
     const order = s.ledger.dispatch;
     if (!order?.delivered || order.reportRead || o?.delivery !== order.route || !onFootAt(s,o)) return false;
     order.reportRead = true;
-    notify(s, "The crew's signed check-in is in your field ledger.");
+    notify(s, "The crew's signed check-in is in your logbook.");
     return true;
   }
 
@@ -1919,6 +2070,7 @@ const Sim = (() => {
     }
     add(s.player.bag, product, qty, {born: batch.readyAt});
     addXp(s, "cooking", 3);
+    if (id !== "water") recordDaily(s,"cooked",qty);
     if (id === "water") {
       fire.boilUntil = null;
       notify(s, s.flags.water ? "Collected drinking water." : "Shelter water project complete. You collected your first batch of drinking water.");
@@ -1958,6 +2110,7 @@ const Sim = (() => {
     site.harvested = true;
     add(s.player.bag,site.species,1,{born:s.minutes});
     addXp(s,"foraging",3);
+    recordDaily(s,"gathered");
     if (site.colony === "active" && !s.fungalAlert && s.elapsed >= (s.nextFungalAlert ?? 0)) {
       s.fungalAlert = {region:s.world.region,id:site.id,due:s.elapsed + FieldStories.mushroom.warning};
       hear(s,"fungus",site);
@@ -2036,6 +2189,7 @@ const Sim = (() => {
       const qty = forageAmount(s,site), {recovery} = Data.wildResources[site.resource];
       add(s.player.bag, site.resource, qty, {born:s.minutes});
       addXp(s, "foraging", 2 * qty);
+      recordDaily(s,"gathered",qty);
       site.forageAt = s.minutes + recovery;
       notify(s, "Gathered " + qty + " × " + Data.items[site.resource].name + ".");
     } else if (site.fishUntil == null) {
@@ -2051,7 +2205,7 @@ const Sim = (() => {
       const born = site.fishUntil;
       site.fishUntil = null;
       if (isSpoiled(s, {id:"rawfish",born})) notify(s, "The catch spoiled. You cleared the line.");
-      else { add(s.player.bag, "rawfish", 1, {born}); addXp(s, "fishing", 4); notify(s, "Caught a fish. Grill it at a campfire."); }
+      else { add(s.player.bag, "rawfish", 1, {born}); addXp(s, "fishing", 4); recordDaily(s,"gathered"); notify(s, "Caught a fish. Grill it at a campfire."); }
     }
     return true;
   }
@@ -2091,6 +2245,7 @@ const Sim = (() => {
     bed.garden.crop = null;
     bed.garden.growth = 0;
     addXp(s, "gardening", 6);
+    recordDaily(s,"gathered",Object.values(bundle).reduce((sum,qty)=>sum+qty,0));
     s.flags.harvested = true;
     if (s.longHaul && !s.longHaul.harvest && nearLongHaulShelter(s,bed) && !mainsWater(s) && !gridPower(s)) {
       s.longHaul.harvest = true;
@@ -2347,6 +2502,7 @@ const Sim = (() => {
 
   function defeat(s, enemy) {
     s.kills++;
+    recordDaily(s,enemy.kind);
     hearZombie(s,"death",enemy);
     const winner = enemy.origin === "cinema-winner";
     const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item;
@@ -2365,6 +2521,7 @@ const Sim = (() => {
       return false;
     }
     recordPlaytest(s, "fight");
+    recordDaily(s,"attacks");
     faceTowards(p, z);
     s.swingVisual = {weapon:item.id, dx:z.x - p.x, dy:z.y - p.y};
     const family = Data.weaponSkills[item.id];
@@ -2433,6 +2590,7 @@ const Sim = (() => {
   function hurt(s, z) {
     const p = s.player;
     if (p.flash > 0) return;
+    recordDaily(s,"hits");
     recordPlaytest(s, "fight");
     const car = vehicle(s);
     if (car) {
@@ -2864,6 +3022,7 @@ const Sim = (() => {
     const previousMinutes = s.minutes;
     const minutes = dt * s.rules.clock;
     s.elapsed += dt; s.minutes += minutes;
+    if (runDay(s.minutes) !== runDay(previousMinutes)) closeDaily(s);
     s.weather = localWeather(s);
     settleDispatch(s);
     updatePlayer(s, dt, input);
@@ -3071,7 +3230,7 @@ const Sim = (() => {
 
   function snapshotZone(s) {
     const a = s.atmosphere;
-    return {booksStocked:s.world.booksStocked, mapRevision:Regions.mapRevision,ledgerRevision:Chronicle.revision,fieldRevision:FieldStories.revision,atmosphere:{...a,pending:a.pending?{...a.pending}:null,alarm:a.alarm?{...a.alarm}:null},
+    return {booksStocked:s.world.booksStocked, coverage:s.world.coverage, routeCoverage:s.world.routeCoverage, mapRevision:Regions.mapRevision,ledgerRevision:Chronicle.revision,fieldRevision:FieldStories.revision,atmosphere:{...a,pending:a.pending?{...a.pending}:null,alarm:a.alarm?{...a.alarm}:null},
       waypoint:s.waypoint,mapPins:s.mapPins.map(pin => ({...pin})),npc:{...s.world.npc,path:[],moving:false},
       objects:s.world.objects,enemies:s.world.enemies.map(({stats,path,...enemy}) => ({...enemy,path:[]})),
       explored:Array.from(s.world.explored),rng:s.world.rng.state()};
@@ -3082,6 +3241,8 @@ const Sim = (() => {
       schema: Data.saveVersion, generator: s.world.generator, seed: s.seed, difficulty: s.difficulty, role: s.role, rules:{...s.rules},
       region:s.world.region, regionStates:s.regionStates,
       elapsed: s.elapsed, minutes: s.minutes, mode: s.mode, quiet: s.quiet, kills: s.kills, serial: s.serial, controlStart: s.controlStart,
+      daily:s.daily?.day === runDay(s.minutes) ? {...s.daily} : undefined,
+      dailyHistory:s.dailyHistory.map(entry=>({...entry})),
       guideStep:s.guideStep, firstSleep:s.firstSleep, pinStory:s.pinStory, playtest:s.playtest,
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
@@ -3101,6 +3262,8 @@ const Sim = (() => {
     const supportedMap = data?.mapRevision === Regions.mapRevision ||
       region !== Regions.cavern && (data?.mapRevision === undefined || data.mapRevision === 2);
     return data && Object.hasOwn(Regions.definitions, region) && supportedMap &&
+      (data.coverage === undefined || typeof data.coverage === "boolean") &&
+      (data.routeCoverage === undefined || typeof data.routeCoverage === "boolean") &&
       (data.fieldRevision === undefined || [1,2,FieldStories.revision].includes(data.fieldRevision)) &&
       (data.ledgerRevision === undefined || [1,2,3,4,Chronicle.revision].includes(data.ledgerRevision)) &&
       Array.isArray(data.objects) && data.objects.length <= 1000 &&
@@ -3135,6 +3298,10 @@ const Sim = (() => {
     const s = crossing?.template ?? create(data.seed, data.difficulty, data.role, data.generator, rules, region), p = data.player;
     s.regionStates = {...regionStates};
     s.ledger = Chronicle.restore(data.ledger,data.minutes);
+    s.world.coverage = data.coverage === true;
+    s.world.routeCoverage = data.routeCoverage === true;
+    if (!s.world.routeCoverage) s.world.initialPopulation = s.world.basePopulation;
+    if (Number.isFinite(data.minutes) && data.minutes >= 0) restoreDaily(s,data);
     if (typeof data.deathCause === "string" && data.deathCause.length <= 80) s.deathCause = data.deathCause;
     s.atmosphere = Atmosphere.restore(data.atmosphere,s.world,s.rules.hordes);
     const {width, height} = s.world;
@@ -3192,13 +3359,14 @@ const Sim = (() => {
     const missingLegacyFixture = o => {
       const entry = Chronicle.entries[o.record];
       const ledgerVersion = data.ledgerRevision ?? 0;
-      return legacy && utilityIds.has(o.id) || data.region === undefined && o.action === "travel" ||
+      return coverageCrate(o) && (!s.world.coverage || routeCrate(o) && !s.world.routeCoverage) || legacy && utilityIds.has(o.id) || data.region === undefined && o.action === "travel" ||
         region === "ridge" && data.mapRevision !== Regions.mapRevision && ["exit-" + Regions.cavern,"cave-gear"].includes(o.id) ||
         Chronicle.isFixture(o) && (ledgerVersion === 0 || ledgerVersion === 1 && entry?.extra || ledgerVersion < (entry?.added ?? 0)) ||
         data.fieldRevision === undefined && FieldStories.isFixture(o) || oldMap && Atmosphere.isFixture(o);
     };
     const validTimer = (until, recipe) => Number.isFinite(until) && until > 0 && until <= data.minutes + recipe.minutes;
     const validStation = (o, original) => {
+      if (original && coverageCrate(original)) return o.active && !o.solid && o.building === null;
       if (FieldStories.isFixture(original)) {
         if (o.solid || !o.active || o.building !== original.building) return false;
         if (original.action === "mushroom") return o.species === original.species && o.colony === original.colony &&
@@ -3305,7 +3473,7 @@ const Sim = (() => {
         (dropNames.has(o.name) || o.name === "The El Gordo Winner" ? o.name : "On the ground"),
       ...(o.kind === "barrel" ? {water: o.water ?? 0} : {})
     }));
-    for (const original of originalObjects.values()) if (!savedIds.has(original.id) && missingLegacyFixture(original)) {
+    for (const original of originalObjects.values()) if (!savedIds.has(original.id) && missingLegacyFixture(original) && !coverageCrate(original)) {
       const overlaps = original.decor && [p,data.npc,...data.enemies,...data.objects.filter(o => o.active && o.solid)].some(a => distance(a,original) < .72);
       s.world.objects.push(overlaps ? {...original,solid:false} : original);
     }

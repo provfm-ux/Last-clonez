@@ -1212,6 +1212,19 @@
       '</div>' + skillsHtml() + '<div style="margin-top:14px">' + effects.map(([title, text]) => '<div class="effect-row"><b>' + title + "</b><p>" + text + "</p></div>").join("") + "</div>", "health");
   }
 
+  function dailySummary() {
+    const rows = [...state.dailyHistory].reverse();
+    const summary = entry => '<p>Infected defeated: '+(entry.walker+entry.runner+entry.brute)+
+      ' · '+entry.walker+' walkers · '+entry.runner+' runners · '+entry.brute+' brutes</p>'+
+      '<p>Attacks '+entry.attacks+' · Hits taken '+entry.hits+' · Loot '+entry.loot+' · Gathered '+entry.gathered+
+      ' · Crafted '+entry.crafted+' · Meals cooked '+entry.cooked+' · Crossings '+entry.crossings+'</p>';
+    show("Daily summary",'<section class="ledger-case"><h3>Day '+state.daily.day+' · In progress</h3>'+
+      summary(state.daily)+rows.map((entry,i)=>'<details'+(i===0?' open':'')+'><summary>Day '+entry.day+
+      '</summary>'+summary(entry)+'</details>').join("")+
+      (rows.length?'':'<p>Completed days appear here at midnight.</p>')+'</section><div class="item-actions">'+
+      button("Survival journal","journal")+'</div>',"daily-summary");
+  }
+
   function diary() {
     const eva = state.world.npc.mode;
     const evaRegion = Object.keys(state.regionStates).find(id => state.regionStates[id].npc.mode !== "away");
@@ -1224,7 +1237,8 @@
         (FieldStories.noteDetails[o.id.slice("field-note-".length)] ?
           '<br>' + esc(FieldStories.noteDetails[o.id.slice("field-note-".length)]) : "") + '</p>').join("") + '</details>' : "";
     show("Survival journal", '<div class="item-actions story-nav">' +
-      button("Field ledger", "field-ledger", false, "primary") +
+      button("Logbook", "field-ledger", false, "primary") +
+      button("Daily summary", "daily-summary") +
       button("Outbreak log · " + knownStory().length + "/" + Object.keys(Data.story).length, "outbreak-log", false, "primary") +
       (state.flags.radio ? button("Supply run" + (state.supplyRun === "complete" ? " ✓" : ""), "supply-run") : "") +
       button("Garden & kitchen" + (state.flags.gardenMeal ? " ✓" : ""), "garden-project") +
@@ -1284,7 +1298,7 @@
       Chronicle.has(ledger,"shutdown") ? "The recorded all-clear has stopped. The district clerks are still checking who made it home." :
       ledger.dispatch?.reportRead ? "The crew made it through. Follow the survey trail below Pine Ridge to find the source of the broadcast." :
       "The same all-clear has aired twice. Trace it across the five surface regions and give the survivors one live signal.";
-    show("Field ledger", '<section class="ledger-case"><h3>' + Chronicle.title + '</h3><p>' + esc(chapter) + '</p>' +
+    show("Logbook", '<section class="ledger-case"><h3>' + Chronicle.title + '</h3><p>' + esc(chapter) + '</p>' +
       '<p class="item-meta">' + gathered + ' / ' + Chronicle.core.length + ' core records and checks</p>' + districtHint + districtProgress +
       (world.region === "coast" && Chronicle.has(ledger,"tidebook") ? '<p>' + esc(Chronicle.tideForecast(state.minutes)) + '</p>' : '') + dispatchStatus() +
       '<div class="item-actions">' + button(town ? "Mark civil defence desk" : "Mark crossing to " + Regions.definitions[back].name,
@@ -1298,7 +1312,7 @@
   function ledgerEntry(id) {
     if (!Object.hasOwn(Chronicle.entries,id) || !Chronicle.has(state.ledger,id)) return;
     const entry = Chronicle.entries[id];
-    show(entry.title, ledgerEntryText(entry) + '<div class="item-actions">' + button("Field ledger", "field-ledger", false, "primary") + '</div>', "ledger-entry");
+    show(entry.title, ledgerEntryText(entry) + '<div class="item-actions">' + button("Logbook", "field-ledger", false, "primary") + '</div>', "ledger-entry");
   }
 
   function ledgerReport(parcel = null) {
@@ -1307,12 +1321,12 @@
     const route = Chronicle.routes[order.route];
     show("Signed check-in", '<div class="ledger-source">' + esc(route.cache) + '</div><p>' + esc(route.report) + '</p><div class="item-actions">' +
       (parcel ? button("Open parcel", "relayparcel-" + objectIndex(parcel), false, "primary") : '') +
-      button("Field ledger", "field-ledger") + '</div>', "ledger-report");
+      button("Logbook", "field-ledger") + '</div>', "ledger-report");
   }
 
   function ledgerPanel(o) {
     const index = objectIndex(o), ledger = state.ledger;
-    const back = button("Field ledger", "field-ledger");
+    const back = button("Logbook", "field-ledger");
     if (o.action === "ledger-desk") {
       const choices = ledger.dispatch ? dispatchStatus() : '<div class="ledger-regions">' + Object.entries(Chronicle.routes).map(([id,route]) => {
         const problem = Sim.dispatchProblem(state,o,id);
@@ -1993,6 +2007,8 @@
     else if (action === "copy-playtest") copyPlaytest();
     else if (action === "outbreak-log") outbreakLog();
     else if (action === "field-ledger") fieldLedger();
+    else if (action === "daily-summary") dailySummary();
+    else if (action === "journal") diary();
     else if (action === "ledgerreport") ledgerReport();
     else if (action.startsWith("ledgerread-")) ledgerEntry(action.slice(11));
     else if (action === "regional-map") map();
@@ -2494,6 +2510,7 @@
           }
         }
       } else {
+        const previousDay = state.daily.day;
         for (let i = 0; i < steps && active(); i++) Sim.tick(state, delta / steps, input);
         updateLesson();
         if (state.interaction) {
@@ -2513,7 +2530,7 @@
           }
           if (food >= 4 && water >= 3) state.flags.supplies = true;
         }
-        if (!lesson && state.elapsed >= nextSave) save();
+        if (!lesson && (state.daily.day !== previousDay || state.elapsed >= nextSave)) save();
       }
     }
     if (state.mode === "dead" && !deathShown && !afterlife) {

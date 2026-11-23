@@ -209,10 +209,10 @@ const Research = {
       "Route searches reuse their memory. Older saves bring their explored ground, records and pins into the larger maps."
     ]},
     {version:"0.14 Control", date:"12 November 2026", changes:[
-      "The Second All-Clear connects all five regions. Find five primary records and investigate ten hidden incidents. Read discoveries again in Journal → Field ledger.",
+      "The Second All-Clear connects all five regions. Find five primary records and investigate ten hidden incidents. Read discoveries again in Journal → Logbook.",
       "Compare clues across maps to open hidden caches, test relays and look for a washbox at low tide. The coastal lantern is visible to its receiver after dark.",
       "Verify a radio diversion at the civil defence desk. Your choice redirects existing infected and sends a supply parcel to a different region.",
-      "Previous saves gain the field ledger and scene objects when each area is loaded. Existing outbreak and shelter tasks remain available."
+      "Previous saves gain the logbook and scene objects when each area is loaded. Existing outbreak and shelter tasks remain available."
     ]},
     {version:"0.13 Control", date:"11 November 2026", changes:[
       "Follow four physical crossings from Cold Vale into Pine Ridge, Ironworks, Bracken Coast and Westfields. Each annex is 96 × 96 tiles.",
@@ -294,7 +294,7 @@ const Research = {
   systems: [
     ["Exploration and loot","Playable","Compact houses, regional supplies, and bedrooms, kitchens and gardens to search."],
     ["Outbreak story","Playable","An opening broadcast, six field notes, Eva’s account, radio replies and Mara’s supply run. The journal retains discoveries."],
-    ["Field ledger","Playable","Linked evidence, hidden caches, tide and night conditions, and two cross-region radio diversions."],
+    ["Logbook","Playable","Linked evidence, hidden caches, tide and night conditions, and two cross-region radio diversions."],
     ["Stamina, fatigue and needs","Playable","Hunger, thirst, rest, panic and visible penalties."],
     ["Infected perception","Playable","Walls block sight. Light and weather affect detection, and noise depends on movement and surfaces."],
     ["Combat and aiming","Playable","Range ring, strikes in place, wind-up warning, shove, ammunition and hit chance."],

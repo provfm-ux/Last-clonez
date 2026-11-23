@@ -176,7 +176,7 @@ const FieldStories = (() => {
     film_warehouse:"battery",laundrette:"cloth",pump_house:"part",allotment:"radishseed",
     stone_yard:"scrap",safehouse:"water",hunting_camp:"bait"};
   const offsets = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1],[0,2],[0,-2]];
-  const revision = 2;
+  const revision = 3;
   const mushroom = {colonized:.15, warning:4, cooldown:120, range:35, maxSites:10};
   const density = {absurd:.02, reference:.08, flavor:.18, functional:.35, spacing:4};
   const isFixture = o => o?.action === "field-note" || o?.action === "mushroom";

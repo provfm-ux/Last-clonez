@@ -16,4 +16,6 @@ Food, water, rest, and quiet keep you alive. Spend supplies on useful equipment 
 
 Read field notes when you find them and revisit them in **Journal → Field notes**. Inspect mushroom patches before picking. Moving filaments warn that harvesting may attract nearby infected. Identify the caps with Foraging level 2 or the Cold Vale Foraging Guide. Cook only identified Pantrycaps. Bitterfold is toxic.
 
+At a campfire, recipes you have ingredients for appear first. Check the shelter crate and grocery store for oats, flour and beans. Look for dried ingredients at the orchard farmhouse, Net shed and district kitchens. Harvest fruit outdoors for porridge, compote and dried apple rings.
+
 **Pause → Save and exit** returns to the title screen. Use **Continue** to resume. Export a save from the journal to keep a separate copy.

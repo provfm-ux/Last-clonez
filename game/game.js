@@ -1600,9 +1600,12 @@
     const batch = Sim.fireBatch(state, o);
     const warm = button("Recover stamina", "context-" + id);
     if (!batch) {
-      show("Campfire", '<section class="water-panel"><p>Choose a batch. Each campfire can prepare one at a time.</p><div class="recipe-list">' +
-        Object.entries(Data.fireRecipes).filter(([,recipe]) => !recipe.identify || Sim.knownMushrooms(state)).map(([key, recipe]) => {
-          const missing = Sim.recipeProblem(state, recipe);
+      const recipes = Object.entries(Data.fireRecipes)
+        .filter(([,recipe]) => !recipe.identify || Sim.knownMushrooms(state))
+        .map(([key,recipe]) => ({key,recipe,missing:Sim.recipeProblem(state,recipe)}))
+        .sort((a,b) => Number(Boolean(a.missing)) - Number(Boolean(b.missing)));
+      show("Campfire", '<section class="water-panel"><p>Available batches appear first. Each campfire prepares one at a time.</p><div class="recipe-list">' +
+        recipes.map(({key,recipe,missing}) => {
           const action = key === "water" ? "boil-" + id : "cook-" + id + "-" + key;
           return '<article class="recipe"><h3>' + Data.items[recipe.product].name + " ×" + recipe.qty + "</h3><p>" +
             itemQuantities(recipe.inputs) + " · " + recipe.minutes + " in-game min</p>" +

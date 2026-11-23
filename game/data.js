@@ -42,6 +42,21 @@ const Data = (() => {
     potato: {name:"Potato", group:"Food", weight:.26, perish:4, icon:"food", detail:"Cook it at a campfire"},
     stew: {name:"Bowl of potato stew", group:"Food", weight:.45, use:"food", nutrition:40, hydration:14, perish:.8, icon:"food"},
     dried: {name:"Dried radishes", group:"Food", weight:.18, use:"food", nutrition:25, icon:"food", detail:"Keeps without refrigeration"},
+    oats: {name:"Rolled oats",group:"Food",weight:.17,icon:"food",detail:"Cook at a campfire"},
+    flour: {name:"Plain flour",group:"Food",weight:.22,icon:"food",detail:"Cook at a campfire"},
+    cannedbeans: {name:"Canned beans",group:"Food",weight:.29,use:"food",nutrition:24,icon:"food"},
+    lentils: {name:"Dried lentils",group:"Food",weight:.18,icon:"food",detail:"Cook at a campfire"},
+    herbs: {name:"Dried herbs",group:"Food",weight:.03,icon:"food",detail:"Season fish or soup"},
+    honey: {name:"Honey",group:"Food",weight:.12,use:"food",nutrition:12,icon:"food"},
+    oatporridge: {name:"Apple oat porridge",group:"Food",weight:.35,use:"food",nutrition:36,hydration:10,perish:.8,icon:"food"},
+    flatbread: {name:"Campfire flatbread",group:"Food",weight:.18,use:"food",nutrition:28,perish:2.5,icon:"food"},
+    lentilstew: {name:"Lentil and radish stew",group:"Food",weight:.33,use:"food",nutrition:33,hydration:10,perish:.9,icon:"food"},
+    beanstew: {name:"Bean and potato soup",group:"Food",weight:.38,use:"food",nutrition:35,hydration:13,perish:.8,icon:"food"},
+    herbfish: {name:"Herb-roasted fish",group:"Food",weight:.36,use:"food",nutrition:36,perish:.8,icon:"food"},
+    berrycompote: {name:"Honey berry compote",group:"Food",weight:.21,use:"food",nutrition:29,hydration:5,perish:2,icon:"food"},
+    driedapple: {name:"Dried apple rings",group:"Food",weight:.12,use:"food",nutrition:28,perish:8,icon:"food"},
+    cappotatoes: {name:"Pantrycap and potato skillet",group:"Food",weight:.35,use:"food",nutrition:42,perish:.8,icon:"food"},
+    fishchowder: {name:"Fish and potato chowder",group:"Food",weight:.39,use:"food",nutrition:39,hydration:11,perish:.8,icon:"food"},
     water: {name:"Bottled water", group:"Food", weight:.5, use:"water", icon:"water"},
     emptybottle: {name:"Empty bottle", group:"Equipment", weight:.05, icon:"water", detail:"Refill it at a tap or freshwater source"},
     rainwater: {name:"Untreated water", group:"Materials", weight:.5, icon:"water", detail:"Boil it at a campfire"},
@@ -324,11 +339,20 @@ const Data = (() => {
   const fireRecipes = {
     water:waterBatch,
     caps:{name:"Roast Pantrycaps",inputs:{pantrycap:2,wood:1},product:"mushroommeal",qty:1,minutes:16,identify:true},
-    stew:{name:"Cook potato stew", inputs:{potato:2,water:1,wood:1}, product:"stew", qty:2, minutes:28},
-    dry:{name:"Dry radishes", inputs:{radish:2,wood:1}, product:"dried", qty:1, minutes:20},
-    fish:{name:"Grill fish", inputs:{rawfish:1,wood:1}, product:"grilledfish", qty:1, minutes:18}
+    stew:{name:"Cook potato stew", inputs:{potato:2,water:1,wood:1}, product:"stew", qty:2, minutes:28, garden:true},
+    dry:{name:"Dry radishes", inputs:{radish:2,wood:1}, product:"dried", qty:1, minutes:20, garden:true},
+    fish:{name:"Grill fish", inputs:{rawfish:1,wood:1}, product:"grilledfish", qty:1, minutes:18},
+    porridge:{name:"Cook apple oat porridge",inputs:{oats:1,apple:1,water:1,wood:1},product:"oatporridge",qty:1,minutes:14},
+    bread:{name:"Cook flatbread",inputs:{flour:1,water:1,wood:1},product:"flatbread",qty:2,minutes:18},
+    lentils:{name:"Cook lentil and radish stew",inputs:{lentils:1,radish:2,water:1,wood:1},product:"lentilstew",qty:2,minutes:26,garden:true},
+    beans:{name:"Cook bean and potato soup",inputs:{cannedbeans:1,potato:2,water:1,herbs:1,wood:1},product:"beanstew",qty:2,minutes:28,garden:true},
+    herbfish:{name:"Roast fish with herbs",inputs:{rawfish:1,herbs:1,wood:1},product:"herbfish",qty:1,minutes:20},
+    compote:{name:"Cook honey berry compote",inputs:{berries:1,strawberry:1,honey:1,wood:1},product:"berrycompote",qty:1,minutes:14,garden:true},
+    apples:{name:"Dry apple rings",inputs:{apple:2,wood:1},product:"driedapple",qty:1,minutes:20},
+    skillet:{name:"Cook Pantrycap and potato skillet",inputs:{pantrycap:1,potato:1,herbs:1,wood:1},product:"cappotatoes",qty:1,minutes:21,identify:true,garden:true},
+    chowder:{name:"Cook fish and potato chowder",inputs:{rawfish:1,potato:1,water:1,wood:1},product:"fishchowder",qty:2,minutes:27,garden:true}
   };
-  const wildResources = {berries:{qty:2,recovery:720},apple:{qty:2,recovery:1440},bait:{qty:2,recovery:180}};
+  const wildResources = {berries:{qty:3,recovery:720},apple:{qty:3,recovery:1440},bait:{qty:2,recovery:180}};
   const fishingMinutes = 24;
   const fishingStock = {capacity:3,recovery:960};
   const garden = {water:72, minMoisture:18, rainRate:1.12, emptyDryRate:.25, dutyInterval:15, shelterRange:6, collectorRange:4};

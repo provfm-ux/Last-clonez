@@ -236,6 +236,32 @@ const Sim = (() => {
     for (const [id,qty] of Object.entries({flint:6,rubble:6,mortar:3})) add(stash.loot,id,qty);
   }
 
+  const pantryStock = {
+    coldvale:[
+      ["base",{oats:2,flour:2,cannedbeans:2,herbs:1}],
+      ["market",{oats:4,flour:4,cannedbeans:4,lentils:4,herbs:3,honey:3}]
+    ],
+    fields:[["Orchard farmhouse",{oats:3,flour:3,lentils:3,honey:3}]],
+    coast:[["Net shed",{cannedbeans:3,lentils:2,herbs:4}]],
+    southbank:[["Night Bakery",{oats:4,flour:5,honey:3}],["Union Kitchen",{cannedbeans:3,lentils:4,herbs:3}]],
+    farfields:[["Common Kitchen",{oats:3,flour:4,cannedbeans:3,lentils:4,herbs:3,honey:3}]]
+  };
+
+  function stockPantry(world, rules) {
+    for (const [landmark,stock] of pantryStock[world.region] ?? []) {
+      const building = landmark === "base" ? world.base :
+        world.buildings.find(b => b.name === landmark || b.type === landmark);
+      if (!building) continue;
+      const containers = world.objects.filter(o => o.building === building.id && o.action === "loot" &&
+        o.active && o.kind !== "car" && (landmark !== "base" || o.kind === "crate" && o.storage));
+      if (!containers.length) continue;
+      for (const [index,[id,qty]] of Object.entries(stock).entries()) {
+        const count = Math.max(1,Math.round(qty * rules.loot / 100));
+        add(containers[index % containers.length].loot,id,count);
+      }
+    }
+  }
+
   function create(seed, difficulty = "survival", role = "carer", generator = 2, options, region = Regions.home, profile) {
     const rules = Data.worldRules(difficulty, options);
     const world = World.build(seed, difficulty, generator, rules, region);
@@ -286,6 +312,7 @@ const Sim = (() => {
     World.sync(world);
     FieldStories.place(world);
     stockStoneMaterials(world);
+    stockPantry(world,rules);
     const bag = [];
     for (const [id, qty] of [["bat", 1], ["bandage", 2], ["cloth", 2], ["food", 2], ["water", 2], ["jeans", 1], ["boots", 1]]) add(bag, id, qty);
     for (const [id,qty] of Object.entries(Data.roles[role]?.kit ?? {})) add(bag,id,qty);
@@ -1902,7 +1929,7 @@ const Sim = (() => {
       }
     } else {
       fire.cook = null;
-      if (id === "stew" || id === "dry") s.flags.gardenMeal = true;
+      if (batch.recipe.garden) s.flags.gardenMeal = true;
       notify(s, "Collected " + Data.items[product].name.toLowerCase() + ".");
     }
     return true;
@@ -3074,7 +3101,7 @@ const Sim = (() => {
     const supportedMap = data?.mapRevision === Regions.mapRevision ||
       region !== Regions.cavern && (data?.mapRevision === undefined || data.mapRevision === 2);
     return data && Object.hasOwn(Regions.definitions, region) && supportedMap &&
-      (data.fieldRevision === undefined || data.fieldRevision === 1 || data.fieldRevision === FieldStories.revision) &&
+      (data.fieldRevision === undefined || [1,2,FieldStories.revision].includes(data.fieldRevision)) &&
       (data.ledgerRevision === undefined || [1,2,3,4,Chronicle.revision].includes(data.ledgerRevision)) &&
       Array.isArray(data.objects) && data.objects.length <= 1000 &&
       Array.isArray(data.enemies) && data.enemies.length <= 200 && Array.isArray(data.explored) && data.explored.length === mapSize &&
@@ -3284,6 +3311,7 @@ const Sim = (() => {
     }
     if (data.booksStocked !== undefined && typeof data.booksStocked !== "boolean") throw new Error("Invalid book stock.");
     if ((data.fieldRevision ?? 0) < 2) stockStoneMaterials(s.world);
+    if ((data.fieldRevision ?? 0) < 3) stockPantry(s.world,rules);
     s.world.booksStocked = data.booksStocked === true;
     stockSkillBooks(s.world);
     if (p.readBooks !== undefined && (!Array.isArray(p.readBooks) || p.readBooks.length > Object.keys(Data.skillBooks).length ||

@@ -1,6 +1,8 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Added nine campfire recipes and six pantry ingredients stocked across five regions.
+- Increased blackberry and apple yields and moved cookable batches to the top of the campfire list.
 - Added flint knapping at workbenches, with skill-based blade condition.
 - Added outdoor stone walls, skill-based strength, and material stores in the quarry and Highmoor.
 - Added seed-based field notes, linked survivor accounts, and optional scavenging rewards.

@@ -1,6 +1,8 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Spread existing infected across quiet landmarks and added small roadside supply caches on new maps.
+- Renamed the Field Ledger to Logbook and added saved daily summaries of combat and survival activities.
 - Added nine campfire recipes and six pantry ingredients stocked across five regions.
 - Increased blackberry and apple yields and moved cookable batches to the top of the campfire list.
 - Added flint knapping at workbenches, with skill-based blade condition.

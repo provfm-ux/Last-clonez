@@ -18,4 +18,6 @@ Read field notes when you find them and revisit them in **Journal → Field note
 
 At a campfire, recipes you have ingredients for appear first. Check the shelter crate and grocery store for oats, flour and beans. Look for dried ingredients at the orchard farmhouse, Net shed and district kitchens. Harvest fruit outdoors for porridge, compote and dried apple rings.
 
+Open **Journal → Logbook** to revisit linked outbreak evidence. **Daily summary** keeps a running tally and files the completed day at midnight, including infected defeated, hits taken, loot, crafting, meals and travel.
+
 **Pause → Save and exit** returns to the title screen. Use **Continue** to resume. Export a save from the journal to keep a separate copy.

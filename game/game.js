@@ -740,13 +740,14 @@
     const choices = active() && !car ? nearbyObjects() : [];
     const o = choices[0], talk = !car && canTalk();
     const bat = guidedBat(choices);
+    const track = active() && !o && !talk && Sim.nearbyTrack(state);
     const exit = active() && car && nearbyExit();
     const multiple = choices.length + Number(talk) > 1 && !taskTarget(o);
-    const context = car ? (exit ? "Cross" : "Exit") : multiple ? "Nearby" : o ? interactionLabel(o) : talk ? "Talk" : "Use";
+    const context = car ? (exit ? "Cross" : "Exit") : multiple ? "Nearby" : o ? interactionLabel(o) : talk ? "Talk" : track ? "Tracks" : "Use";
     $("context-label").textContent = bat ? "Take bat" : context;
-    $("touch-use-label").textContent = bat ? "Take bat" : car ? context : "Use";
+    $("touch-use-label").textContent = bat ? "Take bat" : car || track ? context : "Use";
     $("touch-use-icon").setAttribute("href", !bat && (exit || o?.action === "travel") ? "#map" : car ? "#exit" : "#search");
-    $("touch-use").classList.toggle("ready", Boolean(car || talk || o));
+    $("touch-use").classList.toggle("ready", Boolean(car || talk || o || track));
     setHtml("objectives", objectiveHtml());
     $("quest-count").textContent = objectives().filter(o => o.done).length + " / 4";
     setHtml("radio-log", state.messages.filter(m => m?.lang === "en" && typeof m.text === "string").slice(-3).reverse().map(m => '<p' + (m.danger ? ' class="danger"' : "") + "><time>" + time(m.time) + "</time><span>" + esc(m.text) + "</span></p>").join(""));
@@ -1239,6 +1240,7 @@
     show("Survival journal", '<div class="item-actions story-nav">' +
       button("Logbook", "field-ledger", false, "primary") +
       button("Daily summary", "daily-summary") +
+      (Sim.nearbyTrack(state) ? button("Inspect tracks","inspect-tracks") : "") +
       button("Outbreak log · " + knownStory().length + "/" + Object.keys(Data.story).length, "outbreak-log", false, "primary") +
       (state.flags.radio ? button("Supply run" + (state.supplyRun === "complete" ? " ✓" : ""), "supply-run") : "") +
       button("Garden & kitchen" + (state.flags.gardenMeal ? " ✓" : ""), "garden-project") +
@@ -1834,6 +1836,7 @@
     else if (!talk && choices.length > 1 && choices.every(choice => choice.action === "loot" && choice.kind !== "car")) bag("nearby");
     else if (choices.length) interactions(choices, talk);
     else if (talk) npcPanel();
+    else if (Sim.inspectTrack(state)) { save(); updateHud(); }
     else bag("nearby");
   }
 
@@ -2009,6 +2012,7 @@
     else if (action === "field-ledger") fieldLedger();
     else if (action === "daily-summary") dailySummary();
     else if (action === "journal") diary();
+    else if (action === "inspect-tracks" && Sim.inspectTrack(state)) close();
     else if (action === "ledgerreport") ledgerReport();
     else if (action.startsWith("ledgerread-")) ledgerEntry(action.slice(11));
     else if (action === "regional-map") map();

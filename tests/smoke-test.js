@@ -1461,6 +1461,39 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     !restored.world.objects.some(o=>o.id.startsWith("coverage-route-")));
 }
 
+{
+  const s = fresh("training");
+  const tile = s.world.tiles.find(t=>t.surface==="grass" && !t.building && t.x>5 && t.y>5 &&
+    t.x<s.world.width-9 && t.y<s.world.height-2 &&
+    [0,1,2,3,4,5,6,7].every(dx=>World.clear(s.world,t.x+.5+dx,t.y+.5)));
+  const point = {x:tile.x+.5,y:tile.y+.5};
+  Object.assign(s.player,point);
+  const z = World.infected(s.world,"test-tracks",point.x+5,point.y,"walkers",context.Level.seeded(23));
+  z.path = [{x:point.x+7,y:point.y}];
+  z.alert = 4; z.replan = 5;
+  s.world.enemies.push(z);
+  Sim.tick(s,.1);
+  const track = s.world.tracks?.[0];
+  check("tracking: moving infected leaves a directional track on outdoor ground",
+    track?.kind==="walker" && track.direction===0);
+  s.world.enemies = [];
+  Object.assign(s.player,{x:track.x-2,y:track.y});
+  check("tracking: novices cannot inspect out of reach",!Sim.inspectTrack(s) && !s.player.skills.tracking);
+  s.player.skills.tracking = Data.skillXp(3);
+  const xp = s.player.skills.tracking;
+  check("tracking: skill extends reach and identifies age, direction and type once",
+    Sim.inspectTrack(s) && !Sim.inspectTrack(s) && s.player.skills.tracking===xp+4 &&
+    /Walker tracks.*Heading east/.test(s.notice.text));
+  const save = JSON.parse(JSON.stringify(Sim.snapshot(s))), loaded = Sim.restore(save);
+  check("tracking: examined evidence survives save and does not give repeat XP",
+    loaded.world.tracks[0].examined && !Sim.inspectTrack(loaded));
+  delete save.tracks;
+  check("tracking: older saves load with an empty trail",Sim.restore(save).world.tracks.length===0);
+  track.examined = false;
+  s.minutes += 51;
+  check("tracking: old footprints fade",!Sim.inspectTrack(s) && Sim.snapshot(s).tracks.length===0);
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

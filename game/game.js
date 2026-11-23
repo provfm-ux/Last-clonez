@@ -295,13 +295,23 @@
     const seed = enteredSeed ? Number(enteredSeed) : Math.floor(Math.random()*1000000000);
     const run = Sim.createControl(preset, role, startPoint, preset === "custom" ? customRules : undefined, {...profile,seed});
     run.difficultyOptions = Sim.difficultyOptions(run, savedAssists());
-    run.pinStory = true;
+    run.pinStory = preset !== "longhaul";
     run.waypoint = "";
     activate(run);
     rememberSetup();
     write(startChoiceKey, "advanced");
     save();
     cue(170, 86, .3, .07);
+  }
+
+  function startLongHaul() {
+    if (!$("continue-btn").hidden && !window.confirm("Start a new challenge? Your current run will move to the backup slot.")) return;
+    $("difficulty").value = "longhaul";
+    $("start-point").value = "shelter";
+    $("guide-enabled").checked = true;
+    write(guideKey, "1");
+    setNavigation("locations");
+    start();
   }
 
   function startRecommended() {
@@ -533,6 +543,7 @@
   }
 
   function objectives() {
+    if (state.longHaul) return Sim.longHaulGoals(state);
     const reserves = state.flags.supplies;
     return [
       {done: state.flags.barricade, text: "Protect the shelter", detail: "Barricade a door or window."},
@@ -617,8 +628,8 @@
     $("afterlife-tools").hidden = !afterlife;
     $("lesson").hidden = !lesson;
     const inRun = active() && !lesson;
-    const goal = inRun ? Sim.pinnedGoal(state) ?? "" : "";
-    const hint = inRun && $("guide-enabled").checked ? guideHints[state.guideStep] ?? "" : "";
+    const goal = inRun ? state.longHaul ? state.longHaul.days + "/30 days" + (state.longHaul.complete ? " · complete" : "") : Sim.pinnedGoal(state) ?? "" : "";
+    const hint = inRun && $("guide-enabled").checked ? state.longHaul ? Sim.longHaulHint(state) : guideHints[state.guideStep] ?? "" : "";
     $("onboarding").hidden = !goal && !hint;
     if ($("pinned-goal").textContent !== goal) $("pinned-goal").textContent = goal;
     if ($("guide-hint").textContent !== hint) $("guide-hint").textContent = hint;
@@ -1788,7 +1799,7 @@
     if (dialog.open) { close(); return; }
     show("Paused", "<p>The game is paused.</p>" + button("Resume", "resume", false, "primary") +
       '<div class="item-actions">' + button("Save", "save") + button("Export", "export") + button("Import", "import") + button("Save and exit", "menu") + button("Stuck? Free me", "unstick") + button(noiseRings ? "Noise rings: on" : "Noise rings: off", "noise-toggle") + button("Graphics: " + {dark: "Dark pixel", fast: "Fast", classic: "Classic"}[look], "gfx-toggle") + button(state.lookahead === false ? "Driving camera · fixed" : "Driving camera · look ahead", "lookahead") +
-      (state.guideStep === undefined || lesson ? "" : button("Beginner hints: " + ($("guide-enabled").checked ? "on" : "off"), "guide-toggle")) +
+      ((state.guideStep === undefined && !state.longHaul) || lesson ? "" : button("Guidance: " + ($("guide-enabled").checked ? "on" : "off"), "guide-toggle")) +
       button("Atmosphere: " + atmosphereLabels[visualAtmosphere()], "atmosphere-options") +
       (lesson ? "" : button("Difficulty and assists", "difficulty-options")) + "</div>", "pause");
   }
@@ -1945,8 +1956,12 @@
     else if (action === "edit-survivor") editSurvivor();
     else if (action === "gear-open") gear();
     else if (action === "watch-wait" && dialogView === "gear" && itemCount("watch")) {
-      show("Wait with wristwatch", "<p>Choose how many in-game minutes to wait. Nearby danger interrupts waiting.</p>" +
-        '<div class="item-actions">' + [15, 30, 60].map(minutes => button(minutes + " min", "wait-" + minutes)).join("") +
+      const sheltered = state.longHaul && World.tileAt(state.world,state.player.x,state.player.y)?.building === state.world.base?.id &&
+        Boolean(state.world.base);
+      const waits = sheltered ? [15,30,60,480] : [15,30,60];
+      show("Wait with wristwatch", "<p>Choose how long to wait. Nearby danger interrupts waiting." +
+        (sheltered ? " The eight-hour wait also stops if food or water runs low." : "") + "</p>" +
+        '<div class="item-actions">' + waits.map(minutes => button(minutes === 480 ? "8 hours" : minutes + " min", "wait-" + minutes)).join("") +
         button("Cancel", "gear-open") + "</div>", "watch-wait");
     }
     else if (action.startsWith("wait-") && dialogView === "watch-wait") {
@@ -2295,7 +2310,7 @@
 
   const handlers = {
     "opening-btn":opening, "intro-btn":startLesson, "lesson-exit":endLesson, "afterlife-exit":endAfterlife,
-    "start-btn": start, "recommended-btn": startRecommended, "continue-btn": resumeSaved, "rules-btn": () => worldRulesEditor(),
+    "start-btn": start, "recommended-btn": startRecommended, "longhaul-btn": startLongHaul, "continue-btn": resumeSaved, "rules-btn": () => worldRulesEditor(),
     "setup-assists": () => difficultyPanel(), "map-btn": () => map(), "journal-btn": diary, "diary-btn": diary,
     "help-btn": help, "pause-btn": pause, "search-btn": nearbyAction, "attack-btn": () => strike(),
     "shove-btn": shoveOrBrake, "pack-btn": bag, "gear-btn": gear, "craft-btn": crafting,
@@ -2490,7 +2505,7 @@
   startPoint.value = "shelter";
   startPoint.addEventListener("change", showStartDetail);
   const presets = $("difficulty");
-  const headline = ["relaxed","survival","harsh"];
+  const headline = ["longhaul","relaxed","survival","harsh"];
   const presetOption = id => '<option value="' + id + '">' + Data.modes[id].name + '</option>';
   presets.innerHTML = headline.map(presetOption).join("") + '<optgroup label="More modes">' +
     Object.keys(Data.modes).filter(id => !headline.includes(id)).map(presetOption).join("") +

@@ -195,6 +195,37 @@ const Sim = (() => {
     world.booksStocked = true;
   }
 
+  const shelterRoad = {x:29.5,y:40.5,name:"Shelter road"};
+  const longHaulCache = "longhaul-ridge-supplies";
+  const longHaulFields = ["cleared","supplied","returned","water","power","harvest","complete"];
+  const newLongHaul = () => ({days:0,...Object.fromEntries(longHaulFields.map(key => [key,false]))});
+
+  function stockLongHaul(world, seed) {
+    if (world.region === Regions.home) {
+      const crate = world.objects.find(o => o.storage && o.building === world.base.id);
+      for (const [item,count] of Object.entries({watch:1,wood:11,scrap:2,tape:1,nails:4,cloth:3,
+        food:7,water:4,seedpotato:2,axe:1,bandage:3})) add(crate.loot,item,count);
+      const rng = Level.seeded(seed ^ 0x38caf162);
+      for (const dx of [-1,0,1]) {
+        const x = shelterRoad.x+dx, y = shelterRoad.y;
+        if (World.clear(world,x,y) && !world.enemies.some(z => distance(z,{x,y}) < 1)) {
+          world.enemies.push(World.infected(world,"road-walker-"+dx,x,y,"walkers",rng,"resident"));
+        }
+      }
+    } else if (world.region === "ridge") {
+      const exit = world.objects.find(o => o.id === "exit-" + Regions.home);
+      const spot = world.tiles.filter(t => !t.building && !t.baseSolid)
+        .map(t => ({x:t.x+.5,y:t.y+.5})).filter(point => distance(exit,point) >= 3 && distance(exit,point) <= 7)
+        .sort((a,b) => distance(exit,a)-distance(exit,b))
+        .find(point => World.clear(world,point.x,point.y) && !world.objects.some(o => distance(o,point) < .7));
+      if (!spot) throw new Error("The guided supply cache has no clear site.");
+      const loot = [];
+      for (const [item,count] of Object.entries({fuel:4,food:7,wood:4,tape:1})) add(loot,item,count);
+      world.objects.push({id:longHaulCache,...spot,building:null,zone:World.tileAt(world,spot.x,spot.y).zone,
+        kind:"crate",name:"Ridge supply cache",action:"loot",active:true,solid:false,searched:false,loot});
+    }
+  }
+
   function create(seed, difficulty = "survival", role = "carer", generator = 2, options, region = Regions.home, profile) {
     const rules = Data.worldRules(difficulty, options);
     const world = World.build(seed, difficulty, generator, rules, region);
@@ -241,6 +272,7 @@ const Sim = (() => {
       world.objects.push({id:world.underground ? "grotto-spares" : "cave-gear", x,y,zone:World.tileAt(world,x,y).zone,building:null,
         kind:"crate",name:world.underground ? "Rope landing cache" : "Survey gear box",action:"loot",tint:.64,active:true,solid:false,storage:true,searched:false,loot});
     }
+    if (difficulty === "longhaul") stockLongHaul(world,seed);
     World.sync(world);
     const bag = [];
     for (const [id, qty] of [["bat", 1], ["bandage", 2], ["cloth", 2], ["food", 2], ["water", 2], ["jeans", 1], ["boots", 1]]) add(bag, id, qty);
@@ -261,6 +293,11 @@ const Sim = (() => {
         gardenSeeded: false, harvested: false, gardenMeal: false, gardenHelp: false}, nextEvent: 180, weather: "Overcast",
       exploredAt: 0, radioWave: false, zoom: 1, waypoint: town ? "market" : world.underground ? "exit-ridge" : "exit-" + (Regions.definitions[region].host ?? Regions.home), lookahead: true, roofsHidden: false
     };
+    if (difficulty === "longhaul") {
+      s.longHaul = newLongHaul();
+      s.waypoint = "";
+      s.atmosphere.nextWave = Math.max(s.atmosphere.nextWave,360);
+    }
     s.weather = localWeather(s);
     explore(s);
     if (town) {
@@ -486,6 +523,10 @@ const Sim = (() => {
     item.qty -= amount;
     if (!item.qty) object.loot.splice(index, 1);
     object.searched = true;
+    if (s.longHaul && object.id === longHaulCache && item.id === "fuel" && !s.longHaul.supplied) {
+      s.longHaul.supplied = true;
+      notify(s,"Supplies secured. Bring that fuel home. You’re giving this shelter a second chance.");
+    }
     recordPlaytest(s, "pickup");
     if (s.guideStep === 0 && item.id === "bat") s.guideStep = 1;
     if ((s.guideStep === 2 || s.guideStep === 3) &&
@@ -935,9 +976,80 @@ const Sim = (() => {
     if (car.hp <= 0) { exitVehicle(s, true); notify(s, "The vehicle was wrecked.", true); }
   }
 
+  const nearLongHaulShelter = (s,o) => s.world.region === Regions.home && distance(s.world.start,o) <= 12;
+
+  function longHaulGoals(s) {
+    const run = s.longHaul;
+    if (!run) return [];
+    return [
+      {done:run.cleared,text:"Clear the shelter road",detail:"Take the bat beside the shelter, equip it and clear the marked stretch of road."},
+      {done:run.supplied && run.returned,text:"Bring fuel back from Ridge",detail:"Cross to Ridge, take fuel from the marked cache, and return to Cold Vale."},
+      {done:run.water,text:"Collect off-grid drinking water",detail:"Build a rain collector and campfire near the shelter. After the cutoffs, collect two bottles of rainwater, boil them with a plank, and collect the batch."},
+      {done:run.power,text:"Run backup power",detail:"After both utilities fail, add fuel to the shelter generator and start it. Switch it off when you’re done to save fuel."},
+      {done:run.harvest,text:"Harvest off-grid food",detail:"Build a garden bed near the shelter, sow a seed and harvest after both cutoffs. Water the bed during dry spells."},
+      {done:run.days >= 30,text:"Survive 30 days",detail:run.days + " / 30 full days survived."}
+    ];
+  }
+
+  function longHaulHint(s) {
+    const run = s.longHaul;
+    if (!run) return "";
+    if (run.complete) return "Thirty days. You kept the lights, water and food going. Cold Vale is yours to explore.";
+    const p = s.player;
+    if (p.wounds.some(w => !w.bandaged)) return "Use a bandage from your inventory to stop the bleeding before moving on.";
+    if (p.hydration < 32) return "Take a water break. Use a carried bottle or check the shelter’s supplies.";
+    if (p.hunger < 32) return "Eat before the next job. Small steps keep you alive.";
+    if (!run.cleared && weapon(s).id === "fists") return "Start with the shelter crate and the bat outside. Equip the bat in Gear.";
+    if (!run.returned && s.world.region === "ridge") return run.supplied ? "You have the fuel. Follow the marked crossing home." : "Find the marked Ridge supply cache and take a can of fuel.";
+    if (run.returned && !nearLongHaulShelter(s,p)) return "Head back to the shelter. Check the road for new walkers along the way.";
+    if (run.returned && (gridPower(s) || mainsWater(s))) {
+      const nearby = s.world.objects.filter(o => o.active && nearLongHaulShelter(s,o));
+      if (!nearby.some(o => o.kind === "barrel")) return "Open Build and craft a rain collector outside the shelter.";
+      if (!nearby.some(o => o.kind === "campfire")) return "Build a campfire outside. You’ll use it to boil rainwater and cook.";
+      const beds = nearby.filter(o => o.kind === "garden");
+      if (!beds.length) return "Build a garden bed on clear grass near the shelter.";
+      if (!beds.some(o => o.garden.crop)) return "Interact with your garden bed and plant a seed potato.";
+      return "Your shelter is set up. Use the wristwatch indoors to wait for the cutoffs, or look for more supplies.";
+    }
+    if (run.water && run.power && run.harvest && run.days < 30) return "Your shelter is working off-grid. Keep food and water stocked, and use the wristwatch indoors to pass time safely.";
+    return longHaulGoals(s).find(goal => !goal.done)?.detail ?? "";
+  }
+
+  function updateLongHaul(s) {
+    const run = s.longHaul;
+    if (run.complete) return;
+    if (!run.cleared && s.world.region === Regions.home && distance(s.player,shelterRoad) <= 4 &&
+        !s.world.enemies.some(z => z.hp > 0 && !z.dormant && distance(z,shelterRoad) <= 6)) {
+      run.cleared = true;
+      notify(s,"The shelter road is clear. That’s breathing room. Next up: the fuel cache in Ridge.");
+    }
+    if (!run.power && nearLongHaulShelter(s,s.player) && !gridPower(s) && !mainsWater(s) && shelterGenerator(s)?.running) {
+      run.power = true;
+      notify(s,"The shelter has backup power. One repair at a time, you’re making this place work.");
+    }
+    const days = Math.min(30,Math.floor((s.minutes - s.rules.startHour * 60) / 1440));
+    if (days > run.days) {
+      run.days = days;
+      const notes = {1:"One full day down. Stay steady.",7:"A week alive. Your routines are paying off.",
+        14:"Two weeks. A little preparation goes a long way.",21:"Three weeks. Keep the shelter stocked for the final stretch."};
+      if (notes[days]) notify(s,notes[days]);
+    }
+    if (run.days === 30 && longHaulFields.every(key => key === "complete" || run[key])) {
+      run.complete = true;
+      notify(s,"30 days survived. You turned a temporary shelter into a home.");
+    }
+  }
+
   function destination(s) {
     if (s.hideNavigation) return null;
     const goal = s.world.region === Regions.home && pinnedGoal(s);
+    const run = s.longHaul;
+    if (run && !s.waypoint && !run.complete) {
+      if (s.world.region === Regions.home && !run.cleared) return shelterRoad;
+      if (s.world.region === Regions.home && !run.returned) return s.world.objects.find(o => o.id === "exit-ridge");
+      if (s.world.region === "ridge") return s.world.objects.find(o => o.id === (run.supplied ? "exit-" + Regions.home : longHaulCache));
+      if (s.world.region === Regions.home) return {...s.world.start,name:"Shelter"};
+    }
     const id = s.waypoint || (goal ? (s.flags.rescued || s.world.npc.mode === "dead" ? "base" : "clinic") : "");
     if (!id) return null;
     if (id.startsWith("pin")) return s.mapPins.find(pin => pin.id === id) || null;
@@ -1020,7 +1132,12 @@ const Sim = (() => {
       const run = snapshotRun(s);
       const player = {...run.player,...arrival,headingX:Math.sign(arrival.x-entry.x),headingY:Math.sign(arrival.y-entry.y)};
       const next = restore({...target,...run,region:to,regionStates,player}, {template,arrival,following});
-      if (target.leftAt < next.minutes) catchUpArea(next, target.leftAt);
+      const supplyReturn = to === Regions.home && next.longHaul?.cleared && next.longHaul.supplied && !next.longHaul.returned;
+      if (target.leftAt < next.minutes || supplyReturn) catchUpArea(next, target.leftAt);
+      if (supplyReturn) {
+        next.longHaul.returned = true;
+        notify(next,"You made it back. Check the road before carrying supplies through town.");
+      }
       explore(next);
       notify(next, "Entered " + Regions.definitions[to].name + ". " + (to === Regions.home ? "The other routes are on your map." : Regions.definitions[to].detail));
       settleDispatch(next, true);
@@ -1227,7 +1344,7 @@ const Sim = (() => {
         entered++;
       }
       a.pending = null;
-      a.nextWave = a.time + (entered ? Atmosphere.nextWave(mode,rng) / pressure(s) : 8);
+      a.nextWave = a.time + (entered ? Atmosphere.nextWave(mode,rng) * (s.longHaul ? 2.5 : 1) / pressure(s) : 8);
       if (entered) notify(s,"A group entered from " + route.name + ".",true);
       else notify(s,"The shuffling drifts along the boundary.");
     } else {
@@ -1247,7 +1364,9 @@ const Sim = (() => {
   }
 
   function waitWithWatch(s, duration) {
-    if (![15, 30, 60].includes(duration) || s.mode !== "play" || !quantity(s.player.bag, "watch")) return false;
+    const overnight = duration === 480 && s.longHaul && nearLongHaulShelter(s,s.player) &&
+      World.tileAt(s.world,s.player.x,s.player.y)?.building === s.world.base?.id;
+    if ((!overnight && ![15, 30, 60].includes(duration)) || s.mode !== "play" || !quantity(s.player.bag, "watch")) return false;
     const p = s.player;
     if (p.vehicle || p.sleeping || p.grabbed > 0 || threats(s).length) {
       notify(s, "Find a safe place on foot before waiting.", true);
@@ -1261,7 +1380,7 @@ const Sim = (() => {
     s.dash = false;
     while (s.mode === "play" && end - s.minutes > .000001) {
       tick(s, Math.min(.25, (end - s.minutes) / s.rules.clock));
-      if (p.hp < hp || threats(s).length) break;
+      if (p.hp < hp || threats(s).length || overnight && Math.min(p.hunger,p.hydration) < 25) break;
     }
     if (s.mode === "play") notify(s, end - s.minutes > .001 ? "Waiting interrupted." : "You waited " + duration + " minutes.");
     return true;
@@ -1737,6 +1856,10 @@ const Sim = (() => {
       fire.boilUntil = null;
       notify(s, s.flags.water ? "Collected drinking water." : "Shelter water project complete. You collected your first batch of drinking water.");
       s.flags.water = true;
+      if (s.longHaul && !s.longHaul.water && nearLongHaulShelter(s,fire) && !mainsWater(s) && !gridPower(s)) {
+        s.longHaul.water = true;
+        notify(s,"Clean water after the cutoffs. That’s one less thing the town can take from you.");
+      }
     } else {
       fire.cook = null;
       if (id === "stew" || id === "dry") s.flags.gardenMeal = true;
@@ -1835,6 +1958,10 @@ const Sim = (() => {
     bed.garden.growth = 0;
     addXp(s, "gardening", 6);
     s.flags.harvested = true;
+    if (s.longHaul && !s.longHaul.harvest && nearLongHaulShelter(s,bed) && !mainsWater(s) && !gridPower(s)) {
+      s.longHaul.harvest = true;
+      notify(s,"Food grown at home after the cutoffs. Save the seed and keep the garden going.");
+    }
     return true;
   }
 
@@ -1862,6 +1989,23 @@ const Sim = (() => {
   }
 
   function catchUpArea(s, leftAt) {
+    if (s.longHaul?.cleared && s.world.region === Regions.home && s.rules.hordes !== "off") {
+      const elapsed = s.minutes - leftAt;
+      const firstSupplyReturn = s.longHaul.supplied && !s.longHaul.returned;
+      if (firstSupplyReturn || elapsed >= 30) {
+        const count = Math.min(3,Math.max(1,Math.floor(elapsed/30)),encounterSlots(s));
+        const rng = Level.seeded((s.seed ^ Math.floor(leftAt) ^ 0x4e21371a) >>> 0);
+        const entries = [shelterRoad,{x:29.5,y:45.5},{x:29.5,y:35.5}];
+        let arrived = 0;
+        for (const point of entries) {
+          if (arrived >= count) break;
+          if (!freeEncounterSpot(s,point,10)) continue;
+          newInfected(s,point,"horde",rng);
+          arrived++;
+        }
+        if (arrived) notify(s,"Tracks on the shelter road. New infected moved into Cold Vale while you were away.",true);
+      }
+    }
     updateUtilities(s, leftAt, s.minutes - leftAt, true);
     if (s.world.underground) { updateOutdoor(s,s.minutes - leftAt,false); return; }
     const {weather} = s.rules;
@@ -2592,6 +2736,7 @@ const Sim = (() => {
     updateUtilities(s, previousMinutes, minutes);
     const raining = s.weather === "Rain";
     updateOutdoor(s, minutes, raining);
+    if (s.longHaul && s.player.hp > 0) updateLongHaul(s);
     const interval = Data.garden.dutyInterval;
     if (!raining && Math.floor(previousMinutes / interval) !== Math.floor(s.minutes / interval)) tendShelterGarden(s);
     for (const effect of s.effects) effect.life -= dt;
@@ -2791,6 +2936,7 @@ const Sim = (() => {
       region:s.world.region, regionStates:s.regionStates,
       elapsed: s.elapsed, minutes: s.minutes, mode: s.mode, quiet: s.quiet, kills: s.kills, serial: s.serial, controlStart: s.controlStart,
       guideStep:s.guideStep, firstSleep:s.firstSleep, pinStory:s.pinStory, playtest:s.playtest,
+      longHaul:s.longHaul ? {...s.longHaul} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
@@ -3047,6 +3193,14 @@ const Sim = (() => {
         data.shelterIdleSince > s.elapsed)) throw new Error("Invalid shelter idle time.");
     s.recoveryUsed = data.recoveryUsed;
     s.shelterIdleSince = crossing ? undefined : data.shelterIdleSince;
+    if (s.longHaul && data.longHaul !== undefined) {
+      const run = data.longHaul;
+      if (!run || !Number.isInteger(run.days) || run.days < 0 || run.days > 30 ||
+          longHaulFields.some(key => typeof run[key] !== "boolean") ||
+          run.returned && (!run.cleared || !run.supplied) || run.complete && (run.days !== 30 ||
+            longHaulFields.some(key => !run[key]))) throw new Error("Invalid 30-day challenge progress.");
+      s.longHaul = {days:run.days,...Object.fromEntries(longHaulFields.map(key => [key,run[key]]))};
+    }
     if (data.guideStep !== undefined) {
       if (!Number.isInteger(data.guideStep) || data.guideStep < 0 || data.guideStep > 6) throw new Error("Invalid beginner guide step.");
       s.guideStep = data.guideStep;
@@ -3100,7 +3254,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, createControl, createRecommended, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

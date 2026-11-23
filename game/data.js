@@ -115,6 +115,9 @@ const Data = (() => {
     weather:"cycle", infection:"bites", care:"gradual", exposure:"on", powerDays:3, waterDays:2, afterlifeChance:60};
   const modes = {
     survival:{...baseline, name:"Survival", desc:"The standard Cold Vale outbreak."},
+    longhaul:{name:"Easy · 30 Days", desc:"Hold the Cold Vale shelter for 30 days with guided objectives and slower needs.",
+      count:18, mix:"walkers", damage:45, loot:150, needs:25, clock:4, weather:"showers",
+      infection:"off", care:"quick", exposure:"off", powerDays:4, waterDays:3, afterlifeChance:0},
     relaxed:{name:"Relaxed", desc:"Fewer infected, more supplies and slower needs.", count:35, mix:"walkers", damage:60, needs:65, loot:140, powerDays:6, waterDays:5},
     harsh:{name:"Harsh", desc:"More infected, including runners, and fewer supplies.", count:95, mix:"runners", damage:130, needs:130, loot:80, powerDays:1, waterDays:1},
     training:{name:"Training", desc:"An empty town for practising controls, routes and building. Hunger and thirst never become fatal.", noStarve:true, count:0, hordes:"off", loot:170, needs:45, infection:"off", exposure:"off", powerDays:-1, waterDays:-1},
@@ -142,6 +145,7 @@ const Data = (() => {
     waterDays:{label:"Days before water cuts", min:-1, max:14, step:1}
   };
   const modeAdvice = {
+    longhaul:"Follow one suggestion at a time. The shelter has a starter kit.",
     relaxed:"For learning controls and exploring.",
     survival:"For a first full survival run.",
     harsh:"For players comfortable fleeing fast infected.",

@@ -999,6 +999,157 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     Sim.craft(run,"mend",damaged) && damaged.condition === 58 && p.skills.crafting === 28);
 }
 
+{
+  const assert = require("node:assert/strict");
+  let s = fresh("longhaul");
+  const home = {...s.world.start};
+  const move = (x, y) => Object.assign(s.player,{x,y});
+  const reach = o => {
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1],[0,0]]) {
+      move(o.x+dx,o.y+dy);
+      if (World.clear(s.world,s.player.x,s.player.y) && Sim.reachableObject(s,o)) return;
+    }
+    assert.fail("Could not reach " + o.id);
+  };
+  const reload = () => { s = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s)))); };
+  const object = id => s.world.objects.find(o => o.id === id);
+  const collect = (o,id,count) => {
+    reach(o);
+    for (let i=0; i<count; i++) assert.equal(Sim.collect(s,o,o.loot.findIndex(item => item.id === id)),1,id);
+  };
+  const use = id => Sim.use(s,s.player.bag.findIndex(item => item.id === id));
+  const build = recipe => {
+    assert.ok(Sim.craft(s,recipe),recipe);
+    for (const tile of s.world.tiles) {
+      const point = {x:tile.x+.5,y:tile.y+.5};
+      if (tile.surface !== "grass" || Sim.distance(home,point) > 11) continue;
+      for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        move(point.x+dx,point.y+dy);
+        if (World.clear(s.world,s.player.x,s.player.y) && Sim.place(s,point.x,point.y)) return s.world.objects.at(-1).id;
+      }
+    }
+    assert.fail("Could not place " + recipe);
+  };
+  const travel = region => {
+    const exit = object("exit-" + region);
+    reach(exit);
+    const next = Sim.travel(s,exit);
+    assert.ok(next,"Could not travel to " + region);
+    s = next;
+  };
+  const crate = s.world.objects.find(o => o.storage && o.building === s.world.base.id);
+  const bat = s.world.objects.find(o => o.loot?.some(item => item.id === "bat"));
+  collect(bat,"bat",1);
+  assert.ok(use("bat"));
+  collect(crate,"watch",1);
+  collect(crate,"wood",7);
+  collect(crate,"scrap",2);
+  collect(crate,"tape",1);
+  collect(crate,"nails",4);
+  collect(crate,"seedpotato",1);
+  const barrelId = build("rainbarrel"), fireId = build("campfire"), bedId = build("gardenbed");
+  collect(crate,"wood",4);
+  const road = Sim.destination(s);
+  const walkers = s.world.enemies.filter(z => z.hp > 0 && !z.dormant && Sim.distance(z,road) <= 6);
+  assert.ok(walkers.length);
+  for (const walker of walkers) {
+    move(walker.x,walker.y+.7);
+    for (let swing=0; walker.hp > 0 && swing < 8; swing++) {
+      s.player.cooldown = 0;
+      assert.ok(Sim.attack(s,walker),"Attack on shelter road");
+    }
+    assert.equal(walker.hp,0);
+  }
+  move(road.x,road.y);
+  Sim.tick(s,.25);
+  assert.ok(s.longHaul.cleared);
+  const oldIds = new Set(s.world.enemies.map(z => z.id));
+  travel("ridge");
+  const cache = object("longhaul-ridge-supplies");
+  collect(cache,"fuel",1);
+  collect(cache,"wood",4);
+  reload();
+  assert.ok(s.longHaul.cleared && s.longHaul.supplied && !s.longHaul.returned);
+  travel(ctxRegions.home);
+  assert.ok(s.longHaul.returned);
+  assert.ok(s.world.enemies.some(z => z.hp > 0 && !oldIds.has(z.id) && z.origin === "horde" && Sim.distance(z,road) <= 6));
+  assert.ok(Sim.gridPower(s) && Sim.mainsWater(s));
+  move(home.x,home.y);
+  const until = s.minutes + 480;
+  assert.ok(Sim.waitWithWatch(s,480));
+  assert.ok(s.minutes >= until-.001,"Sheltered wait advances eight hours");
+  const crateId = crate.id;
+  const entrance = s.world.objects.find(o => o.kind === "door" && o.building === s.world.base.id && o.open);
+  if (entrance) {
+    reach(entrance);
+    assert.ok(Sim.door(s,entrance));
+  }
+  let usedOffGridWater = false;
+  let reloadedMidRun = false;
+  for (let step=0; step<11500 && !s.longHaul.complete && s.mode === "play"; step++) {
+    for (const walker of Sim.threats(s).filter(z => Sim.inAttackRange(s,z))) Sim.attack(s,walker);
+    if (s.player.wounds.some(w => !w.bandaged)) assert.ok(use("bandage"));
+    if (s.player.hunger < 55) {
+      if (!Sim.quantity(s.player.bag,"food")) collect(object(crateId),"food",1);
+      assert.ok(use("food"));
+    }
+    if (s.player.hydration < 55) {
+      if (Sim.mainsWater(s)) {
+        const tap = object("shelter-tap");
+        reach(tap);
+        assert.ok(Sim.useTap(s,tap));
+      } else {
+        assert.ok(use("water"),"The shelter ran out of drinking water");
+        usedOffGridWater ||= s.longHaul.water;
+      }
+    }
+    if (!Sim.gridPower(s) && !Sim.mainsWater(s)) {
+      const gen = object("shelter-generator"), fire = object(fireId), barrel = object(barrelId), bed = object(bedId);
+      if (!s.longHaul.power) {
+        if (!gen.running) {
+          reach(gen);
+          assert.ok(Sim.useGenerator(s,gen,true) && Sim.useGenerator(s,gen));
+        }
+        Sim.tick(s,.25);
+        assert.ok(s.longHaul.power);
+        assert.ok(Sim.useGenerator(s,gen));
+      }
+      if (!bed.garden.crop && !s.longHaul.harvest) {
+        reach(bed);
+        assert.ok(Sim.sow(s,bed,"potato"));
+      }
+      if (bed.garden.crop && Sim.gardenYield(s,bed)) {
+        reach(bed);
+        assert.ok(Sim.harvestGarden(s,bed));
+      }
+      const batch = Sim.fireBatch(s,fire);
+      if (batch && !batch.remaining) {
+        reach(fire);
+        assert.ok(Sim.collectBoiledWater(s,fire));
+      } else if (!batch && Sim.quantity(s.player.bag,"water") < 2 && Sim.rainBottles(barrel) >= 2) {
+        reach(barrel);
+        assert.ok(Sim.contextual(s,barrel));
+        reach(fire);
+        assert.ok(Sim.startBoiling(s,fire));
+      }
+    }
+    move(home.x,home.y);
+    Sim.tick(s,1,idle);
+    if (s.longHaul.days >= 14 && !reloadedMidRun) {
+      reload();
+      reloadedMidRun = true;
+      assert.ok(s.longHaul.power && s.longHaul.water && s.longHaul.harvest && object(barrelId).active);
+    }
+  }
+  assert.equal(s.mode,"play",s.harm + " on day " + s.longHaul.days);
+  assert.ok(reloadedMidRun && usedOffGridWater);
+  assert.equal(s.longHaul.days,30);
+  assert.ok(s.longHaul.complete);
+  reload();
+  check("Easy 30 Days: clear, resupply, return to new walkers, sustain the off-grid shelter, survive and reload",
+    s.longHaul.complete && Sim.longHaulGoals(s).every(goal => goal.done));
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

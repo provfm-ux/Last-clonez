@@ -827,7 +827,7 @@ const Sim = (() => {
   }
 
   const patchMaterials = {scrap:2,tape:1};
-  const vehicleRepairAmount = s => Data.roles[s.role].vehicleRepair ?? 28;
+  const vehicleRepairAmount = s => (Data.roles[s.role].vehicleRepair ?? 28) + 2 * level(s, "mechanics");
 
   function vehicleRepairProblem(s, car) {
     if (car?.kind !== "car" || !onFootAt(s,car)) return "Stand beside the vehicle on foot.";
@@ -841,7 +841,9 @@ const Sim = (() => {
     const problem = vehicleRepairProblem(s,car);
     if (problem) { notify(s,problem,true); return false; }
     if (!consume(s,patchMaterials)) return false;
-    car.hp = Math.min(140,car.hp + vehicleRepairAmount(s));
+    const restored = Math.min(140 - car.hp, vehicleRepairAmount(s));
+    car.hp += restored;
+    addXp(s, "mechanics", restored / 4);
     noise(s,car.x,car.y,8);
     notify(s,"Vehicle patched. Condition " + Math.round(car.hp / 1.4) + "%.");
     return true;
@@ -1182,7 +1184,7 @@ const Sim = (() => {
     const center = Atmosphere.marker(x,y);
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
       const point = Atmosphere.marker(x+dx,y+dy);
-      if (World.drivable(World.tileAt(s.world,point.x,point.y)) && freeEncounterSpot(s,point,12)) spots.push(point);
+      if (World.clear(s.world,point.x,point.y) && !World.tileAt(s.world,point.x,point.y)?.building && freeEncounterSpot(s,point,12)) spots.push(point);
     }
     return spots.sort((a,b) => distance(a,center)-distance(b,center));
   }
@@ -1211,12 +1213,13 @@ const Sim = (() => {
     }
     if (a.time < (pending?.due ?? a.nextWave)) return;
     const room = encounterSlots(s,a.awake ? 0 : 6), rng = Level.seeded(a.rng);
-    const routes = Atmosphere.arrivals[s.world.region];
+    const routes = Atmosphere.arrivals[s.world.region] ?? [];
     if (pending) {
       const route = routes[pending.route], goal = Atmosphere.marker(...route.goal);
-      const slots = waveSpots(s,route).slice(0,Math.min(room,pending.size));
+      const slots = waveSpots(s,route);
       let entered = 0;
       for (const point of slots) {
+        if (entered >= Math.min(room,pending.size)) break;
         const path = World.route(s.world,point.x,point.y,goal.x,goal.y,1.45,true);
         if (!path.length) continue;
         const z = newInfected(s,point,"horde",rng), end = path.at(-1);
@@ -1228,7 +1231,7 @@ const Sim = (() => {
       if (entered) notify(s,"A group entered from " + route.name + ".",true);
       else notify(s,"The shuffling drifts along the boundary.");
     } else {
-      const options = routes.map((route,index) => ({route,index})).filter(({route}) => room >= 3 && waveSpots(s,route).length >= 3);
+      const options = routes.map((route,index) => ({route,index})).filter(({route}) => room > 0 && waveSpots(s,route).length > 0);
       const alternatives = options.filter(({index}) => index !== a.lastRoute);
       const choices = alternatives.length ? alternatives : options;
       const choice = choices[Math.floor(rng()*choices.length)];
@@ -1241,6 +1244,27 @@ const Sim = (() => {
       }
     }
     a.rng = rng.state();
+  }
+
+  function waitWithWatch(s, duration) {
+    if (![15, 30, 60].includes(duration) || s.mode !== "play" || !quantity(s.player.bag, "watch")) return false;
+    const p = s.player;
+    if (p.vehicle || p.sleeping || p.grabbed > 0 || threats(s).length) {
+      notify(s, "Find a safe place on foot before waiting.", true);
+      return false;
+    }
+    const end = s.minutes + duration, hp = p.hp;
+    endPursuit(s);
+    p.path = [];
+    p.resting = false;
+    s.interaction = null;
+    s.dash = false;
+    while (s.mode === "play" && end - s.minutes > .000001) {
+      tick(s, Math.min(.25, (end - s.minutes) / s.rules.clock));
+      if (p.hp < hp || threats(s).length) break;
+    }
+    if (s.mode === "play") notify(s, end - s.minutes > .001 ? "Waiting interrupted." : "You waited " + duration + " minutes.");
+    return true;
   }
 
   function armWatch(s) {
@@ -1568,11 +1592,17 @@ const Sim = (() => {
     return gen?.running && gen.fuel > 0 && generatorReaches(o, gen);
   };
 
+  const moonlight = s => {
+    const hour = s.minutes % 1440;
+    const day = Math.floor(s.minutes / 1440) - Number(hour < 390);
+    return [0, .25, .5, .75, 1, .75, .5, .25][((day % 8) + 8) % 8];
+  };
+
   function sight(s) {
     const p = s.player, inside = World.tileAt(s.world, p.x, p.y)?.building;
     const dark = isNight(s) && !(inside && hasPower(s, p));
-    const fires = s.world.underground ? s.world.objects.filter(o => o.active && o.kind === "campfire" && distance(p,o) <= 5) : null;
-    return {radius:s.world.underground ? 1.25 : dark ? 5.2 : 8.5, lamp:activeLight(s),fires};
+    const fires = (s.world.underground || dark) ? s.world.objects.filter(o => o.active && o.kind === "campfire" && distance(p,o) <= 5) : null;
+    return {radius:s.world.underground ? 1.25 : dark ? .65 + moonlight(s) * 4.55 : 8.5, lamp:activeLight(s),fires};
   }
 
   function canSee(s, x, y, optics = sight(s)) {
@@ -1884,8 +1914,21 @@ const Sim = (() => {
     }
   }
 
+  const isFurniture = o => Boolean(o && (o.action === "dismantle" ||
+    (!o.action && ["armchair", "bench", "chair", "rug", "sofa", "table"].includes(o.kind))));
+
+  function dismantleFurniture(s, o) {
+    if (!isFurniture(o) || !reachableObject(s, o) || s.player.vehicle) return false;
+    o.active = false;
+    World.sync(s.world);
+    s.world.objects.push({id: "built" + s.serial++, x: o.x, y: o.y, kind: "drop", active: true, solid: false,
+      name: "Dismantled furniture", action: "loot", searched: true, loot: [{id: "scrap", qty: 2}, {id: "wood", qty: 1}]});
+    noise(s, o.x, o.y, 5);
+    return true;
+  }
+
   function contextual(s, o) {
-    if (!reachableObject(s, o)) return false;
+    if (!reachableObject(s, o) || isFurniture(o)) return false;
     const p = s.player;
     if (p.vehicle) { notify(s, "Exit the vehicle to interact."); return false; }
     if (o.action === "door") return door(s, o);
@@ -1904,11 +1947,6 @@ const Sim = (() => {
       s.world.objects.push({id: "built" + s.serial++, x: o.x, y: o.y, kind: "drop", active: true, solid: false,
         name: "Chopped wood", action: "loot", searched: true, loot: [{id: "wood", qty: 4}]});
       noise(s, o.x, o.y, 9);
-    } else if (o.action === "dismantle") {
-      o.active = false; World.sync(s.world);
-      s.world.objects.push({id: "built" + s.serial++, x: o.x, y: o.y, kind: "drop", active: true, solid: false,
-        name: "Dismantled furniture", action: "loot", searched: true, loot: [{id: "scrap", qty: 2}, {id: "wood", qty: 1}]});
-      noise(s, o.x, o.y, 5);
     } else if (o.action === "radio") {
       if (s.flags.radio) {
         if (s.supplyRun === "return") {
@@ -1967,7 +2005,7 @@ const Sim = (() => {
 
   function aimChance(s, enemy = s.target) {
     const aim = enemy && enemy === s.target ? s.aim : 0;
-    return clamp(.5 + aim * .45 - s.player.panic * .0015 - s.player.fatigue * .001, .2, .98);
+    return clamp(.5 + aim * .45 + level(s, "marksmanship") * .015 - s.player.panic * .0015 - s.player.fatigue * .001, .2, .98);
   }
 
   function inAttackRange(s, enemy, range = weaponData(s).range) {
@@ -2074,7 +2112,8 @@ const Sim = (() => {
     }
     s.effects.push({x: z.x, y: z.y, text: hit ? (matchup < 1 ? "RESISTED " : matchup > 1 ? "STRONG " : "") + "−" + amount : "MISS", color: hit ? "#efc785" : "#d2cfb6", life: .8});
     addXp(s, "combat", hit ? 1.5 : .2);
-    if (!w.firearm) addXp(s, "strength", hit ? .8 : .1);
+    if (w.firearm) addXp(s, "marksmanship", hit ? 3 : 1);
+    else addXp(s, "strength", hit ? .8 : .1);
     if (!z.hp) {
       defeat(s, z);
       if (s.target === z) endPursuit(s);
@@ -3069,7 +3108,7 @@ const Sim = (() => {
     threats, notify, level, addXp, moodles, sleep, unstick, season, snapshot, restore, distance, lineOfSight,
     vehicle, enterVehicle, exitVehicle, refuel, repairVehicle, vehicleRepairProblem, vehicleRepairAmount, brake, canListen, listenAtDoor,
     destination, markDestination, markStation, exploredTile, saveMapPin, markPin, removePin,
-    travel, travelProblem, wildProblem, useWild, sceneProblem, resolveScene, dispatchProblem, sendDispatch, readDispatchReport, touchFungus, inspectCrib, armWatch,
+    travel, travelProblem, wildProblem, useWild, sceneProblem, resolveScene, dispatchProblem, sendDispatch, readDispatchReport, touchFungus, inspectCrib, armWatch, waitWithWatch, isFurniture, dismantleFurniture, moonlight,
     resumeEncounterWarning,
     minutesToRain, gridPower, mainsWater, hasPower, useTap, useGenerator, isNight, rainBottles, rainDraw, boilingMinutes, startBoiling, collectBoiledWater,
     fireBatch, startFireBatch, collectCookedFood, sow, waterGarden, gardenYield, harvestGarden, evaAtShelter, toggleGardenHelp};

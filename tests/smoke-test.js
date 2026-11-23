@@ -24,6 +24,115 @@ const idle = {x: 0, y: 0, run: false};
 const run = (s, ticks, input = idle) => { for (let i = 0; i < ticks && s.mode === "play"; i++) Sim.tick(s, .033, input); return s; };
 const fresh = mode => Sim.createControl(mode, "carer", "shelter");
 
+{
+  const profile = {name:"Rita",appearance:"female",skinTone:"deep",hairStyle:"wavy",hairColor:"auburn",jacketColor:"burgundy"};
+  const run = Sim.createControl("training","carer","shelter",undefined,profile);
+  const saved = JSON.parse(JSON.stringify(Sim.snapshot(run)));
+  const loaded = Sim.restore(saved);
+  check("personalização do sobrevivente persiste da criação ao carregamento",
+    Object.entries(profile).every(([field,value]) => loaded.player[field] === value));
+  for (const key of Object.keys(Data.survivorStyle)) delete saved.player[key];
+  saved.player.hairColor = "unknown";
+  const legacy = Sim.restore(saved);
+  const defaults = Data.character({appearance:"female"});
+  check("saves antigos e opções inválidas recebem a aparência predefinida",
+    Object.keys(Data.survivorStyle).every(key => legacy.player[key] === defaults[key]));
+}
+
+{
+  const s = fresh("training"), p = s.player;
+  const baseAim = Sim.aimChance(s), baseRepair = Sim.vehicleRepairAmount(s);
+  p.skills.marksmanship = Data.skillXp(2);
+  p.skills.mechanics = Data.skillXp(2);
+  check("novas perícias melhoram pontaria e reparações",
+    Sim.aimChance(s) > baseAim && Sim.vehicleRepairAmount(s) === baseRepair + 4);
+  const save = JSON.parse(JSON.stringify(Sim.snapshot(s)));
+  const reloaded = Sim.restore(JSON.parse(JSON.stringify(save)));
+  delete save.player.skills.marksmanship;
+  delete save.player.skills.mechanics;
+  const old = Sim.restore(save);
+  check("perícias novas persistem e começam a zero em saves anteriores",
+    Sim.level(reloaded,"marksmanship") === 2 && Sim.level(reloaded,"mechanics") === 2 &&
+    old.player.skills.marksmanship === 0 && old.player.skills.mechanics === 0);
+  const car = {id:"mechanics-car",kind:"car",x:p.x,y:p.y,hp:70,active:true};
+  s.world.objects.push(car);
+  p.bag.push({id:"scrap",qty:2},{id:"tape",qty:1});
+  const beforeRepair = p.skills.mechanics;
+  check("reparar carro atribui experiência de mecânica",
+    Sim.repairVehicle(s,car) && car.hp === 70 + baseRepair + 4 && p.skills.mechanics > beforeRepair);
+  p.bag.push({id:"pistol",uid:"test-pistol",condition:100,qty:1},{id:"ammo",qty:1});
+  Sim.use(s,p.bag.length - 2);
+  const enemy = World.infected(s.world,"test-target",p.x+.4,p.y,s.rules.mix,context.Level.seeded(11));
+  s.world.enemies.push(enemy);
+  const beforeShot = p.skills.marksmanship;
+  check("disparar contra um infetado atribui experiência de pontaria",
+    Sim.attack(s,enemy) && p.skills.marksmanship > beforeShot && Sim.quantity(p.bag,"ammo") === 0);
+}
+
+{
+  const s = fresh("training");
+  const p = s.player;
+  for (const z of s.world.enemies) z.hp = 0;
+  p.bag = p.bag.filter(item => item.id !== "watch");
+  const before = s.minutes;
+  check("esperar exige relógio", !Sim.waitWithWatch(s, 15) && s.minutes === before);
+  p.bag.push({id:"watch", qty:1, condition:100, born:0, cold:0});
+  check("relógio avança a simulação pelo tempo escolhido", Sim.waitWithWatch(s, 30) &&
+    Math.abs(s.minutes - before - 30) < .001 && !p.sleeping && Sim.quantity(p.bag,"watch") === 1);
+  const z = s.world.enemies[0];
+  if (z) {
+    Object.assign(z,{x:p.x,y:p.y,hp:10,dormant:false});
+    const start = s.minutes;
+    check("relógio não espera quando há perigo perto", !Sim.waitWithWatch(s, 15) && s.minutes === start);
+  }
+  const chair = {id:"test-chair", kind:"chair", name:"Chair", x:p.x, y:p.y, active:true, solid:false};
+  s.world.objects.push(chair);
+  check("mobiliário exige ação explícita para desmontar",
+    Sim.isFurniture(chair) && !Sim.contextual(s,chair) && chair.active);
+  check("desmontar mobiliário deixa materiais uma só vez",
+    Sim.dismantleFurniture(s,chair) && !chair.active && !Sim.dismantleFurniture(s,chair) &&
+    s.world.objects.at(-1).loot.some(item => item.id === "wood"));
+}
+{
+  const s = fresh("training");
+  const tile = s.world.tiles.find(t => !t.building && !t.solid &&
+    !World.tileAt(s.world,t.x+2,t.y)?.building && !World.tileAt(s.world,t.x+2,t.y)?.solid &&
+    World.sees(s.world,t.x+.5,t.y+.5,t.x+2.5,t.y+.5));
+  Object.assign(s.player,{x:tile.x+.5,y:tile.y+.5,lightUid:null});
+  const x = s.player.x+2, y = s.player.y;
+  s.minutes = 1260;
+  const moonless = Sim.moonlight(s) === 0 && !Sim.canSee(s,x,y);
+  s.minutes = 1440+180;
+  const afterMidnight = Sim.moonlight(s) === 0;
+  s.world.objects.push({id:"test-night-fire",kind:"campfire",x,y,active:true});
+  const lit = Sim.canSee(s,x,y);
+  s.world.objects.pop();
+  s.minutes = 4*1440+1260;
+  check("a lua altera visibilidade, mantém a fase após meia-noite e fogueiras iluminam",
+    moonless && afterMidnight && lit && Sim.moonlight(s) === 1 && Sim.canSee(s,x,y));
+}
+{
+  const s = fresh("survival");
+  s.guideStep = undefined;
+  const clearMap = () => { for (const z of s.world.enemies) z.hp = 0; };
+  clearMap();
+  s.atmosphere.nextWave = s.atmosphere.time;
+  Sim.tick(s,.03);
+  const first = s.atmosphere.pending?.route;
+  if (s.atmosphere.pending) s.atmosphere.pending.due = s.atmosphere.time;
+  Sim.tick(s,.03);
+  const entered = s.world.enemies.some(z => z.origin === "horde" && z.hp > 0);
+  clearMap();
+  s.atmosphere.nextWave = s.atmosphere.time;
+  Sim.tick(s,.03);
+  const second = s.atmosphere.pending?.route;
+  if (s.atmosphere.pending) s.atmosphere.pending.due = s.atmosphere.time;
+  Sim.tick(s,.03);
+  check("hordas reentram por outra rota após a eliminação dos infetados",
+    entered && first !== undefined && second !== undefined && second !== first &&
+    s.world.enemies.some(z => z.origin === "horde" && z.hp > 0));
+}
+
 for (const mode of Object.keys(Data.modes)) {
   const s = fresh(mode); let error = null; const walk = {x: 0, y: 0, run: false};
   try { for (let i = 0; i < 8000 && s.mode === "play"; i++) { if (i % 150 === 0) { walk.x = Math.round(random() * 2 - 1); walk.y = Math.round(random() * 2 - 1); } Sim.tick(s, .033, walk); } }

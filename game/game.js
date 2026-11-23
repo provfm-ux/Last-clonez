@@ -199,7 +199,8 @@
 
   function startLesson() {
     const previous = state;
-    const setup = ["difficulty","role","start-point","survivor-name","appearance","world-seed"].map(id => [id,$(id).value]);
+    const setup = ["difficulty","role","start-point","survivor-name","appearance","world-seed",
+      ...Object.keys(Data.survivorStyle).map(key => "setup-" + key)].map(id => [id,$(id).value]);
     activate(Sim.createControl("training","carer","shelter"));
     const {x,y} = state.player;
     const crate = state.world.objects.find(o => o.storage && o.building === state.world.base.id);
@@ -218,6 +219,7 @@
     lesson = null;
     titleScreen();
     for (const [id,value] of setup) $(id).value = value;
+    updateSurvivorPreview("setup");
     showStartDetail();
     View.prepare(state.world);
   }
@@ -287,7 +289,7 @@
   function start() {
     wakeSound();
     const preset = $("difficulty").value, role = $("role").value, startPoint = $("start-point").value;
-    const profile = Data.character({name:$("survivor-name").value,appearance:$("appearance").value});
+    const profile = survivorProfile("setup");
     const seedInput = $("world-seed"), enteredSeed = seedInput.value.trim();
     if (enteredSeed && !/^\d{1,9}$/.test(enteredSeed)) { seedInput.reportValidity(); return; }
     const seed = enteredSeed ? Number(enteredSeed) : Math.floor(Math.random()*1000000000);
@@ -306,8 +308,10 @@
     const skip = read(skipKey);
     wakeSound();
     setNavigation("locations");
-    activate(Sim.createRecommended(Math.floor(Math.random() * 1000000000), $("playtest-enabled").checked,
-      skip ? Number(skip) : null, savedAssists()));
+    const run = Sim.createRecommended(Math.floor(Math.random() * 1000000000), $("playtest-enabled").checked,
+      skip ? Number(skip) : null, savedAssists());
+    Object.assign(run.player,survivorProfile("setup"));
+    activate(run);
     write(skipKey, "");
     write(startChoiceKey, "recommended");
     $("advanced-start").open = false;
@@ -383,7 +387,7 @@
   }
 
   function rememberSetup() {
-    const profile = Data.character({name:$("survivor-name").value,appearance:$("appearance").value});
+    const profile = survivorProfile("setup");
     write(setupKey, JSON.stringify({preset:$("difficulty").value, role:$("role").value, start:$("start-point").value,
       seed:$("world-seed").value, profile, customBase, customRules}));
   }
@@ -489,8 +493,7 @@
     $("difficulty").value = state.difficulty;
     if (state.difficulty === "custom") customRules = state.rules;
     $("role").value = state.role;
-    $("survivor-name").value = state.player.name;
-    $("appearance").value = state.player.appearance;
+    setSetupSurvivor(state.player);
     showStartDetail();
     updateHud();
   }
@@ -576,13 +579,14 @@
       return o.action === "loot" && (o.loot.length || Sim.unreadClueAt(state, o)) ? 0 :
         o.action === "door" ? .2 : o.action === "harvest" ? 2 : .5;
     };
-    const choices = Sim.nearby(state).filter(o => o.action && (o.action !== "loot" || !o.searched || o.loot.length ||
+    const choices = Sim.nearby(state).filter(o => (o.action || Sim.isFurniture(o)) && (o.action !== "loot" || !o.searched || o.loot.length ||
       Sim.canStore(o) || Sim.unreadClueAt(state, o) || Sim.isSupplyCache(state, o)))
       .sort((a, b) => rank(a) - rank(b) || Sim.distance(state.player, a) - Sim.distance(state.player, b));
     return includeDecor || !choices.some(o => !o.decor) ? choices : choices.filter(o => !o.decor);
   }
 
   function interactionLabel(o) {
+    if (Sim.isFurniture(o)) return "Furniture";
     if (o.kind === "car") return "Vehicle";
     if (o.action === "loot") return "Loot";
     if (o.action === "door") return o.kind === "fence" ? "Fence" : o.boards ? "Barricade" :
@@ -963,7 +967,7 @@
     show("Inventory", '<div class="bag-controls"><div class="bag-header"><div class="bag-panes" aria-label="Inventory view">' +
       '<button type="button" id="bag-nearby" data-action="bag-nearby">Nearby</button><button type="button" id="bag-carried" data-action="bag-carried">Backpack</button>' +
       '<button type="button" data-action="equipment">Equipment</button>' +
-      '</div><b id="bag-weight"></b></div><input class="input-search" type="search" id="bag-search" placeholder="Search items" aria-label="Search items">' +
+      '</div><b id="bag-weight"></b></div><details class="bag-search-toggle"><summary>Search items</summary><input class="input-search" type="search" id="bag-search" placeholder="Item name" aria-label="Search items"></details>' +
       '<div class="tabs bag-filters" aria-label="Item category">' + categories.map(([id, label]) => '<button type="button" data-filter="' + id +
         '" aria-pressed="' + (id === bagTab) + '">' + label + "</button>").join("") +
       '</div></div><div id="bag-feedback" class="bag-feedback" role="status" hidden></div>' +
@@ -977,7 +981,12 @@
       (state.player.vehicle || !nearbyObjects().some(o => o.action !== "loot") && !canTalk() ? "" :
         '<div class="item-actions">' + button("Other nearby actions", "interactions") + "</div>"), "bag");
     updateInventoryLists();
-    $("bag-search").addEventListener("input", event => { bagFilter = event.target.value; updateInventoryLists(); });
+    const search = $("bag-search");
+    search.addEventListener("input", () => { bagFilter = search.value; updateInventoryLists(); });
+    search.parentElement.addEventListener("toggle", () => {
+      if (search.parentElement.open) search.focus();
+      else if (search.value) { search.value = bagFilter = ""; updateInventoryLists(); }
+    });
     $("loot-source").addEventListener("change", event => { bagSource = event.target.value; updateInventoryLists(); });
     $("store-source").addEventListener("change", event => { storeSource = event.target.value; updateInventoryLists(); });
   }
@@ -1066,8 +1075,9 @@
       '<dl class="equipment-slots">' + slots.map(([label,name]) => '<div><dt>' + label + '</dt><dd>' +
         esc(name || "Empty") + '</dd></div>').join("") + '</dl></div>' +
       '<div class="stats-summary"><span>LOAD · ' + formatWeight(Sim.weight(p.bag)) + " / " + Sim.capacity(state) + " kg</span></div>" +
-      '<div class="item-actions">' + button("Backpack", "equipment-backpack") + button("Edit survivor", "edit-survivor") + button("Customize quick belt", "belt-edit", false, "primary") +
-      (itemCount("watch") ? button("Place watch alarm · 10 s", "arm-watch", Boolean(p.vehicle || state.atmosphere.alarm)) : "") + "</div>" +
+      '<div class="item-actions">' + button("Backpack", "equipment-backpack") + button("Customize survivor", "edit-survivor") + button("Customize quick belt", "belt-edit", false, "primary") +
+      (itemCount("watch") ? button("Wait with wristwatch", "watch-wait", Boolean(p.vehicle)) +
+        button("Place watch alarm · 10 s", "arm-watch", Boolean(p.vehicle || state.atmosphere.alarm)) : "") + "</div>" +
       (lighting.length ? '<section class="inventory-section"><h3>LIGHTING</h3><div class="inventory-items">' + lighting.join("") + "</div></section>" : "") +
       '<section class="inventory-section"><h3>WEAPONS</h3><p class="item-meta">Blunt hits work well on walkers. Quick and long-reach weapons help against runners. Heavy hits can interrupt brutes.</p><div class="gear-list">' + (weapons.join("") || '<div class="empty">No weapons carried.</div>') +
       '</div></section><section class="inventory-section"><h3>WEARABLE GEAR</h3><div class="gear-list">' +
@@ -1078,13 +1088,50 @@
   const appearanceOptions = selected => Object.entries(Data.appearances).map(([id,label]) =>
     '<option value="' + id + '"' + (selected === id ? " selected" : "") + ">" + label + "</option>").join("");
 
+  function survivorFields(prefix, profile) {
+    return Object.entries(Data.survivorStyle).map(([key,field]) =>
+      '<label>' + field.label + '<select id="' + prefix + '-' + key + '">' +
+      Object.entries(field.options).map(([id,option]) =>
+        '<option value="' + id + '"' + (profile[key] === id ? " selected" : "") + '>' + option.label + '</option>'
+      ).join("") + '</select></label>'
+    ).join("");
+  }
+
+  function survivorProfile(prefix) {
+    const name = $(prefix === "setup" ? "survivor-name" : "profile-name").value;
+    const appearance = $(prefix === "setup" ? "appearance" : "profile-appearance").value;
+    const style = Object.fromEntries(Object.keys(Data.survivorStyle).map(key => [key,$(prefix + "-" + key).value]));
+    return Data.character({name,appearance,...style});
+  }
+
+  function updateSurvivorPreview(prefix) {
+    const preview = $(prefix + "-portrait");
+    const player = {...state.player, ...survivorProfile(prefix)};
+    // Show the chosen jacket in the editor even when protective gear covers it in play.
+    player.gear = {...player.gear,body:null};
+    View.equipmentPortrait(preview,{...state,player});
+  }
+
+  function setSetupSurvivor(profile) {
+    const player = Data.character(profile);
+    $("survivor-name").value = player.name;
+    $("appearance").value = player.appearance;
+    for (const key of Object.keys(Data.survivorStyle)) $("setup-" + key).value = player[key];
+    updateSurvivorPreview("setup");
+  }
+
   function editSurvivor() {
     if (!active()) return;
-    show("Edit survivor", '<form id="profile-form"><div class="rules-grid"><label>Name<input id="profile-name" maxlength="56" value="' +
+    show("Customize survivor", '<form id="profile-form"><div class="equipment-overview">' +
+      '<canvas id="profile-portrait" class="survivor-portrait" width="48" height="48" aria-label="Survivor appearance preview"></canvas>' +
+      '<div class="rules-grid"><label>Name<input id="profile-name" maxlength="56" value="' +
       esc(state.player.name) + '" autocomplete="off"></label><label>Appearance<select id="profile-appearance">' +
-      appearanceOptions(state.player.appearance) + '</select></label></div><div class="item-actions">' +
-      '<button type="submit" class="small-button primary">Save survivor</button>' + button("Back to Gear", "gear-open") +
+      appearanceOptions(state.player.appearance) + '</select></label>' +
+      survivorFields("profile",state.player) + '</div></div><div class="item-actions">' +
+      '<button type="submit" class="small-button primary">Save survivor</button>' + button("Cancel", "gear-open") +
       "</div></form>", "edit-survivor");
+    updateSurvivorPreview("profile");
+    $("profile-form").addEventListener("change",() => updateSurvivorPreview("profile"));
   }
 
   function crafting(ingredient = null) {
@@ -1555,6 +1602,11 @@
     if (Chronicle.isScene(o) || o.action === "ledger-desk") { ledgerPanel(o); return; }
     if (o.delivery && Sim.readDispatchReport(state,o)) { save(); ledgerReport(o); return; }
     const id = objectIndex(o);
+    if (Sim.isFurniture(o)) {
+      show(o.name, '<div class="item-actions">' + button("Dismantle…", "furnituremenu-" + id) +
+        button("Back", "interactions") + "</div>", "object-" + id);
+      return;
+    }
     if (o.kind === "car") {
       const repairProblem = Sim.vehicleRepairProblem(state,o);
       const condition = Math.round(Math.min(140 - o.hp,Sim.vehicleRepairAmount(state)) / 1.4);
@@ -1827,7 +1879,7 @@
     else if (event.target.id === "atmosphere-form") applyAtmosphere(event);
     else if (event.target.id === "profile-form" && dialogView === "edit-survivor" && active()) {
       event.preventDefault();
-      Object.assign(state.player,Data.character({name:$("profile-name").value,appearance:$("profile-appearance").value}));
+      Object.assign(state.player,survivorProfile("profile"));
       save();
       gear();
     }
@@ -1892,6 +1944,16 @@
     else if (action === "belt-edit") beltPanel();
     else if (action === "edit-survivor") editSurvivor();
     else if (action === "gear-open") gear();
+    else if (action === "watch-wait" && dialogView === "gear" && itemCount("watch")) {
+      show("Wait with wristwatch", "<p>Choose how many in-game minutes to wait. Nearby danger interrupts waiting.</p>" +
+        '<div class="item-actions">' + [15, 30, 60].map(minutes => button(minutes + " min", "wait-" + minutes)).join("") +
+        button("Cancel", "gear-open") + "</div>", "watch-wait");
+    }
+    else if (action.startsWith("wait-") && dialogView === "watch-wait") {
+      if (Sim.waitWithWatch(state, Number(action.slice(5)))) close();
+      else { gear(); if (state.notice) $("dialog-title").textContent = state.notice.text; }
+      updateHud();
+    }
     else if (action === "arm-watch" && dialogView === "gear") { if (Sim.armWatch(state)) close(); updateHud(); }
     else if (action === "pinhere" && active()) map({x:state.player.x, y:state.player.y});
     else if (action === "pincancel") map();
@@ -1955,6 +2017,19 @@
     } else {
       const [kind, first, second] = action.split("-");
       const index = Number(first), o = state.world.objects[index];
+      if (Sim.isFurniture(o) && Sim.reachableObject(state, o)) {
+        if (kind === "furnituremenu" && dialogView === "object-" + index) {
+          show("Dismantle " + o.name + "?", "<p>This removes the furniture and leaves two scrap and one plank.</p>" +
+            '<div class="item-actions">' + button("Dismantle", "furnitureconfirm-" + index, false, "danger") +
+            button("Cancel", "furniturecancel-" + index) + "</div>", "furniture-" + index);
+          body.querySelector('[data-action="furniturecancel-' + index + '"]')?.focus();
+          return;
+        }
+        if (dialogView === "furniture-" + index) {
+          if (kind === "furniturecancel") { objectPanel(o); return; }
+          if (kind === "furnitureconfirm" && Sim.dismantleFurniture(state, o)) { close(); updateHud(); return; }
+        }
+      }
       if (kind === "patchcar" && dialogView === "car-" + index && o?.kind === "car") {
         if (Sim.repairVehicle(state,o)) save();
         objectPanel(o,state.notice?.text);
@@ -2425,7 +2500,10 @@
   $("role").value = "carer";
   $("role").addEventListener("change",showStartDetail);
   $("appearance").innerHTML = appearanceOptions("male");
-  $("appearance").value = "male";
+  $("setup-style-fields").innerHTML = survivorFields("setup",Data.character());
+  $("setup-style-fields").addEventListener("change",() => updateSurvivorPreview("setup"));
+  $("appearance").addEventListener("change",() => updateSurvivorPreview("setup"));
+  setSetupSurvivor(Data.character());
   try {
     const setup = JSON.parse(read(setupKey));
     if (setup) {
@@ -2435,9 +2513,7 @@
       if (Object.hasOwn(Data.roles, setup.role)) $("role").value = setup.role;
       if (Object.hasOwn(Data.control.starts, setup.start)) startPoint.value = setup.start;
       if (typeof setup.seed === "string" && /^\d{1,9}$/.test(setup.seed)) $("world-seed").value = setup.seed;
-      const profile = Data.character(setup.profile);
-      $("survivor-name").value = profile.name;
-      $("appearance").value = profile.appearance;
+      setSetupSurvivor(setup.profile);
     }
   } catch { /* Ignore a damaged menu preference. */ }
   presets.addEventListener("change", () => {

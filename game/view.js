@@ -179,8 +179,34 @@ const View = (() => {
     } else if (t.surface === "asphalt") {
       if (h % 4 === 0) { const [a, b] = at(.2, .3), [c, d] = at(.5, .55), [e, f] = at(.8, .5); line([a, b], [c, d], "#141212c0", 1); line([c, d], [e, f], "#141212c0", 1); }
       for (let k = 0; k < 3; k++) { const q = ((h + k * 31) * 2654435761) >>> 0, [px, py] = at((q % 80) / 100 + .1, ((q >> 8) % 80) / 100 + .1); dot(px, py, 2, 2, k % 2 ? "#3a3a3a" : "#777168"); }
+      if (h % 11 === 0) {
+        const grate = [at(.54,.65),at(.74,.65),at(.74,.86),at(.54,.86)];
+        poly(grate, "#242830", "#73746b");
+        for (const r of [.69,.74,.79,.84]) line(at(.56,r),at(.72,r),"#77796f");
+      } else if (h % 7 === 0) {
+        const stain = [at(.25,.51),at(.48,.44),at(.67,.61),at(.54,.78),at(.31,.72)];
+        poly(stain, "#23262c61");
+        const [sx, sy] = at(.44,.58);
+        dot(sx,sy,3,1,"#9b9e8552");
+      }
+    } else if (t.surface === "path" || t.surface === "concrete") {
+      if (h % 3 === 0) {
+        line(at(.24,.16),at(.38,.37),"#353b33");
+        line(at(.38,.37),at(.32,.52),"#353b33");
+        const [sx, sy] = at(.33,.53);
+        dot(sx,sy-2,1,3,"#767f4f");
+        dot(sx+1,sy-1,2,1,"#94987a");
+      }
+      if (h % 5 === 0) {
+        line(at(.58,.27),at(.83,.27),"#c2b79859");
+        line(at(.58,.30),at(.81,.30),"#464a3e69");
+      }
     } else if (t.surface === "tile" || t.surface === "sand") {
       for (let k = 0; k < 4; k++) { const q = ((h + k * 733) * 2654435761) >>> 0, [px, py] = at((q % 80) / 100 + .1, ((q >> 8) % 80) / 100 + .1); dot(px, py, 2, 2, t.surface === "sand" ? "#c9b98c" : k % 2 ? "#2c2820" : "#5a5444"); }
+    }
+    if (t.surface === "tile" && t.room && h % 4 === 0) {
+      line(at(.21,.40),at(.71,.40),"#ab967458");
+      line(at(.26,.43),at(.63,.43),"#52463264");
     }
     if (t.nearHome && (t.surface === "tile" || t.surface === "path") && h % 29 === 0) {
       const [px, py] = at(.36, .57);
@@ -374,16 +400,15 @@ const View = (() => {
   const cream = ["#bfc1a9", "#8f927e", "#747c6d"];
 
   const gardenTrees = [];
-  function gardenTree(x, y, tintValue) {
+  function gardenTree(x, y, tintValue, wind, pine) {
     const variant = Number.isFinite(tintValue) ? clamp(Math.floor(tintValue * 4), 0, 3) : 0;
-    let sprite = gardenTrees[variant];
+    const key = variant + (pine ? 4 : 0);
+    let sprite = gardenTrees[key];
     if (!sprite) {
       sprite = document.createElement("canvas");
       sprite.width = 54; sprite.height = 61;
       const c = sprite.getContext("2d");
-      c.fillStyle = "#41382c"; c.fillRect(25, 29, 5, 31);
-      c.fillStyle = "#786653"; c.fillRect(25, 34, 2, 24);
-      const crown = [[16, 29, 12], [38, 30, 12], [27, 35, 14], [13, 20, 9],
+      const crown = pine ? [[27, 11, 7], [26, 20, 10], [29, 29, 13], [26, 36, 16]] : [[16, 29, 12], [38, 30, 12], [27, 35, 14], [13, 20, 9],
         [36, 16, 12], [23, 13, 12], [28, 22, 15]];
       const leaves = [["#344334", "#43533b", "#566649", "#687652"],
         ["#3e4834", "#50583d", "#656b48", "#7b7e55"],
@@ -394,21 +419,30 @@ const View = (() => {
           for (let px = cx - radius; px <= cx + radius; px += 2) {
             const noise = ((px * 73856093 ^ py * 19349663 ^ variant * 83492791) >>> 0) % 7;
             const dx = px - cx, dy = (py - cy) * 1.25;
+            if (pine && Math.abs(dx) > (py - cy + radius) * .75 + noise * .55) continue;
             if (dx * dx + dy * dy > (radius - noise * .65) ** 2) continue;
             const shade = clamp(Math.floor(1.3 - (dx + dy) / radius + noise * .22), 0, 3);
             c.fillStyle = leaves[shade]; c.fillRect(px, py, 2, 2);
+            if (noise === 2 && shade > 0) {
+              c.fillStyle = leaves[shade - 1]; c.fillRect(px + 1, py + 1, 1, 1);
+            }
           }
         }
       }
-      gardenTrees[variant] = sprite;
+      gardenTrees[key] = sprite;
     }
     const [sx, sy] = p(x, y);
     shadow(x, y, 24, 9, "#10171090");
-    ctx.drawImage(sprite, Math.round(sx) - 27, Math.round(sy) - 60);
+    const left = Math.round(sx) - 27, top = Math.round(sy) - 60;
+    ctx.fillStyle = "#41382c"; ctx.fillRect(left + 25, top + 29, 5, 31);
+    ctx.fillStyle = "#786653"; ctx.fillRect(left + 25, top + 34, 2, 24);
+    ctx.fillStyle = "#302c24"; ctx.fillRect(left + 28, top + 43, 1, 15);
+    ctx.fillStyle = "#8f795a"; ctx.fillRect(left + 26, top + 52, 1, 4);
+    ctx.drawImage(sprite, left + wind, top);
   }
 
   const furnitureSprites = new Map();
-  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug"]);
+  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug", "crate", "generator", "barrel", "radio", "bench", "chair", "cart"]);
 
   function paintFurniture(kind, variant, powered) {
     const oak = ["#947859", "#735943", "#514035"];
@@ -417,9 +451,155 @@ const View = (() => {
     const enamel = ["#c7c9b4", "#a3a796", "#777e76"];
     const metal = ["#b1b7aa", "#818c86", "#576965"];
     const edge = (a, b, color) => line(p(...a), p(...b), color);
-    if (kind !== "rug") shadow(0, 0, kind === "bed" || kind === "sofa" ? 28 : 23, 9, "#0d120f70");
+    const mark = (position, color, width = 1, height = 1) => {
+      const [x, y] = p(...position);
+      dot(x, y, width, height, color);
+    };
+    if (kind !== "rug" && kind !== "door" && kind !== "window") shadow(0, 0, kind === "bed" || kind === "sofa" ? 28 : 23, 9, "#0d120f70");
 
     switch (kind) {
+      case "door":
+      case "window": {
+        const horizontal = Boolean(variant & 1);
+        const open = Boolean(variant & 2);
+        const broken = Boolean(variant & 4);
+        const glass = kind === "window";
+        const slab = (along, depth, z, length, thickness, height, colors) =>
+          horizontal ? box(along, depth, z, length, thickness, height, colors) :
+            box(depth, along, z, thickness, length, height, colors);
+        const face = (along, z, depth = .084) => horizontal ? [along, depth, z] : [depth, along, z];
+        const hardware = glass ? metal : ["#b8a790", "#8b7b69", "#5d554a"];
+        if (broken) {
+          slab(-.47, -.07, 0, .94, .16, 3, hardware);
+          for (const offset of [-.35, -.06, .26]) {
+            slab(offset, -.045, 3, .09, .08, glass ? 2 : 4, glass ? enamel : oak);
+          }
+          break;
+        }
+        if (open) {
+          box(-.43, -.31, 0, .10, .65, 29, glass ? metal : oak);
+          edge([-.321, -.29, 25], [-.321, .31, 25], hardware[0]);
+          mark([-.32, .24, 13], "#d0ba88", 2, 1);
+          break;
+        }
+        slab(-.48, -.07, 0, .96, .14, 29, glass ? metal : oak);
+        slab(-.39, .069, 3, .78, .015, 22, glass ?
+          ["#80998c", "#516c68", "#415653"] : ["#8f7355", "#765b46", "#594537"]);
+        for (const z of glass ? [4, 14, 25] : [3, 13, 25]) edge(face(-.39, z), face(.39, z), hardware[0]);
+        for (const offset of glass ? [-.38, 0, .38] : [-.38, .38]) {
+          edge(face(offset, 4), face(offset, 25), "#baa98a");
+        }
+        if (glass) {
+          edge(face(-.30, 20), face(-.10, 23), "#a6c0b4");
+          edge(face(.08, 7), face(.25, 10), "#849e93");
+          mark(face(.10, 13), "#ccbf9f", 2, 1);
+        } else {
+          for (const offset of [-.28, -.12, .06, .24]) {
+            edge(face(offset, 5), face(offset, 11), "#5c4839");
+            edge(face(offset, 15), face(offset, 23), "#654e3e");
+          }
+          mark(face(.27, 14), "#c6af7b", 2, 2);
+          mark(face(-.35, 8), "#65574b", 2, 1);
+        }
+        break;
+      }
+      case "campfire": {
+        box(-.35, -.15, 0, .70, .30, 4, oak);
+        box(-.15, -.35, 3, .30, .70, 4, oak);
+        const [x, y] = p(0, 0, 7);
+        const tip = [0, 2, -2, 1][variant];
+        poly([[x-8,y],[x-6,y-8],[x-3,y-7],[x+tip,y-18],[x+4,y-10],[x+7,y-11],[x+8,y]], "#a75336");
+        poly([[x-5,y],[x-3,y-6],[x+tip,y-12],[x+4,y-5],[x+5,y]], "#e2a564");
+        ctx.fillStyle = "#f1cf87";
+        ctx.fillRect(x-2,y-4,4,3);
+        break;
+      }
+      case "barrel": {
+        const paint = ["#56746d", "#3f6059", "#304b46"];
+        box(-.29, -.29, 0, .58, .58, 4, paint);
+        box(-.31, -.31, 3, .62, .62, 2, metal);
+        box(-.29, -.29, 5, .58, .58, 11, paint);
+        box(-.31, -.31, 15, .62, .62, 2, metal);
+        box(-.29, -.29, 17, .58, .58, 6, paint);
+        box(-.32, -.32, 22, .64, .64, 2, metal);
+        box(-.26, -.26, 24, .52, .52, 1, powered ? ["#486963", "#344e48", "#2a403c"] : paint);
+        edge([-.13, .293, 6], [-.13, .293, 15], "#92a08a");
+        edge([.18, .293, 6], [.18, .293, 15], "#2c483e");
+        mark([-.23, .295, 14], "#b28c64", 2, 2);
+        mark([.12, .295, 7], "#8d6249", 3, 1);
+        mark([.11, -.13, 25], "#aeb29a", 2, 2);
+        if (powered) edge([-.2, .05, 25], [.09, .05, 25], "#9cae9d");
+        break;
+      }
+      case "radio":
+        box(-.35, -.27, 0, .70, .54, 19, oak);
+        box(-.26, -.20, 19, .52, .40, 11, iron);
+        edge([.14, -.16, 30], [.14, -.16, 43], "#a3a999");
+        mark([.14, -.16, 43], "#c4bda0", 1, 2);
+        box(-.22, .20, 21, .19, .03, 7, rubber);
+        for (const z of [22, 24, 26]) edge([-.20, .235, z], [-.06, .235, z], "#68726a");
+        mark([.04, .235, 26], powered ? "#c0d58f" : "#745945", 4, 2);
+        mark([.15, .235, 22], "#c1b298", 2, 2);
+        mark([-.12, .275, 16], "#9eaa9c", 2, 1);
+        break;
+      case "bench":
+      case "chair": {
+        const half = kind === "bench" ? .47 : .24;
+        for (const x of [-half + .03, half - .10]) {
+          box(x, -.22, 0, .07, .08, 23, metal);
+          box(x, .15, 0, .07, .08, 10, metal);
+        }
+        for (const y of [-.22, -.06, .10]) box(-half, y, 9, half * 2, .13, 2, oak);
+        for (const z of [15, 20]) {
+          box(-half, -.24, z, half * 2, .085, 3, oak);
+          edge([-half + .04,-.15,z+2],[half - .06,-.15,z+2],"#b59b73");
+          for (const x of [-half + .10, half - .11]) mark([x,-.149,z+1],"#485650");
+        }
+        break;
+      }
+      case "cart":
+        for (const x of [-.30,.22]) for (const y of [-.23,.16]) box(x,y,0,.10,.10,5,rubber);
+        box(-.37,-.28,4,.74,.56,3,metal);
+        box(-.34,-.25,7,.68,.50,8,variant === 2 ? red : iron);
+        box(-.31,-.22,15,.62,.44,1,["#3a4945","#35443d","#2f3e37"]);
+        edge([-.30,.25,12],[.30,.25,12],"#8d9b90");
+        for (const x of [-.24,-.08,.08,.24]) edge([x,.253,8],[x,.253,13],"#a5a68f");
+        box(-.36,-.27,10,.06,.06,9,metal);
+        box(-.36,.19,10,.06,.06,9,metal);
+        box(-.38,-.27,19,.10,.52,2,metal);
+        if (powered) box(-.21,.26,9,.42,.26,2,metal);
+        else mark([.02,.256,10],"#c3b391",3,1);
+        break;
+      case "crate":
+        box(-.35, -.31, 0, .70, .62, 17, oak);
+        for (const z of [4, 9, 14]) {
+          edge([-.35, .312, z], [.35, .312, z], "#493b30");
+          edge([.352, -.31, z], [.352, .31, z], "#493b30");
+        }
+        for (const x of [-.32, .24]) box(x, .31, 1, .075, .045, 16, metal);
+        edge([-.23, -.18, 17], [.23, -.18, 17], "#b89b74");
+        for (const x of [-.29, .27]) for (const z of [3, 13]) mark([x, .361, z], "#d1c09b");
+        for (const z of [6, 11, 15]) {
+          edge([-.19, .313, z], [.09, .313, z], "#a0835b");
+          mark([.16, .314, z - 1], "#574332", 2);
+        }
+        const stencil = ["#baad83", "#a6a18d", "#917050"][variant];
+        mark([-.12, .315, 11], stencil, 3, 2);
+        mark([-.03, .315, 10], stencil, 2);
+        break;
+      case "generator":
+        box(-.38, -.30, 0, .76, .60, 3, rubber);
+        box(-.31, -.25, 3, .62, .50, 13, red);
+        box(-.26, -.22, 16, .52, .44, 2, metal);
+        box(-.28, .25, 5, .34, .05, 9, iron);
+        for (const z of [6, 8, 10, 12]) edge([-.25, .305, z], [.02, .305, z], "#293533");
+        box(.10, .25, 9, .12, .05, 5, rubber);
+        box(.13, .305, 11, .06, .03, 2, powered ? ["#bfd391", "#95aa6a", "#7c8f55"] : metal);
+        edge([-.20, -.12, 18], [.14, -.12, 18], "#e0ceb1");
+        mark([.16, .09, 18], "#414a44", 3, 2);
+        mark([.312, .11, 11], "#bf9169", 2, 2);
+        for (const x of [-.25, .02]) mark([x, .307, 13], "#c5baa1");
+        break;
       case "bed": {
         for (const side of [-.32, .26]) for (const end of [-.43, .38]) box(side, end, 0, .07, .07, 9, oak);
         box(-.37, -.51, 7, .74, 1.02, 3, oak);
@@ -445,6 +625,10 @@ const View = (() => {
         const [px, py] = p(.24, .36, 28);
         dot(px, py, 2, 1, powered ? "#ceda91" : "#666f61");
         dot(px - 10, py + 7, 3, 2, "#a480697d");
+        mark([.14, .36, 17], "#b19069", 3, 2);
+        mark([.15, .36, 16], "#c9b38b", 2);
+        edge([-.31, .36, 7], [.29, .36, 7], "#818a7a");
+        mark([.22, .36, 8], "#927b65", 2);
         break;
       }
       case "sink":
@@ -548,13 +732,40 @@ const View = (() => {
     ctx.drawImage(sprite, Math.round(sx) - 36, Math.round(sy) - 49);
   }
 
-  function prop(o, state, clock) {
+  let smokeSprite;
+  function campfireSmoke(x, y, clock) {
+    if (!smokeSprite) {
+      smokeSprite = document.createElement("canvas");
+      smokeSprite.width = 16; smokeSprite.height = 12;
+      const smoke = smokeSprite.getContext("2d");
+      smoke.fillStyle = "#767771";
+      smoke.fillRect(2, 4, 12, 4); smoke.fillRect(5, 2, 7, 8);
+      smoke.fillStyle = "#a6a59a";
+      smoke.fillRect(4, 4, 7, 3);
+    }
+    const alpha = ctx.globalAlpha;
+    for (let i = 0; i < 3; i++) {
+      const age = (clock * .64 + i / 3) % 1;
+      const size = Math.round(9 + age * 11);
+      ctx.globalAlpha = alpha * .38 * Math.sin(age * Math.PI);
+      ctx.drawImage(smokeSprite, Math.round(x - 5 + age * 15), Math.round(y - 15 - age * 38), size, Math.round(size * .75));
+    }
+    ctx.globalAlpha = alpha;
+  }
+
+  function prop(o, state, clock, motion, smoke) {
     const {x, y, kind, tint: tone} = o;
     if (darkLook) {
       const furniture = kind === "locker" && !o.opened && World.tileAt(state.world, x, y)?.room === "Bedroom" ? "cupboard" : kind;
       if (furnitureKinds.has(furniture)) {
         const variant = Number.isFinite(tone) ? clamp(Math.floor(tone * 3), 0, 2) : 0;
-        drawFurniture(furniture, x, y, variant, kind === "fridge" && Sim.hasPower(state, o));
+        const powered = kind === "generator" ? Boolean(o.running) :
+          kind === "barrel" ? Sim.rainBottles(o) > 0 :
+          kind === "radio" ? Boolean(state.flags.radio) :
+          kind === "cart" ? Boolean(o.opened) :
+          kind === "fridge" && Sim.hasPower(state, o);
+        drawFurniture(furniture, x, y, variant, powered);
+        if (kind === "generator" && powered) glow(x, y, "#9dca77", 30, .35);
         return;
       }
     }
@@ -841,6 +1052,20 @@ const View = (() => {
     }
     if (kind === "door" || kind === "window") {
       const t = World.tileAt(state.world,x,y), horizontal=t.wallAxis==="x";
+      if (darkLook) {
+        const open = o.open && !o.boards, broken = o.broken && !o.boards;
+        const variant = Number(horizontal) | (open ? 2 : 0) | (broken ? 4 : 0);
+        drawFurniture(kind, x, y, variant, false);
+        for (let i = 0; i < (o.boards || 0); i++) {
+          const board = 7 + i * 7;
+          f(horizontal ? -.44 : -.13, horizontal ? -.13 : -.44, board,
+            horizontal ? .88 : .26, horizontal ? .26 : .88, 3, olive);
+        }
+        if (!open && !broken && (o.locked || o.latched)) {
+          f(horizontal ? .22 : .07, horizontal ? .07 : .24, 13, .08, .08, 3, olive);
+        }
+        return;
+      }
       if (o.broken && !o.boards) {
         f(horizontal ? -.47 : -.06, horizontal ? -.06 : -.47, 0, horizontal ? .94 : .12, horizontal ? .12 : .94, 4, iron);
         if (kind === "window") for (const offset of [-.31, -.06, .22]) {
@@ -909,7 +1134,11 @@ const View = (() => {
       return;
     }
     if(kind==="tree") {
-      if (darkLook && o.treeType !== "pine") { gardenTree(x, y, tone); return; }
+      if (darkLook) {
+        const wind = motion ? Math.round(Math.sin(clock * 1.6 + x * .8 + y * .4) * (state.weather === "Rain" ? 3 : 2)) : 0;
+        gardenTree(x, y, tone, wind, o.treeType === "pine");
+        return;
+      }
       shadow(x,y,30,11);
       f(-.1,-.1,0,.2,.2,24,wood);
       if (o.treeType === "pine") {
@@ -1027,11 +1256,16 @@ const View = (() => {
       return;
     }
     if(kind==="campfire") {
-      f(-.35,-.15,0,.7,.3,4,wood);
-      f(-.15,-.35,3,.3,.7,4,wood);
       const [xx,yy]=p(x,y,8);
-      const sway = state.reduceFlicker ? 0 : Math.sin(clock*11)*3;
-      poly([[xx-8,yy],[xx-4,yy-13-sway],[xx+2,yy-8],[xx+6,yy-18],[xx+9,yy]],"#efb16a");
+      if (smoke) campfireSmoke(xx, yy, clock);
+      if (darkLook) {
+        drawFurniture("campfire", x, y, motion ? Math.floor(clock * 7) % 4 : 0, false);
+      } else {
+        f(-.35,-.15,0,.7,.3,4,wood);
+        f(-.15,-.35,3,.3,.7,4,wood);
+        const sway = state.reduceFlicker ? 0 : Math.sin(clock*11)*3;
+        poly([[xx-8,yy],[xx-4,yy-13-sway],[xx+2,yy-8],[xx+6,yy-18],[xx+9,yy]],"#efb16a");
+      }
       const batch = Sim.fireBatch(state, o);
       if (batch) {
         f(-.22,-.22,14,.44,.44,6,iron);
@@ -1095,8 +1329,25 @@ const View = (() => {
         }
       }
       line(ridgeA, ridgeB, "#9b8c7e", 2);
+      if (building.type === "home") {
+        for (const edge of [[a,d],[b,c]]) line(edge[0],edge[1],"#837c69",2);
+        const gableY = y + h + .11;
+        line(p(x-.05,gableY,39),p(x+w*.5,gableY,peak-2),"#302d29",2);
+        line(p(x+w*.5,gableY,peak-2),p(x+w+.05,gableY,39),"#302d29",2);
+        const ventX = x + w * .5;
+        box(ventX-.18,gableY- .025,44,.36,.05,4,["#756758","#453b33","#40382e"]);
+        for (const offset of [-.11,0,.11]) line(p(ventX+offset,gableY+.034,45),p(ventX+offset,gableY+.034,47),"#292923");
+      }
     }
-    if (!building.compact || (x+y) % 2 === 0) box(x+w*.72,y+h*.2,42,.55,.55,21,["#866b58","#5b493d","#493d32"]);
+    if (!building.compact || (x+y) % 2 === 0) {
+      const chimneyX = x+w*.72, chimneyY = y+h*.2;
+      box(chimneyX,chimneyY,42,.55,.55,21,["#866b58","#5b493d","#493d32"]);
+      if (darkLook && building.type === "home") {
+        box(chimneyX-.035,chimneyY-.035,62,.62,.62,2,["#a28b70","#786958","#5f5548"]);
+        box(chimneyX+.13,chimneyY+.12,64,.30,.3,1,["#363733","#423b31","#38342b"]);
+        for (const z of [56,59]) line(p(chimneyX,chimneyY+.551,z),p(chimneyX+.55,chimneyY+.551,z),"#aa8a6e67");
+      }
+    }
   }
 
   function roofCoversPlayer(b, player) {
@@ -1128,12 +1379,47 @@ const View = (() => {
     return {x:sx, y:sy, width:w};
   }
 
-  // Original 1px sprite art packed into fixed-size atlas pages. A pose is drawn only on first use.
+  // Frame cells share a native pixel grid and fixed equipment palettes.
   const actorFrames = new Map(), actorAtlases = [], strides = new WeakMap();
-  const spriteWidth = 24, spriteHeight = 32;
+  const spriteWidth = 36, spriteHeight = 48, spriteGround = 46;
+  const backpackCloth = "#985b40", backpackLight = "#c4875e";
+  const backpackPixels = [
+    "...#######...",
+    "..#hhhhhhh#..",
+    ".#hmmmmmmhh#.",
+    "#hhmmmmmmhms#",
+    "#mKKmmmmKKms#",
+    "#mLLmmmmLLms#",
+    "#mKKmmmmKKms#",
+    "#mmmmmmmmms#",
+    "#msshhhhssms#",
+    "#msmmmmmsms#",
+    "#msmmmmmsms#",
+    "#mssssssssms#",
+    "#mmmmmmmmmss#",
+    ".#sssssssss#.",
+    "..#########.."
+  ];
+  const backpackPalette = {
+    "#":"#3b2822", h:backpackLight, m:backpackCloth, s:"#714534", K:"#513629", L:"#e0b784"
+  };
 
-  function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack) {
-    const key = [shirt, trousers, skin, hair, direction, pose, step, lift, pack].join("|");
+  function survivorPalette(player) {
+    const options = Data.survivorStyle;
+    const colour = (key,fallback) => options[key].options[player[key]]?.color ?? fallback;
+    const female = player.appearance === "female";
+    return {
+      skin:colour("skinTone","#bca383"),
+      hair:colour("hairColor",female ? "#624c39" : "#413e35"),
+      jacket:colour("jacketColor","#748d7a"),
+      cut:player.hairStyle && player.hairStyle !== "default" ? player.hairStyle : female ? "tied" : "short"
+    };
+  }
+
+  function actorFrame(shirt, trousers, skin, hair, direction, pose, step, lift, pack, gesture, cut = "short") {
+    const back = (direction & 2) !== 0, axial = (direction & 4) !== 0, profile = (direction & 8) !== 0;
+    const showPack = back && pack && pose !== "dead";
+    const key = [shirt, trousers, skin, hair, direction, pose, step, lift, showPack, gesture, cut].join("|");
     if (actorFrames.has(key)) return actorFrames.get(key);
     const index = actorFrames.size, slot = index % 128, page = Math.floor(index / 128);
     if (!actorAtlases[page]) {
@@ -1144,60 +1430,165 @@ const View = (() => {
     }
     const canvas = actorAtlases[page], c = canvas.getContext("2d");
     const left = slot % 16 * spriteWidth, top = Math.floor(slot / 16) * spriteHeight;
-    const ink = "#151a19", boots = "#2b2c29";
-    const back = direction >= 2, side = direction % 2 === 0 ? 1 : -1;
+    const mirrored = (direction & 1) !== 0;
+    const ink = "#222a29", boot = "#3f3831";
+    const jacketDark = tint(shirt,-28), jacketLight = tint(shirt,28);
+    const jeanDark = tint(trousers,-19), jeanLight = tint(trousers,22);
+    const skinDark = tint(skin,-32), skinLight = tint(skin,23);
     const rect = (x, y, w, h, color) => {
+      const x0 = Math.max(0, x), y0 = Math.max(0, y);
+      const x1 = Math.min(spriteWidth, x + w), y1 = Math.min(spriteHeight, y + h);
+      if (x1 <= x0 || y1 <= y0) return;
       c.fillStyle = color;
-      c.fillRect(left + (side > 0 ? x : spriteWidth - x - w), top + y, w, h);
+      c.fillRect(left + (mirrored ? spriteWidth - x1 : x0),top+y0,x1-x0,y1-y0);
+    };
+    const shape = (points,color) => {
+      const rows = points.map(([,y]) => y);
+      for (let y = Math.max(0,Math.min(...rows)); y < Math.min(spriteHeight,Math.max(...rows)); y++) {
+        const cuts = [];
+        for (let i=0; i<points.length; i++) {
+          const [x0,y0]=points[i], [x1,y1]=points[(i+1)%points.length];
+          if ((y0>y+.5) !== (y1>y+.5)) cuts.push(x0+(x1-x0)*(y+.5-y0)/(y1-y0));
+        }
+        cuts.sort((a,b)=>a-b);
+        for (let i=0; i+1<cuts.length; i+=2) {
+          const start=Math.ceil(cuts[i]-.5), end=Math.ceil(cuts[i+1]-.5);
+          rect(start,y,end-start,1,color);
+        }
+      }
     };
     let grip = null;
     if (pose === "dead") {
-      rect(2, 26, 20, 5, ink); rect(3, 27, 7, 3, trousers);
-      rect(10, 25, 7, 5, shirt); rect(17, 26, 4, 4, skin); rect(20, 26, 2, 3, hair);
+      shape([[3,42],[7,39],[17,40],[21,37],[29,38],[33,42],[30,45],[8,45]],ink);
+      rect(7,41,10,3,trousers); rect(17,39,9,5,jacketDark);
+      rect(24,40,3,2,shirt); rect(28,41,3,2,skinDark); rect(29,39,3,2,hair);
     } else {
-      const low = pose === "sneak" ? 3 : 0;
-      const leap = pose === "run" ? 2 : 0;
-      const lean = pose === "hurt" ? -1 : pose === "chase" || pose === "strike" ? 1 : 0;
-      const shoulder = 9 + low - leap - Number(lift !== 0), hip = shoulder + 10;
-      rect(8, hip - 1, 8, 3, ink);
-      for (const [index, x] of [8, 13].entries()) {
-        const stride = index ? -step : step;
-        const foot = x + stride;
-        const y = 28 + Math.sign(stride) - (lift === (index ? 1 : -1) ? 2 : 0);
-        rect(x - 1, hip, 4, 4, ink);
-        rect(x, hip, 2, 4, trousers);
-        rect(foot - 1, hip + 3, 4, y - hip - 1, ink);
-        rect(foot, hip + 3, 2, y - hip - 2, trousers);
-        rect(foot - 1, y, 4, 2, boots);
+      const strike = pose === "strike" || pose === "chase";
+      const ready = pose === "ready";
+      const running = pose === "run";
+      const crouch = pose === "rest" ? 7 : pose === "sneak" ? 4 : running ? 1 : 0;
+      const lean = pose === "hurt" ? -3 : strike ? [-2,1,3][gesture] : running ? 4 : pose === "sneak" ? 2 : 0;
+      const x = 18 + (axial ? Math.sign(lean) : lean);
+      const y = 15 + crouch - Number(lift !== 0) - (pose === "idle" ? gesture : 0);
+      const hip = Math.min(34,y+14);
+      const legs = profile ? [19,16] : [21,15];
+      for (const [leg,root] of legs.entries()) {
+        const stride = (leg ? step : -step) * (axial ? 1 : running ? 4 : 3);
+        const knee = root + Math.round(stride*.6) + Number(crouch>0), foot = root + (axial ? 0 : stride);
+        const depth = axial ? Math.min(0,Math.sign(stride)*(back ? -2 : 2)) : 0;
+        const sole = 45 + depth - (lift === (leg ? -1 : 1) ? 3 : 0);
+        const bend = Math.min(sole-4,hip+6);
+        shape([[root-4,hip-2],[root+3,hip-2],[knee+3,bend],[foot+2,sole-3],
+          [foot+5,sole-2],[foot+5,sole+1],[foot-4,sole+1],[foot-3,sole-4],[knee-3,bend]],ink);
+        shape([[root-3,hip-1],[root+2,hip-1],[knee+2,bend],[foot+1,sole-4],
+          [foot-2,sole-4],[knee-2,bend]],leg ? trousers : jeanDark);
+        if (leg) {
+          rect(knee-2,bend-2,3,2,jeanLight);
+          rect(knee,bend-3,2,1,jeanLight);
+        }
+        rect(knee-1,bend,3,1,jeanLight);
+        rect(knee,bend+1,2,1,jeanDark);
+        rect(foot-2,sole-3,5,2,boot);
+        rect(foot+1,sole-2,3,1,"#a58a6b");
+        rect(foot-1,sole-3,2,1,"#b99b74");
+        rect(foot-3,sole,7,1,"#65574a");
       }
-      rect(7 + lean, shoulder, 10, hip - shoulder + 1, ink);
-      rect(8 + lean, shoulder + 1, 8, hip - shoulder - 1, shirt);
-      rect(9 + lean, shoulder + 1, 2, 7, "#ffffff18");
-      rect(15 + lean, shoulder + 2, 1, 8, "#151a194f");
-      if (pack) {
-        const px = back ? 9 + lean : 6 + lean;
-        rect(px, shoulder + 2, back ? 6 : 3, 7, "#3d4836");
-        rect(px + 1, shoulder + 3, 2, 3, "#73785a");
-      }
-      const reaches = pose === "strike" || pose === "chase";
-      const arm = reaches ? 2 : step;
-      rect(5 + lean, shoulder + 2 + step, 3, 7, ink);
-      rect(6 + lean, shoulder + 3 + step, 2, 4, shirt);
-      rect(6 + lean, shoulder + 7 + step, 2, 2, skin);
-      rect(16 + lean, shoulder + 2 - arm, reaches ? 6 : 3, reaches ? 4 : 7, ink);
-      rect(16 + lean, shoulder + 3 - arm, reaches ? 4 : 2, reaches ? 2 : 4, shirt);
-      const handX = reaches ? 21 : 17 + lean, handY = shoulder + (reaches ? 3 : 7) - arm;
-      rect(handX, handY, 2, 2, skin);
-      grip = [side > 0 ? handX + 1 : spriteWidth - handX - 1, handY + 1];
-      const head = shoulder - 7 + (step ? 1 : 0);
-      rect(9 + lean, head, 6, 7, ink);
-      rect(10 + lean, head + 1, 5, 5, back ? hair : skin);
-      rect(9 + lean, head, 6, 2, hair);
+      const swing = Math.sign(step);
+      const armSwing = swing * (running ? 5 : 2);
+      const farHand = x-(profile ? 5 : 9)+armSwing;
+      const farY = Math.min(41,y+14-(running ? 4 : 1)*Math.max(0,swing));
+      shape([[x-7,y],[x-4,y+2],[farHand+3,y+8],[farHand+2,farY+2],
+        [farHand-2,farY+2],[farHand-2,y+7],[x-9,y+3]],ink);
+      shape([[x-7,y+1],[x-5,y+2],[farHand+1,y+8],[farHand+1,farY-1],
+        [farHand-1,farY-1],[farHand-1,y+7],[x-8,y+3]],jacketDark);
+      rect(farHand-1,farY-1,2,2,skinDark);
+
+      const torsoLeft = x - (profile ? 5 : 7), torsoRight = x + (profile ? 5 : 7);
+      shape([[torsoLeft+1,y-2],[torsoRight-3,y-2],[torsoRight+1,y+1],[torsoRight-1,y+6],
+        [x+4,hip],[x-5,hip],[torsoLeft+1,hip-4],[torsoLeft-1,y+2]],ink);
+      shape([[torsoLeft+1,y-1],[torsoRight-4,y-1],[torsoRight-1,y+1],[torsoRight-2,y+6],
+        [x+3,hip-1],[x-4,hip-1],[torsoLeft+2,hip-5],[torsoLeft,y+2]],shirt);
+      shape([[torsoLeft+1,y],[torsoRight-4,y],[x+2,y+2],[x-4,y+3],[torsoLeft+1,y+2]],jacketLight);
+      shape([[torsoRight-2,y+4],[x+4,y+9],[x+3,hip-1],[x-3,hip-1],[x+1,hip-4]],jacketDark);
+      rect(x-3,hip-2,5,1,jacketDark);
       if (!back) {
-        rect(14 + lean, head + 3, 2, 2, skin);
-        rect(14 + lean, head + 3, 1, 1, ink);
+        const zipper = x + (axial ? 0 : profile ? 3 : 1);
+        rect(zipper,y+1,1,hip-y-4,jacketDark);
+        rect(zipper,y+3,1,2,"#ded0ac");
+        rect(x-4,y+5,3,1,jacketDark);
+        rect(x-4,y+6,2,1,jacketLight);
+        rect(x-5,y+2,1,1,"#c4ad80");
+        rect(x-3,hip-4,2,1,jacketLight);
       }
-      if (pose === "hurt") rect(13 + lean, head + 4, 2, 1, "#a35749");
+
+      const handX = Math.min(32,strike ? x+[6,13,11][gesture] : x+(ready ? 11 : profile ? 5 : 8)-armSwing);
+      const handY = strike ? y+[4,6,3][gesture] : ready ? y+5 : Math.min(41,y+14+swing-(running ? 3 : 0));
+      const elbow = strike ? x+7 : x+(profile ? 4 : 7) - (running ? swing * 2 : 0);
+      shape([[x+3,y],[x+7,y],[elbow+2,y+6],[handX+2,handY-1],
+        [handX+2,handY+3],[handX-2,handY+3],[elbow-2,y+9],[x+2,y+3]],ink);
+      shape([[x+3,y+1],[x+6,y+1],[elbow+1,y+6],[handX+1,handY-1],
+        [handX-1,handY],[elbow-1,y+8]],shirt);
+      rect(elbow,y+5,2,2,jacketLight);
+      rect(elbow-1,y+7,2,1,jacketDark);
+      rect(handX-1,handY-1,3,1,jacketDark);
+      rect(handX-1,handY,3,2,skin);
+      rect(handX-1,handY,1,1,skinLight);
+      rect(handX+1,handY+1,1,1,skinDark);
+      grip = [mirrored ? spriteWidth-handX-1 : handX+1, handY+1];
+
+      // Draw the same bag above the back of the jacket, with no layers on the front.
+      if (showPack) {
+        const bagX = x-7, bagY = y-1;
+        for (const [row,line] of backpackPixels.entries()) {
+          for (let col=0; col<line.length; col++) {
+            const color=backpackPalette[line[col]];
+            if (color) rect(bagX+col,bagY+row,1,1,color);
+          }
+        }
+      }
+      const hx = x + (profile ? 2 : Number(!axial && !back)), hy = y-11;
+      shape([[hx-5,hy+1],[hx-3,hy-1],[hx+3,hy-1],[hx+6,hy+2],[hx+6,hy+6],
+        [hx+3,hy+10],[hx-3,hy+9],[hx-5,hy+6]],ink);
+      shape([[hx-4,hy+2],[hx-2,hy],[hx+3,hy],[hx+5,hy+2],[hx+4,hy+6],
+        [hx+2,hy+9],[hx-2,hy+8],[hx-4,hy+5]],back ? hair : skinDark);
+      if (cut === "shaved") {
+        rect(hx-3,hy+1,7,2,tint(hair,14));
+        rect(hx-2,hy+1,4,1,tint(hair,31));
+      } else {
+        shape([[hx-4,hy+2],[hx-2,hy],[hx+3,hy],[hx+5,hy+2],[hx+2,hy+3],
+          [hx-1,hy+3],[hx-3,hy+6],[hx-4,hy+5]],hair);
+        shape([[hx-3,hy+1],[hx+2,hy],[hx+4,hy+2],[hx+1,hy+3],[hx-3,hy+3]],tint(hair,24));
+        rect(hx-2,hy+1,3,1,tint(hair,38));
+        if (cut === "wavy") {
+          rect(hx-3,hy-1,3,2,hair);
+          rect(hx+2,hy-1,2,2,hair);
+          rect(hx-4,hy+3,2,2,tint(hair,17));
+          rect(hx+3,hy+1,2,2,tint(hair,21));
+        }
+        if (cut === "tied") {
+          const tie = axial && !back ? hx-6 : hx-5;
+          shape([[tie,hy+4],[tie+3,hy+4],[tie+3,hy+7],[tie+1,hy+10],[tie-2,hy+10],[tie-1,hy+7]],hair);
+          rect(tie,hy+6,2,1,"#a88c69");
+          rect(tie-1,hy+8,1,2,tint(hair,18));
+        }
+      }
+      if (back) {
+        rect(hx-2,hy+8,4,1,skinDark);
+        rect(hx-3,hy+9,6,1,jacketLight);
+      } else if (axial) {
+        shape([[hx-4,hy+4],[hx+4,hy+4],[hx+3,hy+7],[hx+2,hy+9],[hx-2,hy+9],[hx-3,hy+7]],skin);
+        rect(hx-3,hy+5,2,1,ink); rect(hx+1,hy+5,2,1,ink);
+        rect(hx-2,hy+6,4,1,skinLight);
+        rect(hx-1,hy+8,2,1,skinDark);
+      } else {
+        shape([[hx,hy+3],[hx+4,hy+3],[hx+6,hy+6],[hx+4,hy+7],[hx+3,hy+9],
+          [hx-1,hy+8],[hx-2,hy+6]],skin);
+        rect(hx+(profile ? 3 : 2),hy+4,2,1,ink);
+        rect(hx+2,hy+6,4,1,skinLight);
+        rect(hx,hy+5,1,2,skinDark);
+        rect(hx+1,hy+8,2,1,skinDark);
+      }
+      if (pose === "hurt" && !back) rect(hx-2,hy+7,2,1,"#a86452");
     }
     const frame = {canvas, left, top, grip};
     actorFrames.set(key, frame);
@@ -1224,7 +1615,7 @@ const View = (() => {
     rollingpin: [[1,0,13,1,lightWood],[3,-2,8,5,woodGrip],[4,-2,6,1,lightWood],[4,2,6,1,"#825132"]]
   };
   const weaponSprites = new Map();
-  const weaponAngles = [-1.15, -.45, .38, .95, 0, -.25];
+  const weaponAngles = [-1.15, -.45, .38, .95, 0, -.25, 1.28];
   const weaponExtent = 36;
 
   function drawHeldWeapon(id, x, y, side, phase) {
@@ -1274,11 +1665,15 @@ const View = (() => {
 
   const zombieAtlasLink = document.getElementById("micro-zombie-atlas");
   let zombieAtlas, mirroredZombieAtlas;
+  const zombieWidth = 24, zombieHeight = 40;
 
-  function drawZombieSprite(zombie, x, y, scale, facesLeft, lift) {
+  function drawZombieSprite(zombie, x, y, scale, direction, stride, clock) {
     if (!zombieAtlasLink?.href || typeof Image !== "function") return false;
-    // Four rows of 28 complete 18×32 cells, all with the manifest's (9, 30) foot pivot.
-    const columns = 28, rows = 4, width = 18, height = 32;
+    // Five views per pose, with the three side-facing views mirrored in the cache.
+    const viewCount = 5, columns = 28, rows = 4 * viewCount, width = zombieWidth, height = zombieHeight;
+    const back = (direction & 2) !== 0, axial = (direction & 4) !== 0;
+    const facesLeft = (direction & 1) !== 0;
+    const view = axial ? (back ? 4 : 0) : direction & 8 ? 2 : back ? 3 : 1;
     if (!zombieAtlas) {
       zombieAtlas = new Image();
       zombieAtlas.src = zombieAtlasLink.href;
@@ -1297,16 +1692,28 @@ const View = (() => {
       }
       atlas = mirroredZombieAtlas;
     }
-    // Phase is selected at spawn and already stored in saves, so appearance does not flicker.
-    const variant = clamp(Math.floor((Number.isFinite(zombie.phase) ? zombie.phase : 0) * 14), 0, columns * rows - 1);
-    const column = variant % columns, row = Math.floor(variant / columns);
-    ctx.drawImage(atlas, (facesLeft ? columns - 1 - column : column) * width, row * height, width, height,
-      Math.round(x - 9 * scale), Math.round(y - (30 + Math.abs(lift)) * scale),
+    // Spawn phase is persisted in saves and keeps each infected's outfit stable.
+    const phase = Number.isFinite(zombie.phase) ? zombie.phase : 0;
+    const outfit = clamp(Math.floor(phase * 7 / 8), 0, 6);
+    let row = 0, frame = Math.floor(Math.max(0, clock + phase) * 4) % 4;
+    if (zombie.flash > 0) {
+      row = 3;
+      frame = zombie.flash > .18 ? 0 : zombie.flash > .10 ? 1 : zombie.flash > .04 ? 2 : 3;
+    } else if (zombie.windup > 0 || zombie.swing > 0) {
+      row = 2;
+      frame = zombie.windup > .16 ? 0 : zombie.windup > 0 ? 1 : zombie.swing > .08 ? 3 : 2;
+    } else if (zombie.moving) {
+      row = 1;
+      frame = Math.floor(stride * 4);
+    }
+    const column = outfit * 4 + frame;
+    ctx.drawImage(atlas, (facesLeft ? columns - 1 - column : column) * width, (row * viewCount + view) * height, width, height,
+      Math.round(x - width / 2 * scale), Math.round(y - (height - 2) * scale),
       Math.round(width * scale), Math.round(height * scale));
     return true;
   }
 
-  function microActor(a, isPlayer, state, alive, x, y, scale) {
+  function microActor(a, isPlayer, state, alive, x, y, scale, clock = 0) {
     const moving = alive && a.moving;
     const running = moving && (isPlayer ? state.running : a.kind === "runner" && a.alert > 0);
     const stride = strides.get(a) ?? {x:a.x, y:a.y, phase:(a.phase || 0) % 1};
@@ -1317,31 +1724,43 @@ const View = (() => {
     const frameIndex = moving ? Math.floor(stride.phase * 6) : 0;
     const step = [0, 1, 1, 0, -1, -1][frameIndex] * (running ? 2 : 1);
     const lift = [0, -1, 0, 0, 1, 0][frameIndex];
-    const pose = !alive ? "dead" : a.flash > 0 ? "hurt" : a.swing > 0 || a.windup > 0 ? "strike" :
-      isPlayer && state.quiet ? "sneak" : running ? "run" : moving && a.stats && a.alert > 0 ? "chase" : "idle";
     const swing = isPlayer && a.swing > 0 ? state.swingVisual : null;
-    const dx = swing?.dx ?? a.headingX ?? (a.face < 0 ? -1 : 1), dy = swing?.dy ?? a.headingY ?? 0;
-    const direction = Number(dx < dy) + 2 * Number(dx + dy < 0);
-    const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, dx < dy, lift);
+    const heldId = isPlayer ? swing?.weapon ?? Sim.weapon(state).id : null;
+    const ready = isPlayer && !moving && !(a.swing > 0) && state.target?.hp > 0 && Object.hasOwn(weaponArt,heldId);
+    const pose = !alive ? "dead" : a.flash > 0 ? "hurt" : a.swing > 0 || a.windup > 0 ? "strike" :
+      isPlayer && a.resting ? "rest" : isPlayer && state.quiet ? "sneak" :
+      running ? "run" : moving ? a.stats && a.alert > 0 ? "chase" : "walk" : ready ? "ready" : "idle";
+    const gesture = pose === "strike" ? a.swing > .125 ? 0 : a.swing > .06 ? 2 : 1 :
+      pose === "idle" && isPlayer ? Math.floor(clock * 2) % 2 : 0;
+    const dx = ready ? state.target.x - a.x : swing?.dx ?? a.headingX ?? (a.face < 0 ? -1 : 1);
+    const dy = ready ? state.target.y - a.y : swing?.dy ?? a.headingY ?? 0;
+    const across = dx - dy, depth = dx + dy;
+    // Convert to screen-space before selecting the eight directional poses.
+    const screenX = Math.abs(across) * halfW, screenY = Math.abs(depth) * halfH;
+    const axial = screenX <= screenY * .414;
+    const profile = !axial && screenY <= screenX * .414;
+    const direction = Number(across < 0) + 2 * Number(depth < 0 && !profile) +
+      4 * Number(axial) + 8 * Number(profile);
+    const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, direction, stride.phase, clock);
     if (!imported) {
-      const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : "#748d7a") :
+      const palette = isPlayer ? survivorPalette(a) : null;
+      const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : palette.jacket) :
         Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
       const frame = actorFrame(shirt, isPlayer ? "#465a5d" : "#56564c",
-        pose === "hurt" ? "#cf9179" : isPlayer ? "#bca383" : "#99977f",
-        isPlayer && a.appearance === "female" ? "#624c39" : "#413e35", direction, pose, step, lift,
-        a.outfit === "hiker" || Boolean(isPlayer && a.backpack));
-      const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - (spriteHeight - 1) * scale);
+        palette?.skin ?? (pose === "hurt" ? "#cf9179" : "#99977f"),
+        palette?.hair ?? "#413e35", direction, pose, step, lift,
+        a.outfit === "hiker" || Boolean(isPlayer && a.backpack), gesture, palette?.cut);
+      const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - spriteGround * scale);
       ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
         Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
       if (isPlayer && frame.grip) {
-        const id = swing?.weapon ?? Sim.weapon(state).id;
-        const phase = swing ? (id === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
-          a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : step > 0 ? 2 : 1;
-        drawHeldWeapon(id, left + frame.grip[0], top + frame.grip[1], dx < dy ? -1 : 1, phase);
+        const phase = swing ? (heldId === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
+          a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : pose === "ready" ? (heldId === "pistol" ? 4 : 0) : 6;
+        drawHeldWeapon(heldId, left + Math.round(frame.grip[0] * scale), top + Math.round(frame.grip[1] * scale), dx < dy ? -1 : 1, phase);
       }
     }
     if (alive && (a.windup > 0 || a.stats && a.alert > 0)) {
-      const height = Math.round(32 * scale);
+      const height = Math.round((imported ? zombieHeight : spriteHeight) * scale);
       ctx.fillStyle = a.windup > 0 ? "#ff987d" : "#cb735b";
       ctx.fillRect(Math.round(x), Math.round(y) - height - 5, 2, a.windup > 0 ? 5 : 3);
     }
@@ -1353,8 +1772,8 @@ const View = (() => {
     try {
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.imageSmoothingEnabled = false;
-      const player = {...state.player, moving:false, flash:0, swing:0, headingX:1, headingY:1};
-      microActor(player,true,{...state,quiet:false},true,canvas.width/2,canvas.height-8,1);
+      const player = {...state.player, moving:false, resting:false, flash:0, swing:0, headingX:1, headingY:1};
+      microActor(player,true,{...state,quiet:false},true,canvas.width/2,canvas.height-5,.9);
     } finally {
       ctx = previous;
     }
@@ -1375,7 +1794,7 @@ const View = (() => {
       ctx.restore();
     }
     if (darkLook) {
-      microActor(a, isPlayer, state, alive, x, y, scale);
+      microActor(a, isPlayer, state, alive, x, y, scale, clock);
       if (alive && a.origin === "cinema-winner") {
         const hand = x+(a.face || 1)*9, bob = a.moving ? Math.round(Math.sin(clock*5)*2) : 0;
         ctx.fillStyle = "#d5ad52";
@@ -1408,10 +1827,10 @@ const View = (() => {
     const step = a.moving ? Math.sin(clock * (isPlayer && state.running ? 17 : 12) + (a.phase || 0)) * 2.5 : 0;
     const crouch = isPlayer && state.quiet ? 5 : 0;
     const top = -25 + crouch - Math.abs(step) * .35;
-    if (a.outfit === "hiker" || isPlayer && a.backpack) {
-      ctx.fillStyle = "#3c5041";
+    if (a.outfit === "hiker" || isPlayer && a.backpack && (a.headingX ?? 0) + (a.headingY ?? 0) < 0) {
+      ctx.fillStyle = isPlayer ? backpackCloth : "#3c5041";
       ctx.fillRect(-11, top + 5, 8, 14);
-      ctx.fillStyle = "#667b55";
+      ctx.fillStyle = isPlayer ? backpackLight : "#667b55";
       ctx.fillRect(-11, top + 7, 5, 7);
     }
     ctx.fillStyle = isPlayer ? "#293e3e" : "#3f4535";
@@ -1420,7 +1839,8 @@ const View = (() => {
     ctx.fillStyle = "#151e17";
     ctx.fillRect(-6, -2 + Math.max(0, step), 6, 2.2);
     ctx.fillRect(.5, -2 + Math.max(0, -step), 6, 2.2);
-    const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#bc9d50" : "#8daa92") : (Data.outfits[a.outfit]?.shirt || a.stats?.color || "#d0a968");
+    const palette = isPlayer ? survivorPalette(a) : null;
+    const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#bc9d50" : palette.jacket) : (Data.outfits[a.outfit]?.shirt || a.stats?.color || "#d0a968");
     poly([[-7.5, top + 4], [2.5, top + 3], [6, top + 8], [5, -8 + crouch * .3], [-5.7, -8 + crouch * .3]], shirt, "#16251b");
     ctx.fillStyle = isPlayer ? "#395f61" : "#5c6148";
     ctx.fillRect(-7.2, top + 7, 3.5, 9);
@@ -1476,18 +1896,23 @@ const View = (() => {
       ctx.fillStyle = "#d1b596";
       ctx.fillRect(handX - 1.5, handY - 1.6, 3, 3);
     }
-    const tiedHair = isPlayer && a.appearance === "female";
+    const tiedHair = palette?.cut === "tied";
     if (tiedHair) {
-      ctx.fillStyle = "#43342c";
+      ctx.fillStyle = palette.hair;
       ctx.fillRect(-6, top - 1.5, 4, 7);
       ctx.fillRect(-7.5, top + 3 + step * .3, 3.5, 4.5);
       ctx.fillStyle = "#a17c4d";
       ctx.fillRect(-6.4, top + 2, 2.4, 1.6);
     }
-    ctx.fillStyle = a.flash > 0 ? "#ffb096" : isPlayer ? "#c7ae84" : "#b0a078";
+    ctx.fillStyle = palette?.skin ?? (a.flash > 0 ? "#ffb096" : "#b0a078");
     ctx.fillRect(-3.3, top - 3, 8, 8.5);
-    ctx.fillStyle = isPlayer ? (tiedHair ? "#513f32" : "#343d31") : "#575c42";
-    ctx.fillRect(tiedHair ? -4.5 : -3.9, top - 5.5, 8.6, 4.8);
+    ctx.fillStyle = palette?.hair ?? "#575c42";
+    const cropped = palette?.cut === "shaved";
+    ctx.fillRect(tiedHair ? -4.5 : -3.9, top - (cropped ? 4 : 5.5), 8.6, cropped ? 2 : 4.8);
+    if (palette?.cut === "wavy") {
+      ctx.fillRect(-3,top-6.5,3,2);
+      ctx.fillRect(1,top-6,3,2);
+    }
     ctx.fillStyle = isPlayer ? "#18261e" : "#df8b62";
     ctx.fillRect(2.9, top + .5, 1.7, 1.5);
     if (a.windup > 0) {
@@ -1681,11 +2106,11 @@ const View = (() => {
   let chunkWorld = null, chunkFrame = 0, fastGround = true;
 
   function chunkSignature(world, cx, cy, menu) {
-    if (menu) return darkLook ? "dm" : -1;
+    if (menu) return darkLook ? "dm2" : -1;
     let n = 0;
     const x1 = Math.min(world.width, cx * CH + CH), y1 = Math.min(world.height, cy * CH + CH);
     for (let y = cy * CH; y < y1; y++) for (let x = cx * CH; x < x1; x++) if (world.explored[y * world.width + x]) n++;
-    return darkLook ? "d" + n : n;
+    return darkLook ? "d2:" + n : n;
   }
 
   function buildChunk(world, key, cx, cy, menu, scale, signature, entry) {
@@ -1966,6 +2391,7 @@ const View = (() => {
     const world=state.world,player=state.player,menu=state.mode==="menu",cave=world.underground;
     const atmosphere = state.visualAtmosphere ?? "off";
     const effects = !menu && atmosphere !== "off", full = atmosphere === "full";
+    const motion = effects && !state.reduceFlicker;
     const wet = effects && !cave && state.weather === "Rain";
     const night = Sim.isNight(state);
     wetGround.length = 0;
@@ -2054,6 +2480,13 @@ const View = (() => {
         ctx.fillRect(sx-13,sy-3,26,7);
         ctx.fillStyle = "#a8c4d02a";
         ctx.fillRect(sx-8,sy-2,16+(t.x%5),2);
+        if (motion && darkLook) {
+          const age = (clock * 1.7 + t.x * .37 + t.y * .23) % 1;
+          const spread = Math.floor(age * 6);
+          ctx.fillStyle = age < .5 ? "#afc1c66b" : "#879fa840";
+          ctx.fillRect(sx - spread, sy - 2, spread * 2 + 1, 1);
+          ctx.fillRect(sx - spread + 2, sy + 1, Math.max(1, spread * 2 - 3), 1);
+        }
       }
     }
     if (menu || !state.roofsHidden) for (const b of world.buildings) {
@@ -2073,7 +2506,7 @@ const View = (() => {
         if (!cave || shown(step.x,step.y)) shadow(step.x,step.y,i===0?5:3,i===0?2.5:1.6,"#dbc48b75");
       }
     }
-    let fireBudget = full ? 8 : 4;
+    let fireBudget = full ? 8 : 4, smokeBudget = full ? 6 : 2;
     for(const o of world.objects) {
       if(o.active&&onScreen(o.x,o.y)&&shown(o.x,o.y)&&(!covered(o)||o.action==="door"))stack.push({kind:"prop",obj:o,depth:o.x+o.y});
       if (o.active && o.kind === "campfire" && onScreen(o.x,o.y) && (!cave || shown(o.x,o.y))) {
@@ -2102,7 +2535,11 @@ const View = (() => {
     const combatFocus = reachable || state.target;
     for(const entry of stack) {
       if(entry.kind==="wall")wall(entry.obj,player,menu);
-      else if(entry.kind==="prop")prop(entry.obj,state,clock);
+      else if(entry.kind==="prop") {
+        const smoke = darkLook && motion && !cave && entry.obj.kind === "campfire" && smokeBudget > 0;
+        if (smoke) smokeBudget--;
+        prop(entry.obj, state, clock, motion && !cave, smoke);
+      }
       else if(entry.kind==="roof") {
         if (entry.fade) {
           ctx.save();
@@ -2127,7 +2564,7 @@ const View = (() => {
         const hasNote = o => Boolean(Sim.unreadClueAt(state, o));
         const hasCache = o => Sim.isSupplyCache(state, o);
         const hasHarvest = o => o.kind === "garden" && Boolean(Sim.gardenYield(state, o));
-        const actions = Sim.nearby(state).filter(o => o.action && (!player.vehicle || o.action === "travel") &&
+        const actions = Sim.nearby(state).filter(o => (o.action || Sim.isFurniture(o)) && (!player.vehicle || o.action === "travel") &&
           !(o.action==="loot"&&o.searched&&!o.loot.length&&!Sim.canStore(o)&&!hasNote(o)&&!hasCache(o)));
         const priority = o => {
           if (o.action === "travel") return 4;
@@ -2198,10 +2635,10 @@ const View = (() => {
     ctx.setTransform(dpr,0,0,dpr,0,0);
     if (!effects) drawDestination(state,width,height,zoom);
     const hour=(state.minutes%1440)/60;
-    const darkness=clamp((Math.abs(hour-12)-5)/7,0,.67);
+    const darkness = night ? Math.max(.35, .90 - .34 * Sim.moonlight(state)) : clamp((Math.abs(hour-12)-5)/7,0,.67);
     if(!menu&&!cave&&darkness>0){
       const shade=ctx.createRadialGradient(width*.5,height*.54,30,width*.5,height*.54,Math.max(width,height)*.65);
-      shade.addColorStop(0,"rgba(10,20,29,"+darkness*(lit ? .15 : .46)+")");shade.addColorStop(1,"rgba(5,13,24,"+darkness+")");
+      shade.addColorStop(0,"rgba(10,20,29,"+darkness*(lit ? .15 : optics.lamp ? .36 : .68)+")");shade.addColorStop(1,"rgba(5,13,24,"+darkness+")");
       ctx.fillStyle=shade;ctx.fillRect(0,0,width,height);
     }
     if (effects) {
@@ -2236,7 +2673,7 @@ const View = (() => {
       (!state.player.vehicle || object.action === "travel") && Math.abs(sx - x) < width / 2 + 6 && Math.abs(sy - y) < 15 && Sim.reachableObject(state, object));
     if (label) return {object:label.object};
     const currentBuilding=World.tileAt(state.world,state.player.x,state.player.y)?.building;
-    const object=state.world.objects.filter(o=>o.active&&o.action&&(!o.building||o.building===currentBuilding||o.action==="door")&&visible(state,o.x,o.y,optics)&&hit(o,o.kind==="tree"?30:["locker","fridge","exit"].includes(o.kind)?25:13,o.kind==="car"?30:20,o.kind==="tree"?35:27)).sort((a,b)=>b.x+b.y-a.x-a.y)[0];
+    const object=state.world.objects.filter(o=>o.active&&(o.action||Sim.isFurniture(o))&&(!o.building||o.building===currentBuilding||o.action==="door")&&visible(state,o.x,o.y,optics)&&hit(o,o.kind==="tree"?30:["locker","fridge","exit"].includes(o.kind)?25:13,o.kind==="car"?30:20,o.kind==="tree"?35:27)).sort((a,b)=>b.x+b.y-a.x-a.y)[0];
     if(object)return {object};
     return ground;
   }

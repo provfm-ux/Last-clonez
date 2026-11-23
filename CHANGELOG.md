@@ -13,6 +13,13 @@
 - Added warm flashlight falloff, powered window glow, firelight, rain sheen and coastal mist.
 - Added Full, Reduced and Off atmosphere effects and a saved Reduce flicker option.
 
+## 0.34 — Dark Pixel
+- Redrew survivor sprites and seven animated infected variants with eight-direction views.
+- Added survivor customization with a live portrait, plus Marksmanship and Mechanics progression.
+- Detailed interiors, streets and props, with moving foliage, rain ripples and campfire smoke.
+- Added alternate horde entrances, moon-dependent visibility and timed waiting with a wristwatch.
+- Made inventory search collapsible and added a confirmation before dismantling furniture.
+
 ## 0.33 — The Outer Districts
 - Expanded Cold Vale and its surrounding regions with five connected districts and 50 explorable sites.
 - Added local witness stories, 300 hidden curios, and a five-district follow-up to The Second All-Clear.

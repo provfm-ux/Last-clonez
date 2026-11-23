@@ -9,6 +9,10 @@ const files = [...html.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).f
 const pascal = f => f.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join("");
 const counts = {};
 let heldWeapon = null;
+const infectedFrames = [], survivorFrames = [];
+const bagPigments = new Set(["#3b2822","#c4875e","#985b40","#714534","#513629","#e0b784"]);
+const bagPixels = [];
+const smokeFrames = [], canopyPositions = [], rippleFrames = [], propSprites = [];
 let beamOpacity = 1;
 const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
   get(t, k) { if (k in t) return t[k]; if (k === "canvas") return {width: 1280, height: 720}; if (k === "measureText") return () => ({width: 10});
@@ -16,9 +20,12 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
     if (k === "createRadialGradient" || k === "createLinearGradient") return () => { counts[k] = (counts[k] || 0) + 1; return {addColorStop() {}}; };
     return (...args) => {
       counts[k] = (counts[k] || 0) + 1;
+      if (k === "fillRect" && (t.fillStyle === "#afc1c66b" || t.fillStyle === "#879fa840")) rippleFrames.push(args);
+      if (k === "fillRect" && bagPigments.has(t.fillStyle)) bagPixels.push(t.fillStyle);
       if (k === "save") t.savedAlpha.push(t.globalAlpha);
       if (k === "restore") t.globalAlpha = t.savedAlpha.pop() ?? 1;
       if (k === "drawImage" && args.length === 5) {
+        if (args[0]?.width === 16 && args[0]?.height === 12) smokeFrames.push(args.slice(1));
         if (args[0]?.width === 104 && args[0]?.height === 104) counts.windowGlow = (counts.windowGlow ?? 0) + 1;
         if (args[0]?.width === 68 && args[0]?.height === 68) counts.fireWindow = (counts.fireWindow ?? 0) + 1;
         if (args[0]?.width === 206 && args[0]?.height === 206) counts.fireGlow = (counts.fireGlow ?? 0) + 1;
@@ -28,17 +35,26 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
           beamOpacity = t.globalAlpha;
         }
       }
+      if (k === "drawImage" && args.length === 3 && args[0]?.width === 54 && args[0]?.height === 61) canopyPositions.push(args[1]);
       if (k === "drawImage" && args.length === 3 && args[0]?.width === 72 && args[0]?.height === 64) {
         counts.furnitureBlit = (counts.furnitureBlit || 0) + 1;
+        propSprites.push(args[0]);
       }
       if (k === "drawImage" && args.length === 3 && args[0]?.width === 36 && args[0]?.height === 36) heldWeapon = args[0];
-      if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 32) counts.actorBlit = (counts.actorBlit || 0) + 1;
+      if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 40) {
+        infectedFrames.push(args.slice(1, 7));
+      }
+      if (k === "drawImage" && args.length === 9 && args[3] === 36 && args[4] === 48) {
+        counts.actorBlit = (counts.actorBlit || 0) + 1;
+        survivorFrames.push(args.slice(1, 3).join(","));
+      }
     }; },
   set(t, k, v) { t[k] = v; return true; }});
 const mkCanvas = () => ({width: 0, height: 0, getContext: () => mk(), getBoundingClientRect: () => ({left: 0, top: 0, width: 1280, height: 720}), style: {}, clientWidth: 160});
 const worldCanvas = mkCanvas();
 const context = {console, Math: Object.assign(Object.create(Math), {random: (() => { let s = 3; return () => (s = s * 16807 % 2147483647) / 2147483647; })()}), Date, JSON, structuredClone, devicePixelRatio: 1,
-  ResizeObserver: class { observe() {} }, document: {getElementById: id => id === "world" ? worldCanvas : mkCanvas(), createElement: () => mkCanvas()}};
+  Image: class { naturalWidth = 672; naturalHeight = 800; },
+  ResizeObserver: class { observe() {} }, document: {getElementById: id => id === "world" ? worldCanvas : id === "micro-zombie-atlas" ? {href:"micro-zombies.png"} : mkCanvas(), createElement: () => mkCanvas()}};
 context.globalThis = context.window = context; vm.createContext(context);
 let source = ""; for (const f of files) source += fs.readFileSync(path.join(dir, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;
 vm.runInContext(source, context);
@@ -103,6 +119,117 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
   d.look = "fast"; e = null; try { View.render(d, 0, 1 / 60); View.minimap({width: 160, height: 160, getContext: () => mk(), clientWidth: 160}, d); } catch (x) { e = x.message; }
   check("dark pixel: voltar a Fast/Classic e desenhar o minimapa funciona (contexto restaurado)", e === null, e ?? ""); }
 {
+  const d = Sim.createControl("survival", "carer", "shelter");
+  const z = d.world.enemies[0];
+  Object.assign(z, {x:d.player.x, y:d.player.y, headingX:1, headingY:0,
+    dormant:false, moving:false, phase:4, flash:0, windup:0, swing:0});
+  d.world.enemies = [z];
+  d.mode = "menu";
+  d.look = "dark";
+  View.prepare(d.world);
+  const pose = () => {
+    infectedFrames.length = 0;
+    View.render(d, 0, 1 / 60);
+    return infectedFrames[0];
+  };
+  const idle = pose();
+  z.moving = true;
+  const walk = pose();
+  z.x += .22;
+  const step = pose();
+  z.windup = .1;
+  const attack = pose();
+  z.flash = .2;
+  z.headingX = -1;
+  const hit = pose();
+  check("dark pixel: infectado anima e espelha a mesma variante",
+    idle?.[1] === 40 && walk?.[1] === 240 && step?.[0] === walk[0] + 24 &&
+    attack?.[1] === 440 && hit?.[1] === 720 && hit[0] === 648 - idle[0] &&
+    idle[5] === walk[5] && step[5] === attack[5] && attack[5] === hit[5]);
+  Object.assign(z,{moving:false,flash:0,windup:0});
+  const views = [[1,1],[1,0],[1,-1],[0,-1],[-1,-1]].map(([headingX,headingY]) => {
+    Object.assign(z,{headingX,headingY});
+    return pose()?.[1];
+  });
+  check("dark pixel: infectado tem vistas distintas de frente, costas, perfil e três quartos",
+    views.every((row,index) => row === index * 40));
+}
+{
+  const d = Sim.createControl("survival", "carer", "shelter");
+  d.world.enemies = [];
+  d.world.npc.ridingVehicle = true;
+  d.look = "dark";
+  View.prepare(d.world);
+  const pose = (clock = 0) => {
+    survivorFrames.length = 0;
+    View.render(d, clock, 1 / 60);
+    return survivorFrames[0];
+  };
+  const idle = pose();
+  const breath = pose(.6);
+  d.player.moving = true;
+  const walk = pose();
+  d.running = true;
+  const run = pose();
+  d.quiet = true;
+  const sneak = pose();
+  d.player.moving = false;
+  d.player.resting = true;
+  const rest = pose();
+  d.player.resting = false;
+  d.player.swing = .16;
+  const windup = pose();
+  d.player.swing = .1;
+  const strike = pose();
+  d.player.swing = 0;
+  d.player.flash = .3;
+  const hit = pose();
+  const poses = [idle, breath, walk, run, sneak, rest, windup, strike, hit];
+  check("dark pixel: poses distintas do sobrevivente usam células em cache",
+    poses.every(Boolean) && new Set(poses).size === poses.length && pose() === hit);
+
+  Object.assign(d.player,{flash:0,moving:true});
+  d.quiet = d.running = false;
+  const directions = [[1,1],[-1,-1],[1,0],[0,-1],[1,-1],[-1,1],[0,1],[-1,0]].map(([headingX,headingY]) => {
+    Object.assign(d.player,{headingX,headingY});
+    return pose();
+  });
+  Object.assign(d.player,{headingX:1,headingY:1});
+  check("dark pixel: marcha usa oito orientações de acordo com a projeção no ecrã",
+    directions.every(Boolean) && new Set(directions).size === directions.length && pose() === directions[0]);
+  const packPoses = [[1,1],[1,-1],[-1,1],[-1,-1]].map(([headingX,headingY]) => {
+    Object.assign(d.player,{headingX,headingY,backpack:false});
+    const without = pose();
+    d.player.backpack = true;
+    return [without,pose()];
+  });
+  check("dark pixel: mochila fica tapada de frente e de lado, visível de costas",
+    packPoses.every(([without,withPack],index) => Boolean(without) && Boolean(withPack) &&
+      (index === 3 ? without !== withPack : without === withPack)));
+  Object.assign(d.player,{headingX:-1,headingY:-1,backpack:true,moving:true});
+  d.player.gear.body = "raincoat";
+  const bagSignature = () => {
+    bagPixels.length = 0;
+    pose();
+    return bagPixels.sort().join(",");
+  };
+  const walkingBag = bagSignature();
+  Object.assign(d.player,{moving:false,resting:true});
+  const restingBag = bagSignature();
+  Object.assign(d.player,{resting:false,swing:.10});
+  const strikingBag = bagSignature();
+  check("dark pixel: mochila traseira mantém os mesmos pixels e cores em marcha, repouso e ataque",
+    Boolean(walkingBag) && walkingBag === restingBag && walkingBag === strikingBag);
+  Object.assign(d.player,{headingX:1,headingY:1,swing:0,gear:{...d.player.gear,body:null}});
+  const styles = [pose()];
+  for (const [key,value] of Object.entries({skinTone:"deep",hairColor:"auburn",hairStyle:"wavy",jacketColor:"burgundy"})) {
+    d.player[key] = value;
+    styles.push(pose());
+  }
+  check("dark pixel: pele, cabelo e casaco selecionados alteram o sprite",
+    styles.every(Boolean) && new Set(styles).size === styles.length && pose() === styles.at(-1));
+}
+{
   const interior = Sim.createControl("survival", "carer", "shelter"), world = interior.world;
   const house = world.buildings.find(b => b.compact);
   const floor = world.tiles.find(t => t.building === house.id && !t.solid);
@@ -135,6 +262,12 @@ check("minimapa: repetições não redesenham os tiles", (m2.fillRect || 0) <= 2
     return heldWeapon;
   });
   check("dark pixel: cada arma equipada tem um sprite distinto", sprites.every(Boolean) && new Set(sprites).size === weapons.length);
+  const carry = heldWeapon;
+  run.target = {hp:1,x:run.player.x+.5,y:run.player.y};
+  View.render(run, 0, 1 / 60);
+  check("dark pixel: arma empunhada ao apontar tem pose diferente de transporte",
+    run.target && heldWeapon && heldWeapon !== carry);
+  run.target = null;
   run.swingVisual = {weapon:"bat", dx:1, dy:0};
   run.player.swing = .17;
   View.render(run, 0, 1 / 60);
@@ -198,6 +331,63 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   run.world.objects.push({kind:"campfire",x:player.x,y:player.y,active:true});
   const fire = per(() => View.render(run,1,.016));
   check("fogueira no exterior: luz no chão e brilho fraco perto da janela após corte", fire.fireGlow > 0 && fire.fireWindow > 0);
+
+  run.look = "dark";
+  run.reduceFlicker = false;
+  run.world.objects.push({kind:"tree",x:player.x,y:player.y,active:true,tint:.25});
+  const worldMotion = clock => {
+    smokeFrames.length = canopyPositions.length = rippleFrames.length = propSprites.length = 0;
+    View.render(run, clock, .016);
+    return {smoke:JSON.stringify(smokeFrames), trees:JSON.stringify(canopyPositions), rain:JSON.stringify(rippleFrames), props:[...propSprites]};
+  };
+  const ambientStart = worldMotion(1), ambientLater = worldMotion(1.85);
+  run.reduceFlicker = true;
+  const stillStart = worldMotion(1), stillLater = worldMotion(1.85);
+  check("dark pixel: fogueira alterna sprites e mantém uma pose com redução de cintilação",
+    ambientStart.props.length > 0 && ambientStart.props.some((sprite, index) => sprite !== ambientLater.props[index]) &&
+    stillStart.props.length > 0 && stillStart.props.every((sprite, index) => sprite === stillLater.props[index]));
+  check("dark pixel: fumo, copas e poças animam, reduzir cintilação desativa o movimento ambiente",
+    ambientStart.smoke !== "[]" && ambientStart.smoke !== ambientLater.smoke &&
+    ambientStart.trees !== "[]" && ambientStart.trees !== ambientLater.trees &&
+    ambientStart.rain !== "[]" && ambientStart.rain !== ambientLater.rain &&
+    stillStart.smoke === "[]" && stillLater.smoke === "[]" && stillStart.trees === stillLater.trees &&
+    stillStart.rain === "[]" && stillLater.rain === "[]");
+
+  const barrel = {kind:"barrel", x:player.x, y:player.y, active:true, water:0};
+  const radio = {kind:"radio", x:player.x, y:player.y, active:true};
+  run.world.objects.push(barrel, radio);
+  run.flags.radio = false;
+  const emptyProps = worldMotion(1).props;
+  barrel.water = context.Data.rainCollector.bottleVolume;
+  run.flags.radio = true;
+  const activeProps = worldMotion(1).props;
+  const reusedProps = worldMotion(1).props;
+  check("dark pixel: rádio e barril alternam entre sprites em cache",
+    emptyProps.length === activeProps.length &&
+    emptyProps.filter((sprite, index) => sprite !== activeProps[index]).length === 2 &&
+    activeProps.every((sprite, index) => sprite === reusedProps[index]));
+
+  const door = {kind:"door", action:"door", x:player.x, y:player.y, active:true};
+  run.world.objects.push(door);
+  const closedProps = worldMotion(1).props;
+  door.open = true;
+  const openProps = worldMotion(1).props;
+  door.broken = true;
+  const brokenProps = worldMotion(1).props;
+  const doorIndex = closedProps.findIndex((sprite, index) => sprite !== openProps[index]);
+  check("dark pixel: porta usa sprites próprios para fechar, abrir e quebrar",
+    doorIndex >= 0 && new Set([closedProps[doorIndex], openProps[doorIndex], brokenProps[doorIndex]]).size === 3 &&
+    worldMotion(1).props[doorIndex] === brokenProps[doorIndex]);
+
+  const cart = {kind:"cart", x:player.x, y:player.y, active:true};
+  run.world.objects.push(cart);
+  const stockedProps = worldMotion(1).props;
+  cart.opened = true;
+  const searchedProps = worldMotion(1).props;
+  check("dark pixel: carrinho aberto usa sprite próprio em cache",
+    stockedProps.length === searchedProps.length &&
+    stockedProps.filter((sprite, index) => sprite !== searchedProps[index]).length === 1 &&
+    worldMotion(1).props.every((sprite, index) => sprite === searchedProps[index]));
 
   run.minutes = 19*60;
   for (const look of ["dark","fast","classic"]) {

@@ -219,7 +219,7 @@ const View = (() => {
     const {x, y} = t;
     const a = p(x, y), b = p(x + 1, y), c = p(x + 1, y + 1), d = p(x, y + 1);
     const points = [a, b, c, d];
-    poly(points, t.color, t.surface === "water" ? null : "#101b1349");
+    poly(points, t.color, t.surface === "water" ? null : (t.surface === "grass" || t.surface === "field" || t.surface === "sand") ? "#101b1318" : "#101b1349");
     if (t.surface === "asphalt") {
       const town = t.roadLine === undefined;
       if ((town ? x === 29 : t.roadLine === "y") && y % 4 < 2) line(p(x+.5,y+.08),p(x+.5,y+.88),"#c4ae737d",2);

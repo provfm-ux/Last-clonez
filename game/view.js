@@ -785,6 +785,11 @@ const View = (() => {
       f(-.23,-.26,18,.12,.12,4,state.atmosphere.awake && state.world.cinema === "projector" ? cream : rubber);
       return;
     }
+    if (kind === "terminal") {
+      f(-.22,-.2,0,.44,.38,10,["#59605a","#3f4540","#2c312d"]);
+      f(-.14,-.12,10,.28,.06,9,o.read ? ["#3b4a3c","#2c372d","#1f2720"] : ["#7fd08a","#4f8f5a","#2f5a36"]);
+      return;
+    }
     if (kind === "statue") {
       if (!o.active) return;
       // A classic squat golden idol on a stone altar: low seated body, big round head, small ears.
@@ -1648,6 +1653,7 @@ const View = (() => {
     shovel: [[1,0,9,2,lightWood],[9,-2,4,5,steel],[12,-1,2,3,lightSteel]],
     golfclub: [[1,0,3,2,darkSteel],[4,0,9,1,steel],[12,0,3,3,lightSteel]],
     crowbar: [[1,0,11,2,"#87564a"],[11,-2,2,3,"#a56e5b"],[12,-2,2,1,lightSteel]],
+    foundrymaul: [[1,0,11,2,woodGrip],[2,0,9,1,lightWood],[10,-3,5,7,darkSteel],[11,-3,3,1,lightSteel],[14,-2,1,5,steel]],
     hatchet: [[1,0,8,2,woodGrip],[7,-1,3,3,darkSteel],[9,-3,3,6,steel],[12,-2,1,4,lightSteel]],
     wrench: [[1,0,8,2,darkSteel],[2,0,6,1,steel],[8,-2,3,5,steel],[11,-2,2,1,lightSteel],[11,2,2,1,lightSteel]],
     fryingpan: [[1,0,7,2,darkSteel],[7,-2,7,6,darkSteel],[8,-3,5,1,steel],[8,4,5,1,steel],[13,-1,2,4,steel],[9,-1,3,3,"#4c5553"]],

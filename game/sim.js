@@ -500,6 +500,7 @@ const Sim = (() => {
     };
     if (difficulty === "campaign") {
       s.campaign = newCampaign();
+      if (region === "ironworks") placeIronworks(world);
       if (town) {
         placeCampaignPages(world, seed);
         placeEvaDiary(world);
@@ -1452,7 +1453,66 @@ const Sim = (() => {
   }
 
   // Campaign objects added after campaign saves already existed: older saves get them back on load.
-  const campaignFixtures = new Set(["eva-diary"]);
+  const campaignFixtures = new Set(["eva-diary", "iron-cage", "iron-toolboard", "iron-terminal-0", "iron-terminal-1", "iron-terminal-2"]);
+
+  // ironworks.barricade: a barricaded weapon cage and a toolboard in the machine shop, and three line-computer terminals.
+  function placeIronworks(world) {
+    const used = new Set(world.objects.map(o => Math.floor(o.x) + ":" + Math.floor(o.y)));
+    const spot = b => {
+      const tiles = [];
+      for (let y = b.y + 1; y < b.y + b.h - 1; y++) for (let x = b.x + 1; x < b.x + b.w - 1; x++) tiles.push(World.tileAt(world,x,y));
+      const centre = {x:b.x + b.w / 2, y:b.y + b.h / 2};
+      return tiles.filter(t => t && t.building === b.id && !used.has(t.x + ":" + t.y) && World.clear(world,t.x+.5,t.y+.5,.32) &&
+        World.route(world,world.start.x,world.start.y,t.x+.5,t.y+.5,0,true).length)
+        .sort((a,c) => distance({x:a.x+.5,y:a.y+.5},centre) - distance({x:c.x+.5,y:c.y+.5},centre) || a.y - c.y || a.x - c.x)[0];
+    };
+    const put = (b, data) => {
+      const t = b && spot(b);
+      if (!t) return;
+      used.add(t.x + ":" + t.y);
+      world.objects.push({x:t.x+.5, y:t.y+.5, building:b.id, zone:t.zone, tint:.5, active:true, ...data});
+    };
+    const named = name => world.buildings.find(b => b.name === name);
+    const shop = named("Machine shop");
+    put(shop, {id:"iron-cage", kind:"locker", action:"ironworks-cage", name:"Barricaded weapon cage", stage:0, solid:true});
+    put(shop, {id:"iron-toolboard", kind:"toolrack", action:"loot", name:"Line toolboard", searched:false, solid:true,
+      loot:[{id:"hammer", qty:1, condition:Data.ironworks.toolCondition}, {id:"crowbar", qty:1, condition:Data.ironworks.toolCondition}]});
+    for (const [line, name] of ["Machine shop", "Power substation", "Dispatch office"].entries())
+      put(named(name), {id:"iron-terminal-" + line, kind:"terminal", action:"ironworks-terminal", name:"Line computer terminal", line, read:false, solid:true});
+  }
+
+  function dismantleCage(s, cage) {
+    const rule = Data.ironworks, stage = rule.stages[cage?.stage];
+    if (!s.campaign || s.mode !== "play" || s.player.vehicle || cage?.action !== "ironworks-cage" || !stage ||
+        !s.world.objects.includes(cage) || !reachableObject(s,cage)) return false;
+    const tools = s.player.bag.filter(item => stage.tools.includes(item.id));
+    const tool = tools.find(item => (item.condition ?? 100) >= rule.wear);
+    if (!tool) {
+      notify(s, tools.length ? Data.campaignText.ironWorn : Data.campaignText.ironTools + stage.verb.toLowerCase() + " needs a " +
+        stage.tools.map(id => Data.items[id].name.toLowerCase()).join(" or a ") + ".", true);
+      return false;
+    }
+    tool.condition = (tool.condition ?? 100) - rule.wear;
+    cage.stage++;
+    noise(s, cage.x, cage.y, 9);
+    hear(s, "hammer", cage);
+    s.effects.push({x:cage.x, y:cage.y, text:cage.stage < rule.stages.length ? "CLANG" : "OPEN", color:"#c9d6ae", life:.8, impact:.3});
+    notify(s, stage.done);
+    if (cage.stage < rule.stages.length) return true;
+    add(s.player.bag, "foundrymaul", 1, {born:s.minutes, condition:100});
+    if (!s.campaign.completed.includes("ironworks.barricade")) s.campaign.completed.push("ironworks.barricade");
+    CampaignHints.track(s.campaign.hints, "fathill.bosses", s.minutes);
+    notify(s, Data.campaignText.ironDone);
+    return true;
+  }
+
+  function readTerminal(s, terminal) {
+    if (s.mode !== "play" || s.player.vehicle || terminal?.action !== "ironworks-terminal" ||
+        !s.world.objects.includes(terminal) || !reachableObject(s,terminal)) return false;
+    terminal.read = true;
+    notify(s, Data.campaignText.ironTerminals[terminal.line] ?? "The screen is dark.");
+    return true;
+  }
   // eva.death: Eva's diary waits, hidden, in the shelter from the first day; it appears on the morning of day 6.
   function placeEvaDiary(world) {
     const b = world.base, crate = world.objects.find(o => o.storage && o.building === b.id), tiles = [];
@@ -3861,7 +3921,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, cinemaBuff, hurt, readEvaDiary, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

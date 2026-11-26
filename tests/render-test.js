@@ -430,5 +430,18 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   const equipped = per(() => View.equipmentPortrait(portrait,run));
   check("equipamento: retrato apresenta jogador e arma equipada", equipped.drawImage >= 2);
 }
+{ // cinema.statue: a estátua desenha-se no palco, barata e sem gradientes, e desaparece depois de apanhada
+  const run = Sim.createControl("campaign","carer","shelter"); Sim.testJump(run, 2, {}, {anyMode: true});
+  const exit = run.world.objects.find(o => o.id === "exit-cinema"); Object.assign(run.player, {x: exit.x - 1, y: exit.y});
+  const c = Sim.travel(run, exit); View.prepare(c.world); Object.assign(c.player, {x: 11.5, y: 7.5}); for (let i = 0; i < 5; i++) Sim.tick(c, .05);
+  const statue = c.world.objects.find(o => o.id === "cinema-statue");
+  const total = r => Object.entries(r).filter(([k]) => !/Gradient/.test(k)).reduce((n, [, v]) => n + v, 0);
+  View.render(c, 0, 1/60);
+  const shown = per(() => View.render(c, 0, 1/60)); statue.active = false;
+  const gone = per(() => View.render(c, 0, 1/60)); statue.active = true;
+  check("cinema.statue estátua desenhada no palco, barata e sem gradientes", total(shown) > total(gone) && total(shown) - total(gone) < 100 &&
+    (shown.createRadialGradient ?? 0) === (gone.createRadialGradient ?? 0) && (shown.createLinearGradient ?? 0) === (gone.createLinearGradient ?? 0),
+    total(shown) + " vs " + total(gone));
+}
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

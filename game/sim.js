@@ -451,6 +451,8 @@ const Sim = (() => {
           world.enemies.push(z);
         }
       }
+      if (difficulty === "campaign") world.objects.push({id:"cinema-statue",kind:"statue",name:"Golden statue",action:"cinema-statue",
+        x:11.5,y:5.5,building:world.buildings[0].id,zone:world.buildings[0].id,tint:.7,active:true,solid:false});
       if (world.cinema === "trophy" || !rules.count && world.cinema === "winner") {
         world.objects.push({id:"cinema-trophy",kind:"crate",name:"Abandoned prize case",x:20.5,y:7.5,
           building:world.buildings[0].id,zone:world.buildings[0].id,tint:.65,active:true,solid:false,action:"loot",searched:false,
@@ -1358,6 +1360,45 @@ const Sim = (() => {
     }
   }
 
+  // cinema.statue: taking the statue jams the doors, wakes a horde of 50 and leaves the windows as the only way out.
+  function takeStatue(s, statue) {
+    if (!s.campaign || s.mode !== "play" || statue?.action !== "cinema-statue" || !statue.active ||
+        !s.world.objects.includes(statue) || !reachableObject(s,statue)) return false;
+    statue.active = false;
+    add(s.player.bag,"goldstatue",1,{born:s.minutes});
+    const hall = s.world.buildings.find(b => b.type === "cinema");
+    for (const o of s.world.objects) {
+      if (o.action !== "door" || o.building !== hall.id) continue;
+      if (o.kind === "window") { if (!o.open) o.reinforced = Data.cinemaTrap.windowHits; }
+      else Object.assign(o,{open:false, sealed:true});
+    }
+    World.sync(s.world);
+    const rng = Level.seeded((s.seed ^ 0x51a7e) >>> 0), spots = [];
+    for (let y = hall.y + 1; y < hall.y + hall.h - 1; y++) for (let x = hall.x + 1; x < hall.x + hall.w - 1; x++) {
+      const point = {x:x+.5, y:y+.5};
+      if (World.tileAt(s.world,x,y)?.building === hall.id && World.clear(s.world,point.x,point.y,.18) && distance(point,s.player) > 3.5) spots.push(point);
+    }
+    for (let i = spots.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [spots[i], spots[j]] = [spots[j], spots[i]]; }
+    for (let i = 0; i < Data.cinemaTrap.horde; i++) {
+      const z = newInfected(s, spots[i % spots.length], "cinema-horde", rng);
+      Object.assign(z,{alert:1, chaseX:s.player.x, chaseY:s.player.y});
+    }
+    s.atmosphere.awake = true;
+    noise(s, statue.x, statue.y, 14);
+    notify(s, Data.campaignText.statueTaken, true);
+    return true;
+  }
+
+  function updateCinemaTrap(s) {
+    if (s.world.region !== "cinema" || s.campaign.completed.includes("cinema.statue")) return;
+    const statue = s.world.objects.find(o => o.id === "cinema-statue"), hall = s.world.buildings.find(b => b.type === "cinema");
+    if (!statue || statue.active || World.tileAt(s.world,s.player.x,s.player.y)?.building === hall.id) return;
+    for (const o of s.world.objects) if (o.sealed) o.sealed = false;
+    s.campaign.completed.push("cinema.statue");
+    CampaignHints.track(s.campaign.hints, "pineridge.two-nights", s.minutes);
+    notify(s, Data.campaignText.cinemaEscape);
+  }
+
   function readCampaignPage(s, note) {
     if (!s.campaign || s.mode !== "play" || s.player.vehicle || note?.action !== "campaign-page" ||
         !s.world.objects.includes(note) || !reachableObject(s,note)) return false;
@@ -1886,6 +1927,7 @@ const Sim = (() => {
 
   function breachProblem(s, o, method) {
     if (s.player.vehicle || !reachableObject(s, o) || o.action !== "door" || o.open || o.boards || o.broken) return "The opening is blocked.";
+    if (o.sealed) return Data.campaignText.jammed;
     if (method === "pry") {
       if (!(o.locked || o.kind === "window")) return "This opening does not need prying.";
       if (!crowbar(s)) return "Carry a crowbar in usable condition.";
@@ -1899,6 +1941,14 @@ const Sim = (() => {
     const tool = method === "pry" ? crowbar(s) : smashTool(s), p = s.player;
     p.stamina -= 9 * staminaCost(s);
     if (tool) tool.condition = Math.max(0, tool.condition - (method === "pry" ? 2.5 : 1.5));
+    if (method === "smash" && o.reinforced > 1) {
+      o.reinforced--;
+      noise(s, o.x, o.y, 13);
+      hear(s,"glassSmash",o);
+      notify(s, Data.campaignText.frameHolds);
+      return true;
+    }
+    o.reinforced = 0;
     o.open = true;
     o.locked = false;
     o.latched = false;
@@ -1927,6 +1977,10 @@ const Sim = (() => {
     if (!o?.active || o.action !== "door" || o.kind === "fence" || o.broken || o.kind === "gate" && o.hp === 0) return false;
     if (o.boards > 0) {
       if (!auto) notify(s, "The barricade blocks the opening. Remove a plank from the door or window panel.", true);
+      return false;
+    }
+    if (o.sealed) {
+      if (!auto) notify(s, Data.campaignText.jammed, true);
       return false;
     }
     if (o.open && openingOccupied(s, o)) {
@@ -3143,6 +3197,7 @@ const Sim = (() => {
     const raining = s.weather === "Rain";
     updateOutdoor(s, minutes, raining);
     if (s.longHaul && s.player.hp > 0) updateLongHaul(s);
+    if (s.campaign) updateCinemaTrap(s);
     if (s.campaign?.hints.objective) {
       const hint = CampaignHints.next(s.campaign.hints, s.minutes);
       if (hint) notify(s, "Hint: " + hint);
@@ -3523,6 +3578,8 @@ const Sim = (() => {
       (o.locked === undefined || typeof o.locked === "boolean" && (!o.locked || original?.locked && !o.open)) &&
       (o.latched === undefined || typeof o.latched === "boolean" && (!o.latched || original?.latched && !o.open)) &&
       (o.alarmArmed === undefined || typeof o.alarmArmed === "boolean" && (!o.alarmArmed || original?.alarmArmed)) &&
+      (o.sealed === undefined || typeof o.sealed === "boolean" && (!o.sealed || !o.open)) &&
+      (o.reinforced === undefined || Number.isInteger(o.reinforced) && o.reinforced >= 0 && o.reinforced <= Data.cinemaTrap.windowHits) &&
       (o.broken === undefined || typeof o.broken === "boolean" && (!o.broken || (o.boards > 0 ? !o.open : o.open && o.hp === 0)));
     const foreignCar = o => o.kind === "car" && o.action === "loot" && o.active && !o.away && o.homeRegion !== region &&
       (o.homeRegion === Regions.home ? /^o\d{1,3}$/.test(o.id) : Object.hasOwn(Regions.vehicleNames, o.id) && o.id.startsWith(o.homeRegion + "-"));
@@ -3704,7 +3761,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, campaignProblem, readCampaignPage, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

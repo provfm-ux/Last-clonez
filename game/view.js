@@ -781,6 +781,14 @@ const View = (() => {
       f(-.23,-.26,18,.12,.12,4,state.atmosphere.awake && state.world.cinema === "projector" ? cream : rubber);
       return;
     }
+    if (kind === "statue") {
+      if (!o.active) return;
+      const gold = ["#e0b85a","#a8812f","#6f5520"];
+      f(-.2,-.2,0,.4,.4,9,["#6b6257","#4e473f","#37322c"]);
+      f(-.08,-.08,9,.16,.16,12,gold);
+      f(-.06,-.06,21,.12,.12,6,gold);
+      return;
+    }
     if (kind === "cinema-body") {
       f(-.13,-.08,12,.35,.31,8,rubber);
       f(.08,-.05,17,.22,.20,4,olive);

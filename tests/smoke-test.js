@@ -1635,6 +1635,43 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("coldvale.houses reler não repete a recompensa", s.campaign.completed.filter(id => id === "coldvale.houses").length === 1 && s.campaign.clues === 1);
 }
 
+{ // cinema.statue (HISTORIA.md secções 10 e 16): estátua → horda de 50 → fuga pela janela; com pé-de-cabra é mais rápido
+  const toCinema = items => {
+    const s = fresh("campaign"); Sim.testJump(s, 2, items, {anyMode: true});
+    const exit = s.world.objects.find(o => o.id === "exit-cinema"); Object.assign(s.player, {x: exit.x - 1, y: exit.y});
+    return Sim.travel(s, exit);
+  };
+  const c = toCinema({}), statue = c.world.objects.find(o => o.id === "cinema-statue");
+  check("cinema.statue a estátua está no palco só na campanha", statue?.active && c.world.tiles.find(t => t.x === 11 && t.y === 5)?.room === "Stage" &&
+    !Sim.create(17, "survival", "carer", context.Expedition.generator, undefined, ctxRegions.definitions.cinema ? "cinema" : undefined).world.objects.some(o => o.id === "cinema-statue"));
+  const take = s => { const st = s.world.objects.find(o => o.id === "cinema-statue"); Object.assign(s.player, {x: 11.5, y: 6.5}); return Sim.takeStatue(s, st); };
+  const doors = s => s.world.objects.filter(o => o.action === "door" && o.kind !== "window" && o.building === s.world.buildings.find(b => b.type === "cinema").id);
+  const win = s => s.world.objects.find(o => o.action === "door" && o.kind === "window");
+  check("cinema.statue retirar a estátua: horda de 50, portas encravadas, estátua no saco", take(c) && !statue.active &&
+    c.world.enemies.filter(z => z.origin === "cinema-horde").length === 50 && doors(c).every(o => o.sealed && !o.open) &&
+    win(c).reinforced === Data.cinemaTrap.windowHits && Sim.quantity(c.player.bag, "goldstatue") === 1);
+  check("cinema.statue a horda do cinema não dá recursos aleatórios",
+    c.world.enemies.filter(z => z.origin === "cinema-horde").every(z => Sim.carriedSupply(c, z) === null));
+  Object.assign(c.player, {x: doors(c)[0].x, y: doors(c)[0].y - 1});
+  check("cinema.statue as portas não abrem", !Sim.door(c, doors(c)[0]) && /Jammed/.test(c.messages.at(-1).text));
+  const saved = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(c))));
+  check("cinema.statue o estado da armadilha fica gravado", doors(saved).every(o => o.sealed) && win(saved).reinforced === 3 &&
+    saved.world.enemies.filter(z => z.origin === "cinema-horde").length === 50);
+  const w = win(c); Object.assign(c.player, {x: w.x - 1, y: w.y, hp: 100});
+  const hit = () => { c.player.stamina = 100; return Sim.breach(c, w, "smash"); };
+  hit(); hit();
+  check("cinema.statue sem pé-de-cabra: 2 pancadas não chegam", !w.open && /frame holds/.test(c.messages.at(-1).text));
+  hit();
+  check("cinema.statue à terceira pancada a janela parte", w.open && w.broken);
+  const fast = toCinema({crowbar: 1}); take(fast);
+  const fw = win(fast); Object.assign(fast.player, {x: fw.x - 1, y: fw.y, stamina: 100});
+  check("cinema.statue com pé-de-cabra abre à primeira", Sim.breach(fast, fw, "pry") && fw.open);
+  Object.assign(c.player, {x: w.x + 1, y: w.y, hp: 100}); c.world.enemies = c.world.enemies.filter(z => z.origin !== "cinema-horde");
+  run(c, 1);
+  check("cinema.statue sair pela janela cumpre o desafio e destrava as portas", c.campaign.completed.includes("cinema.statue") &&
+    doors(c).every(o => !o.sealed) && c.campaign.hints.objective === "pineridge.two-nights" && /feel a little safer/.test(c.messages.at(-1).text));
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

@@ -1832,6 +1832,15 @@ const View = (() => {
     }
   }
 
+  // Seconds-long fall after death, tracked per infected in the view only (0 = just died, 1 = on the ground).
+  // Only infected seen alive fall: corpses that were already down when the area loaded stay down.
+  const deathTimes = new WeakMap(), seenAlive = new WeakSet(), fallSeconds = .45;
+  function deathFall(a, clock) {
+    if (!seenAlive.has(a)) return 1;
+    if (!deathTimes.has(a)) deathTimes.set(a, clock);
+    return Math.min(1, Math.max(0, (clock - deathTimes.get(a)) / fallSeconds));
+  }
+
   function actor(a, isPlayer, state, clock, inReach) {
     const alive = isPlayer || a.hp > 0;
     const [x, y] = p(a.x, a.y);
@@ -1847,7 +1856,22 @@ const View = (() => {
       ctx.restore();
     }
     if (darkLook) {
-      microActor(a, isPlayer, state, alive, x, y, scale, clock);
+      // Animation polish (game-feel): infected fall over when they die and squash on a hit; drawing only, pivot at the feet.
+      if (alive && a.stats) seenAlive.add(a);
+      const fallen = !alive && a.stats ? deathFall(a, clock) : 1;
+      const hit = alive && a.stats && a.flash > 0 ? Math.min(1, a.flash / .25) : 0;
+      const down = !alive && a.stats; // infected corpses keep the same sprite they fell with, so there is no pop at the end
+      if (down || hit > 0) {
+        const side = (a.face ?? 1) < 0 ? -1 : 1, ease = fallen * fallen; // topple: slow start, gravity speeds it up
+        ctx.save();
+        ctx.translate(x, y);
+        if (down) { ctx.rotate(side * ease * 1.35); ctx.globalAlpha *= 1 - .18 * ease; }
+        else ctx.scale(1 + .14 * hit, 1 - .12 * hit);
+        ctx.translate(-x, -y + (down ? ease * 3 : 0));
+        microActor(down ? Object.assign(Object.create(a), {hp: 1, flash: .03, moving: false, swing: 0, windup: 0, alert: 0}) : a,
+          isPlayer, state, true, x, y, scale, clock);
+        ctx.restore();
+      } else microActor(a, isPlayer, state, alive, x, y, scale, clock);
       if (alive && a.origin === "cinema-winner") {
         const hand = x+(a.face || 1)*9, bob = a.moving ? Math.round(Math.sin(clock*5)*2) : 0;
         ctx.fillStyle = "#d5ad52";

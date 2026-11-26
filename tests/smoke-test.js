@@ -1693,6 +1693,25 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("cinema.buff expira ao fim de 3 noites", !Sim.cinemaBuff(c) && c.campaign.buffUntil === 0 && /ordinary lump/.test(c.messages.at(-1).text));
 }
 
+{ // sys.needs-clock (skill survival-crafting): fome, sede e sono medidos contra o tamanho do dia em cada velocidade
+  const measure = clock => {
+    const s = Sim.createControl("campaign", "carer", "shelter", {clock, count: 0, hordes: "off"});
+    Object.assign(s.player, {hunger: 92, hydration: 92, fatigue: 8}); s.world.enemies = [];
+    const at = {}, start = s.minutes, mark = (key, done) => { if (at[key] === undefined && done) at[key] = (s.minutes - start) / 1440; };
+    for (let i = 0; i < 60000 && Object.keys(at).length < 3; i++) {
+      Sim.tick(s, .25); Object.assign(s.player, {hp: 100});
+      mark("fome", s.player.hunger < 30); mark("sede", s.player.hydration < 30); mark("sono", s.player.fatigue >= 60);
+    }
+    return at;
+  };
+  const days = Object.fromEntries([0.4, 1.6, 2].map(c => [c, measure(c)]));
+  const show = Object.entries(days).map(([c, d]) => c + ": fome " + d.fome.toFixed(2) + "d, sede " + d.sede.toFixed(2) + "d, sono " + d.sono.toFixed(2) + "d").join(" | ");
+  check("sys.needs-clock 1,6 e 0,4 gastam por dia o mesmo que o ritmo 2", ["fome", "sede", "sono"].every(k =>
+    Math.abs(days[0.4][k] - days[2][k]) / days[2][k] < .05 && Math.abs(days[1.6][k] - days[2][k]) / days[2][k] < .05), show);
+  check("sys.needs-clock uma barra de fome dura cerca de 1 a 2 dias; a sede chega primeiro", days[0.4].fome >= 1 && days[0.4].fome <= 2 &&
+    days[0.4].sede < days[0.4].fome, show);
+}
+
 { // pineridge.two-nights (HISTORIA.md secções 10 e 16): 2 noites sem barricadas → pista 2; com exposição a noite repete-se
   const start = fresh("campaign"); Sim.testJump(start, 3, {}, {anyMode: true});
   const exit = start.world.objects.find(o => o.id === "exit-ridge"); Object.assign(start.player, {x: exit.x, y: exit.y + (exit.y > start.world.height / 2 ? -1 : 1)});

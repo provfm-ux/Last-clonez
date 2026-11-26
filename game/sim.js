@@ -3187,12 +3187,15 @@ const Sim = (() => {
   }
 
   function updateNeeds(s, dt) {
-    const p = s.player, rate = s.rules.needs / 100 * pressure(s), gradual = s.rules.care === "gradual";
+    // Needs follow game time on clocks slower than the default 2 (1.6 campaign, 0.4 Realistic), so a day costs the same food,
+    // water and sleep at any of those paces. Clocks 2-4 are unchanged.
+    const pace = Math.min(1, s.rules.clock / 2);
+    const p = s.player, rate = s.rules.needs / 100 * pressure(s) * pace, gradual = s.rules.care === "gradual";
     const inDanger = threats(s).length > 0;
     const floor = Data.modes[s.difficulty]?.noStarve ? 8 : 0;
     p.hunger = Math.max(floor, p.hunger - dt * .07 * rate * (p.sleeping ? .5 : 1));
     p.hydration = Math.max(floor, p.hydration - dt * (s.running ? .15 : .1) * rate * (p.sleeping ? .5 : 1));
-    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 : p.resting ? -1.6 : (s.running ? .075 : .04) * rate), 0, 100);
+    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 * pace : p.resting ? -1.6 * pace : (s.running ? .075 : .04) * rate), 0, 100);
     if (p.resting) {
       if (inDanger) { p.resting = false; notify(s, "Danger interrupted your rest.", true); }
       else if (p.hunger > 25 && p.hydration > 25 && (!gradual || !p.wounds.some(w => !w.bandaged))) {

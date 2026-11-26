@@ -1923,6 +1923,31 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("cinema.scene depois da fuga a tensão para", c.campaign.completed.includes("cinema.statue") && !c.sounds.some(x => x.kind === "tension"));
 }
 
+{ // origins (#17): profissões, traços e controlos do Sandbox
+  const traits = ["light-eater","needs-more-sleep"];
+  const profile = {seed:17,name:"Nora",appearance:"female",skinTone:"deep",hairStyle:"wavy",traits};
+  const rules = {count:0,hordes:"off",speed:80,vision:75,hearing:50,memory:60,decay:50,bite:0};
+  const s = Sim.createControl("custom","doctor","shelter",rules,profile);
+  const plain = Sim.createControl("custom","doctor","shelter",rules,{seed:17});
+  check("origins a profissão dá competências e equipamento; a aparência do 0.34 mantém-se",
+    Sim.level(s,"medical") === 3 && Sim.quantity(s.player.bag,"disinfectant") === 1 && s.player.hairStyle === "wavy" && s.player.skinTone === "deep");
+  check("origins 30 traços; o orçamento recusa escolhas por pagar ou contraditórias", Object.keys(Data.traits).length === 30 &&
+    !Data.traitLoadout(["light-eater"]).valid && !Data.traitLoadout(["light-eater","big-appetite"]).valid && Data.traitLoadout(traits).valid);
+  run(s,120); run(plain,120);
+  check("origins os traços mudam as necessidades em jogo", s.player.hunger > plain.player.hunger && s.player.fatigue > plain.player.fatigue);
+  const saved = JSON.parse(JSON.stringify(Sim.snapshot(s)));
+  const again = Sim.restore(saved);
+  check("origins personagem, traços e Sandbox gravam e carregam", again.player.name === "Nora" && again.traitEffects.hunger === .8 &&
+    Object.entries(rules).every(([key,value]) => again.rules[key] === value));
+  const food = {id:"rawfish",born:s.minutes};
+  check("origins o Sandbox muda a duração da comida", Math.abs(Sim.freshMinutes(s,food) * 2 - Sim.freshMinutes({...s,rules:{...s.rules,decay:100}},food)) < 1e-8);
+  saved.player.traits = ["light-eater"];
+  let rejected = false; try { Sim.restore(saved); } catch { rejected = true; }
+  check("origins um orçamento de traços inválido no save é recusado", rejected);
+  const old = Sim.restore(JSON.parse(require("zlib").gunzipSync(fs.readFileSync(path.join(__dirname, "fixtures", "v0.34-survival.json.gz"))).toString("utf8")));
+  check("origins saves da 0.34 carregam com o Sandbox por omissão e sem traços", old.rules.speed === 100 && old.rules.bite === 6 && Object.keys(old.traitEffects).length === 0);
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

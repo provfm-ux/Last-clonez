@@ -164,6 +164,14 @@ const Data = (() => {
     nightshift:{name:"Night Shift", desc:"Start at 22:00 in steady rain with fast infected in town.", count:75, mix:"runners", startHour:22, weather:"rain", powerDays:0, waterDays:1},
     laststand:{name:"Last Stand", desc:"Dense crowds, frequent hordes, limited supplies and infection from bites or other wounds.", count:140, hordes:"frequent", mix:"runners", damage:145, needs:140, loot:50, startHour:18, powerDays:0, waterDays:0, infection:"wounds"}
   };
+  const sandboxTuning = {
+    speed:{label:"Infected movement speed (%)",min:50,max:150,step:5,default:100},
+    vision:{label:"Infected sight range (%)",min:25,max:175,step:5,default:100},
+    hearing:{label:"Infected hearing range (%)",min:25,max:175,step:5,default:100},
+    memory:{label:"Infected sound memory (%)",min:25,max:175,step:5,default:100},
+    decay:{label:"Perishable food lifetime (%)",min:25,max:200,step:5,default:100},
+    bite:{label:"Bite chance per unblocked hit (%)",min:0,max:40,step:1,default:6}
+  };
   const ruleFields = {
     count:{label:"Infected population", min:0, max:160, step:1},
     mix:{label:"Infected types", choices:{walkers:"Walkers only", mixed:"Walkers and brutes", runners:"Includes runners"}},
@@ -179,7 +187,8 @@ const Data = (() => {
     exposure:{label:"Cold and wetness", choices:{on:"On", off:"Off"}},
     powerDays:{label:"Days before power cuts", min:-1, max:14, step:1},
     afterlifeChance:{label:"Continue after infected death (%)", min:0, max:100, step:1},
-    waterDays:{label:"Days before water cuts", min:-1, max:14, step:1}
+    waterDays:{label:"Days before water cuts", min:-1, max:14, step:1},
+    ...sandboxTuning
   };
   const modeAdvice = {
     campaign:"About 15 real minutes per day. Some areas only open on weekdays or at low tide.",
@@ -205,7 +214,7 @@ const Data = (() => {
   function worldRules(mode, values) {
     const rules = {};
     for (const [id, field] of Object.entries(ruleFields)) {
-      const value = values?.[id], fallback = id === "hordes" && rules.count === 0 ? "off" : modes[mode]?.[id] ?? baseline[id];
+      const value = values?.[id], fallback = id === "hordes" && rules.count === 0 ? "off" : modes[mode]?.[id] ?? baseline[id] ?? field.default;
       const valid = field.choices ? Object.hasOwn(field.choices, value) && typeof value === (field.numeric ? "number" : "string") :
         Number.isInteger(value) && value >= field.min && value <= field.max;
       rules[id] = valid ? value : fallback;
@@ -288,6 +297,60 @@ const Data = (() => {
     electrician:{name:"Electrician",desc:"Flashlight batteries last longer. Starts with two spare batteries.",medical:1,craft:1,fitness:1,lampDrain:.7,kit:{battery:2}},
     ranger:{name:"Ranger",desc:"Finds more food and bait when foraging. Starts with an empty bottle.",medical:1,craft:1,fitness:1,forageBonus:1,kit:{emptybottle:1}}
   };
+  const occupations = {
+    unemployed:{name:"Unemployed",desc:"You had an interview on Monday. The Job Centre is now taking walk-ins exclusively."},
+    police:{name:"Police Officer",desc:"Your last call was a noise complaint at the shopping arcade. Nobody knew who still had the keys.",levels:{combat:2},kit:{armguards:1}},
+    doctor:{name:"Doctor",desc:"Cold Vale Clinic logged its last patient twice. Both entries had your signature.",levels:{medical:3},kit:{disinfectant:1,painkiller:1}},
+    nurse:{name:"Nurse",desc:"You used the ambulance keys to open the drug cupboard. By morning the ambulance would have been more useful.",levels:{medical:2},kit:{bandage:2}},
+    carpenter:{name:"Carpenter",desc:"The orchard asked you to board the windows from the inside. Somebody outside kept handing you nails.",levels:{crafting:2},kit:{hammer:1,wood:1}},
+    lumberjack:{name:"Lumberjack",desc:"The firewatch cabin stopped answering. Its radio still called in a wind reading every hour.",levels:{strength:2},kit:{hatchet:1}},
+    cook:{name:"Cook",desc:"The Malt House paid you through closing. Technically, the Malt House has yet to close.",levels:{cooking:2},kit:{fryingpan:1}},
+    farmer:{name:"Farmer",desc:"You left three crates at the Westfields crossing. By dawn the crates had come back empty, stacked by size.",levels:{gardening:2},kit:{seedpotato:2}},
+    fisher:{name:"Fisher",desc:"The ferry keeper still owed you for a catch. After the all-clear, someone nailed the exact change to your door.",levels:{fishing:2},kit:{emptybottle:1}},
+    burglar:{name:"Burglar",desc:"The cinema cashbox was already empty. Someone had left the raffle proceeds in an envelope marked BUS FARES.",levels:{sneaking:2},kit:{crowbar:1}},
+    veteran:{name:"Veteran",desc:"The evacuation list gave the same address for everybody. You knew the address. It was the allotment shed.",levels:{combat:2,fitness:1},kit:{bandage:1}},
+    instructor:{name:"Fitness Instructor",desc:"Your last class met outside the locked sports hall. Warmups ended when the caretaker came through the glass.",levels:{fitness:3},kit:{water:1}},
+    engineer:{name:"Engineer",desc:"The pump telemetry showed a second startup four minutes before the first. Management requested one timestamp per incident.",levels:{crafting:2,foraging:1},kit:{scrap:2}}
+  };
+  for (const [id, occupation] of Object.entries(occupations)) roles[id] = {medical:1,craft:1,fitness:1,...occupation};
+  Object.assign(roles.carer,{levels:{medical:1}});
+  Object.assign(roles.builder,{levels:{crafting:1}});
+  Object.assign(roles.scout,{levels:{sneaking:1}});
+  Object.assign(roles.mechanic,{levels:{crafting:1}});
+  Object.assign(roles.electrician,{levels:{crafting:1}});
+  Object.assign(roles.ranger,{levels:{foraging:1}});
+
+  // Each effect has one advantage and one drawback. They cannot be selected together.
+  const traitPairs = {
+    fitness:[3,"Athletic",1.2,"Unfit",.8,"stamina efficiency"],
+    carry:[3,"Strong",1.2,"Frail",.8,"carry capacity"],
+    heal:[2,"Fast Healer",1.25,"Slow Healer",.75,"bandaged wound healing"],
+    hunger:[2,"Light Eater",.8,"Big Appetite",1.25,"hunger drain"],
+    thirst:[2,"Waterwise",.8,"Thirsty",1.25,"thirst drain"],
+    fatigue:[2,"Rested",.8,"Needs More Sleep",1.25,"fatigue gain"],
+    panic:[2,"Brave",.7,"Cowardly",1.3,"panic gain around infected"],
+    noise:[3,"Graceful",.8,"Clumsy",1.25,"footstep noise radius"],
+    sight:[2,"Eagle Eyed",1.15,"Short Sighted",.8,"ambient sight range"],
+    stealth:[3,"Inconspicuous",.8,"Conspicuous",1.25,"distance at which infected spot you"],
+    illness:[2,"Hardy",.75,"Prone to Illness",1.25,"illness buildup"],
+    bleeding:[2,"Thick Skinned",.75,"Thin Skinned",1.25,"bleeding damage"],
+    aim:[2,"Steady Hands",1.15,"Shaky Hands",.85,"base firearm accuracy"],
+    study:[2,"Fast Reader",1.5,"Slow Reader",.5,"skill book XP"],
+    warmth:[2,"Acclimatised",.8,"Cold Sensitive",1.2,"body heat lost to the environment"]
+  };
+  const traits = {};
+  for (const [effect,[cost,good,goodValue,bad,badValue,label]] of Object.entries(traitPairs)) {
+    for (const [name,value,points] of [[good,goodValue,cost],[bad,badValue,-cost]]) {
+      const id = name.toLowerCase().replaceAll(" ","-");
+      traits[id] = {name,effect,value,points,description:Math.round(value * 100) + "% " + label};
+    }
+  }
+  function traitLoadout(selection) {
+    const ids = Array.isArray(selection) ? [...new Set(selection.filter(id => typeof id === "string" && Object.hasOwn(traits,id)))].sort() : [];
+    const balance = -ids.reduce((points,id) => points + traits[id].points,0);
+    const effects = Object.fromEntries(ids.map(id => [traits[id].effect,traits[id].value]));
+    return {ids,balance,effects,valid:balance >= 0 && Object.keys(effects).length === ids.length};
+  }
   // Skills: XP needed for level n is 12 n^2 (see Sim.level). Every skill uses the same curve.
   const skillMax = 10;
   const skillXp = level => 12 * level * level;
@@ -373,7 +436,8 @@ const Data = (() => {
     return {
       name:[...name].slice(0,characterNameLimit).join("").trimEnd() || "Survivor",
       appearance:typeof appearance === "string" && Object.hasOwn(appearances,appearance) ? appearance : "male",
-      ...style
+      ...style,
+      traits:(loadout => loadout.valid ? loadout.ids : [])(traitLoadout(profile?.traits))
     };
   }
   const infected = {
@@ -455,6 +519,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,campaignText,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

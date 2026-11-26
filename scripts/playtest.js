@@ -131,6 +131,23 @@ const scenarios = {
       notes: "winner walking: " + winner + ", notice read with Use: " + note + ", idol taken: " + r.taken + ", horde: " + r.horde +
         ", doors sealed: " + r.sealed + ", frame rate with the horde: " + fps.toFixed(0) + " fps", shot: true, fps};
   },
+  async "setup-traits"(page) {
+    await page.evaluate(helpers);
+    await page.evaluate(() => { for (const d of [document.querySelector("details.advanced-start"), ...document.querySelectorAll("details.survivor-customization")]) if (d) d.open = true;
+      document.getElementById("role").value = "doctor"; document.getElementById("role").dispatchEvent(new Event("change")); });
+    const count = await page.$$eval("#trait-choices input", inputs => inputs.length);
+    await page.check('#trait-choices input[value="light-eater"]');
+    const unpaid = await page.evaluate(() => document.getElementById("start-btn").disabled);
+    await page.check('#trait-choices input[value="needs-more-sleep"]');
+    const kit = await page.evaluate(() => document.getElementById("background-kit").textContent);
+    await page.locator("#trait-choices").scrollIntoViewIfNeeded();
+    await page.screenshot({path: require("path").join(out, "setup-traits.png")});
+    await page.evaluate(() => { window.confirm = () => true; document.getElementById("start-btn").click(); });
+    await page.waitForFunction(() => window.__state?.mode === "play").catch(() => {});
+    const traits = await page.evaluate(() => pt.s()?.player.traits.join(",") ?? "");
+    return {pass: count === 30 && unpaid && traits === "light-eater,needs-more-sleep" && /Lv\. 3/.test(kit),
+      notes: count + " traits, start blocked while unpaid: " + unpaid + ", doctor kit: " + kit + ", started with: " + traits};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

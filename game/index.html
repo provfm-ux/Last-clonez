@@ -8,15 +8,15 @@
 <title>Last CloneZ</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link id="micro-zombie-atlas" rel="preload" as="image" href="micro-zombies.png?v=0.34">
-<link rel="stylesheet" href="style.css?v=0.34">
-<script src="data.js?v=field-3" defer></script>
+<link rel="stylesheet" href="style.css?v=origins-1">
+<script src="data.js?v=origins-1" defer></script>
 <script src="research.js?v=logbook-1" defer></script>
 <script src="legacy-level.js?v=0.33" defer></script>
 <script src="level.js?v=0.33" defer></script>
 <script src="expedition.js?v=0.33" defer></script>
 <script src="regions.js?v=0.33" defer></script>
 <script src="homes.js?v=0.33" defer></script>
-<script src="chronicle.js?v=logbook-1" defer></script>
+<script src="chronicle.js?v=origins-1" defer></script>
 <script src="world.js?v=difficulty" defer></script>
 <script src="atmosphere.js?v=0.33" defer></script>
 <script src="recordings.js?v=zombie-bank" defer></script>
@@ -25,9 +25,9 @@
 <script src="field-stories.js?v=3" defer></script>
 <script src="campaign-hints.js?v=1" defer></script>
 <script src="campaign.js?v=1" defer></script>
-<script src="sim.js?v=logbook-2" defer></script>
+<script src="sim.js?v=origins-1" defer></script>
 <script src="view.js?v=field-3" defer></script>
-<script src="game.js?v=logbook-1" defer></script>
+<script src="game.js?v=origins-1" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -137,6 +137,12 @@
               </details>
               <div class="new-world-options"><label>BACKGROUND<select id="role" aria-describedby="background-detail"></select></label><label>WORLD PRESET<select id="difficulty" aria-describedby="preset-summary"></select></label></div>
               <p id="background-detail" class="background-detail"></p>
+              <p id="background-kit" class="background-detail"></p>
+              <details class="survivor-customization">
+                <summary>Traits</summary>
+                <p id="trait-points" class="background-detail" aria-live="polite"></p>
+                <div id="trait-choices" class="trait-choices"></div>
+              </details>
               <div class="preset-line"><p id="preset-summary" class="preset-summary"></p><button type="button" class="small-button" id="rules-btn">Customize</button></div>
               <button type="button" class="small-button" id="setup-assists">Assists</button>
               <div class="new-world-options start-options"><label>STARTING POINT<select id="start-point" aria-describedby="start-detail"></select></label><label>MAP SEED<input id="world-seed" type="text" inputmode="numeric" pattern="[0-9]{1,9}" maxlength="9" placeholder="Random" autocomplete="off"></label></div>

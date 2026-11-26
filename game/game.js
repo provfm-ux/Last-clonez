@@ -292,6 +292,7 @@
   }
 
   function start(longHaul = false) {
+    if (!longHaul && $("start-btn").disabled) return;
     const preset = longHaul ? "longhaul" : $("difficulty").value;
     const role = $("role").value, startPoint = longHaul ? "shelter" : $("start-point").value;
     const profile = survivorProfile("setup");
@@ -336,7 +337,12 @@
 
   function showStartDetail() {
     $("start-detail").textContent = Data.control.starts[$("start-point").value]?.detail || "";
-    $("background-detail").textContent = Data.roles[$("role").value]?.desc || "";
+    const role = Data.roles[$("role").value];
+    $("background-detail").textContent = role?.desc || "";
+    $("background-kit").textContent = [
+      ...Object.entries(role?.levels ?? {}).map(([id,n]) => Data.skills[id].name + " Lv. " + n),
+      ...Object.entries(role?.kit ?? {}).map(([id,n]) => Data.items[id].name + " ×" + n)
+    ].join(" · ");
     const preset = $("difficulty").value;
     const rules = Data.worldRules(preset, preset === "custom" ? customRules : null);
     const pip = n => Math.max(1, Math.min(5, Math.round(n)));
@@ -1102,6 +1108,7 @@
       '</p><div class="equipment-overview"><canvas id="equipment-portrait" width="48" height="48" aria-hidden="true"></canvas>' +
       '<dl class="equipment-slots">' + slots.map(([label,name]) => '<div><dt>' + label + '</dt><dd>' +
         esc(name || "Empty") + '</dd></div>').join("") + '</dl></div>' +
+      (p.traits?.length ? '<p class="item-meta">' + p.traits.map(id => esc(Data.traits[id].name + " (" + Data.traits[id].description + ")")).join(" · ") + '</p>' : "") +
       '<div class="stats-summary"><span>LOAD · ' + formatWeight(Sim.weight(p.bag)) + " / " + Sim.capacity(state) + " kg</span></div>" +
       '<div class="item-actions">' + button("Backpack", "equipment-backpack") + button("Customize survivor", "edit-survivor") + button("Customize quick belt", "belt-edit", false, "primary") +
       (itemCount("watch") ? button("Wait with wristwatch", "watch-wait", Boolean(p.vehicle)) +
@@ -1129,7 +1136,17 @@
     const name = $(prefix === "setup" ? "survivor-name" : "profile-name").value;
     const appearance = $(prefix === "setup" ? "appearance" : "profile-appearance").value;
     const style = Object.fromEntries(Object.keys(Data.survivorStyle).map(key => [key,$(prefix + "-" + key).value]));
-    return Data.character({name,appearance,...style});
+    // Traits are chosen once, at setup; editing the survivor later keeps them.
+    const traits = prefix === "setup" ? [...$("trait-choices").querySelectorAll("input:checked")].map(input => input.value) : state?.player?.traits;
+    return Data.character({name,appearance,...style,traits});
+  }
+
+  function showTraitPoints() {
+    const choices = [...$("trait-choices").querySelectorAll("input")];
+    const loadout = Data.traitLoadout(choices.filter(input => input.checked).map(input => input.value));
+    for (const input of choices) input.disabled = !input.checked && Object.hasOwn(loadout.effects,Data.traits[input.value].effect);
+    $("trait-points").textContent = loadout.balance + " points remaining. Drawbacks earn points. Start with zero or more.";
+    $("start-btn").disabled = !loadout.valid;
   }
 
   function updateSurvivorPreview(prefix) {
@@ -1145,6 +1162,8 @@
     $("survivor-name").value = player.name;
     $("appearance").value = player.appearance;
     for (const key of Object.keys(Data.survivorStyle)) $("setup-" + key).value = player[key];
+    for (const input of $("trait-choices").querySelectorAll("input")) input.checked = player.traits.includes(input.value);
+    showTraitPoints();
     updateSurvivorPreview("setup");
   }
 
@@ -2610,6 +2629,10 @@
   $("setup-style-fields").innerHTML = survivorFields("setup",Data.character());
   $("setup-style-fields").addEventListener("change",() => updateSurvivorPreview("setup"));
   $("appearance").addEventListener("change",() => updateSurvivorPreview("setup"));
+  $("trait-choices").innerHTML = Object.entries(Data.traits).sort((a,b) => b[1].points - a[1].points || a[1].name.localeCompare(b[1].name)).map(([id,t]) =>
+    '<label><input type="checkbox" value="' + id + '"><span>' + t.name + ' (' + (t.points > 0 ? "−" : "+") + Math.abs(t.points) + ')<small>' +
+    t.description + '</small></span></label>').join("");
+  $("trait-choices").addEventListener("change",showTraitPoints);
   setSetupSurvivor(Data.character());
   try {
     const setup = JSON.parse(read(setupKey));

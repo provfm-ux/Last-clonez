@@ -1,6 +1,10 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Added 13 occupations with Cold Vale backstories, starting skills and equipment (from #17).
+- Added 30 point-budgeted traits chosen at setup; drawbacks pay for advantages.
+- Added Sandbox controls for infected speed, sight, hearing and sound memory, food lifetime and bite chance.
+- Expanded the firewatch, substation and Night Reel clues.
 - Spread existing infected across quiet landmarks and stocked long travel routes with small caches and patrols on new maps.
 - Renamed the Field Ledger to Logbook and added saved daily summaries of combat and survival activities.
 - Added nine campfire recipes and six pantry ingredients stocked across five regions.

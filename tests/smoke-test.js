@@ -1461,6 +1461,25 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     !restored.world.objects.some(o=>o.id.startsWith("coverage-route-")));
 }
 
+{ // sys.hints (HISTORIA.md secções 14 e 16): 2 dias parado → dica; no máximo uma por dia; três níveis
+  const H = context.CampaignHints, D = 1440, start = 480, s = H.track(H.empty(), "fortress.last-boss", start);
+  check("sys.hints sem dica antes de 2 dias parado", H.next(s, start + 2 * D - 1) === null);
+  const first = H.next(s, start + 2 * D);
+  check("sys.hints 2 dias parado → dica discreta", first === H.hints["fortress.last-boss"][0], String(first));
+  check("sys.hints no máximo uma dica por dia", H.next(s, start + 2 * D + 600) === null);
+  const second = H.next(s, start + 3 * D), third = H.next(s, start + 4 * D);
+  check("sys.hints níveis seguintes, do discreto ao explícito", second === H.hints["fortress.last-boss"][1] && third === "It's mutated. It burns.");
+  check("sys.hints depois do nível 3 não repete", H.next(s, start + 5 * D) === null);
+  H.progress(s, start + 5 * D);
+  check("sys.hints progresso recomeça a contagem", H.next(s, start + 6 * D) === null && H.next(s, start + 7 * D) === H.hints["fortress.last-boss"][0]);
+  H.track(s, "amigo1.lockdown-chat", start + 7 * D + 60);
+  check("sys.hints novo objetivo recomeça do nível 1", s.level === 0 && H.next(s, start + 8 * D) === null);
+  check("sys.hints objetivo sem dicas não dá nada", H.next(H.track(H.empty(), "coldvale.houses", 0), 10 * D) === null);
+  const saved = H.restore(JSON.parse(JSON.stringify(s)));
+  check("sys.hints estado persiste; saves antigos e inválidos começam vazios",
+    JSON.stringify(saved) === JSON.stringify(s) && H.restore(undefined).objective === null && H.restore({objective:3, since:-1}).level === 0);
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

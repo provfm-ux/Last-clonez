@@ -1797,6 +1797,48 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     ridge.regionStates.coldvale.npc.mode === "away" && ridge.world.npc.mode === "away");
 }
 
+{ // sys.campaign-graph (skill level-design): sem bloqueios (soft-locks), prazos possíveis e ritmo com descansos
+  const C = context.Campaign, ids = Object.keys(C.challenges);
+  // Jogador que faz um desafio por dia a partir do dia `first`, sempre o primeiro que o calendário e o inventário deixam.
+  const play = first => {
+    const have = new Set(C.start), done = {}; let clues = 0, busy = 0;
+    for (let d = first; d <= C.length; d++) {
+      if (busy > 0) { busy--; continue; }
+      const next = ids.find(id => done[id] === undefined && C.isOpen(C.challenges[id].area, d) &&
+        (C.challenges[id].needs ?? []).every(n => have.has(n)) && clues >= (C.challenges[id].clues ?? 0));
+      if (!next) continue;
+      const ch = C.challenges[next]; done[next] = d + (ch.days ?? 1) - 1; busy = (ch.days ?? 1) - 1;
+      for (const g of ch.grants ?? []) g === "clue" ? clues++ : have.add(g);
+    }
+    return done;
+  };
+  const done = play(1), late = play(15);
+  const missing = ids.filter(id => done[id] === undefined);
+  check("sys.campaign-graph todos os desafios obrigatórios são possíveis em 30 dias", !missing.length, missing.join(",") || JSON.stringify(done));
+  const plan = {"coldvale.houses":1, "cinema.statue":2, "pineridge.two-nights":4, "eva.death":5, "ironworks.barricade":6, "fathill.bosses":8,
+    "westfields.stealth":10, "cindergrotto.battery":12, "amigo1.lockdown-chat":14, "viragem.zero":15, "fortress.last-boss":25};
+  check("sys.campaign-graph o caminho de ouro segue os dias do documento (secção 9)", ids.every(id => done[id] === plan[id]),
+    ids.filter(id => done[id] !== plan[id]).map(id => id + "@" + done[id]).join(","));
+  check("sys.campaign-graph o que um desafio com prazo precisa obtém-se antes de o prazo fechar", ids.every(id => {
+    const ch = C.challenges[id], end = C.areas[ch.area].to; if (end === undefined) return true;
+    return (ch.needs ?? []).every(n => C.start.includes(n) || ids.some(o => (C.challenges[o].grants ?? []).includes(n) && done[o] < end));
+  }));
+  check("sys.campaign-graph quem começa só no dia 15 ainda chega ao boss final (perde só desafios com prazo)",
+    late["fortress.last-boss"] <= C.length && ids.filter(id => late[id] === undefined).every(id => C.areas[C.challenges[id].area].to !== undefined),
+    JSON.stringify(late));
+  check("sys.campaign-graph as 5 coordenadas existem e a fortaleza pede as 5", ids.filter(id => (C.challenges[id].grants ?? []).includes("clue")).length === 5 &&
+    C.challenges["fortress.last-boss"].clues === 5 && C.areas.fortress.requires.clues === 5);
+  const problems = [], high = .7; let run = 0;
+  for (const [i, b] of C.beats.entries()) {
+    run = b.intensity >= high ? run + 1 : 0;
+    if (run > 2) problems.push("dia " + b.day + ": " + run + " dias intensos seguidos");
+    if (b.type === "boss" && C.beats[i - 1]?.type !== "rest") problems.push("dia " + b.day + ": boss sem descanso antes");
+  }
+  if (C.beats[0].type !== "teach") problems.push("o dia 1 não ensina");
+  check("sys.campaign-graph ritmo: 30 dias, ensina primeiro, descanso antes de cada boss, sem 3 picos seguidos",
+    C.beats.length === C.length && C.beats.every((b, i) => b.day === i + 1) && !problems.length, problems.join("; "));
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

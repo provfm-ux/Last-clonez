@@ -4,6 +4,14 @@ const Soundscape = (() => {
   const buffers = new WeakMap(), playing = new WeakMap(), sampleRate = 16000, tau = 2 * Math.PI;
   const recordings = new WeakMap(), zombieBanks = new WeakMap();
   const maxVoices = 10;
+  // Volume groups (audio-design): one 0..1 slider per group, applied squared so the whole slider travel is audible; 0 is silence.
+  const volumes = {music:1, effects:1, infected:1};
+  const group = cue => cue.kind === "tension" ? "music" :
+    cue.kind.startsWith("zombie.") || cue.zombieVoice || ["near","distant","horde","tapSocial"].includes(cue.kind) ? "infected" : "effects";
+  function setVolumes(values) {
+    for (const key of Object.keys(volumes)) if (Number.isFinite(values?.[key])) volumes[key] = Math.min(1, Math.max(0, values[key]));
+    return {...volumes};
+  }
   const zombieGains = {idle:.19,notice:.29,chase:.22,attack:.37,hit:.33,death:.40};
   const configs = {
     distant:{seconds:2.4,gain:.27,cut:560}, near:{seconds:1.28,gain:.34,cut:1800},
@@ -212,7 +220,7 @@ const Soundscape = (() => {
   }
 
   function play(ctx, cue, listener) {
-    if (!ctx || ctx.state !== "running") return;
+    if (!ctx || ctx.state !== "running" || volumes[group(cue)] <= 0) return;
     if (cue.kind.startsWith("zombie.common.")) {
       const role = cue.kind.slice(14);
       if (Object.hasOwn(zombieGains,role)) return playZombie(ctx,cue,listener,role);
@@ -242,7 +250,7 @@ const Soundscape = (() => {
     const attenuation = zombieVoice
       ? (.09/(1+Math.max(0,distance-4)*.24) + .49*proximity**1.35) * (cue.muffled ? .62 : 1)
       : cue.kind === "horde" ? .8 : 1/(1+distance*.06);
-    volume.gain.value = config.gain * attenuation * (cue.intensity ?? 1);
+    volume.gain.value = config.gain * attenuation * (cue.intensity ?? 1) * volumes[group(cue)] ** 2;
     source.connect(filter).connect(volume);
     if (ctx.createStereoPanner) {
       const pan = ctx.createStereoPanner();
@@ -268,5 +276,5 @@ const Soundscape = (() => {
     sources.clear();
   }
 
-  return {preload,play,stop};
+  return {preload,play,stop,setVolumes};
 })();

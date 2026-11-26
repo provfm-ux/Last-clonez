@@ -165,6 +165,19 @@ const scenarios = {
     return {pass: blocked && /"hunger":0\.8/.test(effects) && /"fatigue":1\.25/.test(effects),
       notes: "unpaid traits block Recommended start: " + blocked + ", trait effects after start: " + effects};
   },
+  async "sound-volumes"(page) {
+    await startCampaign(page);
+    await page.click("#pause-btn"); // the pause menu holds the Atmosphere options
+    await page.click('[data-action="atmosphere-options"]');
+    await page.waitForSelector('input[name="vol-music"]', {timeout: 5000});
+    const labels = await page.$$eval('#atmosphere-form input[type="range"]', inputs => inputs.map(i => i.name).join(","));
+    await page.fill('input[name="vol-music"]', "0"); await page.fill('input[name="vol-effects"]', "60");
+    await page.click('#atmosphere-form button[type="submit"]');
+    await page.reload(); await page.waitForFunction(() => typeof Sim !== "undefined");
+    const kept = await page.evaluate(() => localStorage.getItem("clonez-sound-volumes"));
+    return {pass: labels === "vol-music,vol-effects,vol-infected" && /"music":0/.test(kept) && /"effects":0\.6/.test(kept),
+      notes: "sliders: " + labels + ", saved after reload: " + kept};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

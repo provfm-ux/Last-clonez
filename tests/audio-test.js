@@ -82,6 +82,16 @@ async function run() {
   audio.play(ctx,{kind:"doorSlam",x:1,y:0},{x:0,y:0});
   assert.equal(sources.at(-1).when,undefined,"cue without delay starts now");
   sources.at(-1).onended();
+  const gainOf = kind => { audio.play(ctx,{kind,x:0,y:0},{x:0,y:0}); const g = sources.at(-1).next.next.gain.value; sources.at(-1).onended(); return g; };
+  const fullSlam = gainOf("doorSlam"), fullTension = gainOf("tension");
+  audio.setVolumes({effects:.5, music:0});
+  assert.ok(Math.abs(gainOf("doorSlam") - fullSlam * .25) < 1e-9, "effects slider is squared");
+  const before = sources.length; audio.play(ctx,{kind:"tension",x:0,y:0},{x:0,y:0});
+  assert.equal(sources.length, before, "music at zero plays nothing");
+  assert.ok(Math.abs(gainOf("glassSmash") - gainOf("glassSmash")) < 1e-12 && fullTension > 0);
+  const kept = audio.setVolumes({infected:2, effects:"x"});
+  assert.equal(JSON.stringify(kept), JSON.stringify({music:0, effects:.5, infected:1}), "values are clamped and invalid ones ignored");
+  audio.setVolumes({music:1, effects:1, infected:1});
   await zombie("idle");
   const first = sources.at(-1).buffer;
   await zombie("idle");

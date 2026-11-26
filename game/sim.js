@@ -451,7 +451,7 @@ const Sim = (() => {
           world.enemies.push(z);
         }
       }
-      if (difficulty === "campaign") world.objects.push({id:"cinema-statue",kind:"statue",name:"Golden statue",action:"cinema-statue",
+      if (difficulty === "campaign") world.objects.push({id:"cinema-statue",kind:"statue",name:"Golden idol",action:"cinema-statue",
         x:11.5,y:5.5,building:world.buildings[0].id,zone:world.buildings[0].id,tint:.7,active:true,solid:false});
       if (world.cinema === "trophy" || !rules.count && world.cinema === "winner") {
         world.objects.push({id:"cinema-trophy",kind:"crate",name:"Abandoned prize case",x:20.5,y:7.5,

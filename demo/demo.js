@@ -17,35 +17,41 @@ const Demo = (() => {
   const secondsKey = "last-clonez-demo-seconds-v1";
   const point = ([x, y]) => ({x: x + .5, y: y + .5});
   // Arrival tiles (the tile beside each door): cinema foyer and the grotto's lower gallery.
-  const arrivals = {cinema: point([14, 27]), cavern: point([19, 37])};
+  const arrivals = {cinema: point([14, 27]), grottoReturn: point([22, 28]), cavern: point([19, 37])};
+  const grottoDoor = point([22, 29]);
   const names = {cinema: "Oxford Night Reel", cavern: "Cinder Grotto"};
 
   function patchWorld() {
     const connection = Regions.connection, addExits = Regions.addExits;
     Regions.connection = (from, to) => {
       if (from === "cinema" && to === "cavern") return {arrival: arrivals.cavern, vehicles: false};
-      if (from === "cavern" && to === "cinema") return {arrival: arrivals.cinema, vehicles: false};
-      return connection(from, to);
+      if (from === "cavern" && to === "cinema") return {arrival: arrivals.grottoReturn, vehicles: false};
+      if (from === "cavern" || to === "cavern") return null;
+      if (from === "coldvale" && to === "cinema" || from === "cinema" && to === "coldvale") return connection(from, to);
+      return null;
     };
-    // The cinema's street door and the grotto's ridge tunnel are re-pointed at each other. The old exit stays in the
-    // world, switched off, because the grotto's own set-up (the rope landing cache) still looks it up by id.
+    // Cold Vale (survival hub) -> cinema -> grotto. Every other crossing is switched off. The grotto's old ridge exit
+    // stays in the world, off, because the grotto's own set-up (the rope landing cache) still looks it up by id.
     Regions.addExits = world => {
       addExits(world);
-      const [from, to] = world.region === "cinema" ? ["exit-coldvale", "cavern"] :
-        world.region === "cavern" ? ["exit-ridge", "cinema"] : [];
-      const old = from && world.objects.find(o => o.id === from);
-      if (!old) return;
-      world.objects.push({...old, id: "exit-" + to, name: names[to]});
-      Object.assign(old, {active: false, action: undefined});
+      const off = o => Object.assign(o, {active: false, action: undefined});
+      if (world.region === "coldvale") {
+        for (const o of world.objects) if (o.kind === "exit" && o.id !== "exit-cinema") off(o);
+      } else if (world.region === "cinema") {
+        world.objects.push({id: "exit-cavern", ...grottoDoor, kind: "exit", action: "travel", name: names.cavern, active: true, solid: false, tint: .5});
+      } else if (world.region === "cavern") {
+        const old = world.objects.find(o => o.id === "exit-ridge");
+        if (old) { world.objects.push({...old, id: "exit-cinema", name: names.cinema}); off(old); }
+      }
     };
-    // Both areas open on day 1, no flashlight or clue prerequisites.
+    // All three areas open on day 1, no flashlight or clue prerequisites.
     Campaign.closedReason = () => "";
     Campaign.missing = () => "";
   }
 
   function createRun(seed, profile) {
-    const s = Sim.create(seed, "campaign", "carer", Expedition.generator, undefined, "cinema", {...profile, seed});
-    const pack = [["battery", 2], ["bandage", 2], ["water", 2], ["cannedbeans", 2]];
+    const s = Sim.createControl("campaign", "carer", "shelter", undefined, {...profile, seed});
+    const pack = [["battery", 2], ["bandage", 2]];
     for (const [id, qty] of pack) {
       const held = s.player.bag.find(item => item.id === id);
       if (held) held.qty += qty;
@@ -125,15 +131,15 @@ const Demo = (() => {
       const label = [...start.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
       if (label) label.textContent = " Play the demo ";
       const detail = start.nextElementSibling;
-      if (detail) detail.textContent = "30 minutes · Oxford Night Reel cinema + Cinder Grotto";
+      if (detail) detail.textContent = "30 minutes · Cold Vale survival + Oxford Night Reel cinema + Cinder Grotto";
     }
     const copy = document.querySelector(".hero-copy");
     if (copy) {
       const teaser = document.createElement("p");
       teaser.className = "demo-teaser";
       teaser.innerHTML = "<b>Demo:</b> a radio rumour says the preppers built a fortress with years of supplies. " +
-        "Tonight you are in a shuttered cult cinema where the raffle never finished, then underground in the Cinder Grotto. " +
-        "Take the golden idol if you dare. Something in the dark knows the way to the fortress.";
+        "Hold out in your Cold Vale shelter: scavenge, board up, cook, keep warm. Then cross town to a cult cinema where the " +
+        "raffle never finished, and go underground into the Cinder Grotto. Take the golden idol if you dare.";
       copy.append(teaser);
     }
     const sub = document.querySelector(".brand-sub");
@@ -153,7 +159,7 @@ const Demo = (() => {
       '<button type="button" class="quiet" id="demo-bug-close">Close</button></div>' +
       "<small>" + (email ? "Goes to " + email + ". If your mail app does not open, copy the report and send it yourself." :
         "No email is set for this build.") + "</small>";
-    endDialog.innerHTML = "<h2>That's the end of the demo</h2><p>You used your 30 minutes in the Oxford Night Reel and the Cinder Grotto. " +
+    endDialog.innerHTML = "<h2>That's the end of the demo</h2><p>You used your 30 minutes in Cold Vale, the Oxford Night Reel and the Cinder Grotto. " +
       "Thanks for playing.</p><p><b>In the full game</b> (30 nights, 11 areas):</p><ul>" +
       "<li>Eva, the radio and a rumour about a prepper fortress</li>" +
       "<li>Five coordinates hidden across Pine Ridge, the Ironworks, FatHill, Westfields and the Grotto</li>" +

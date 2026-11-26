@@ -15,32 +15,34 @@ const check = (name, ok, detail = "") => { if (!ok) { failures++; console.log("F
 const idle = {x: 0, y: 0, run: false};
 
 const s0 = Sim.createRecommended(12345);
-check("demo run starts in the cinema", s0.world.region === "cinema", s0.world.region);
-check("bag has a spare battery", s0.player.bag.some(i => i.id === "battery" && i.qty >= 2));
-const exitA = s0.world.objects.find(o => o.action === "travel" && o.active);
-check("cinema exit points at the grotto", exitA?.id === "exit-cavern", exitA?.id);
-check("no exit to Cold Vale", !s0.world.objects.some(o => o.id === "exit-coldvale" && o.active));
+check("demo run starts in Cold Vale", s0.world.region === "coldvale", s0.world.region);
+check("bag has a spare battery", s0.player.bag.some(i => i.id === "battery"));
+const live = w => w.objects.filter(o => o.kind === "exit" && o.active && o.action === "travel").map(o => o.id);
+check("Cold Vale only leads to the cinema", live(s0.world).join() === "exit-cinema", live(s0.world).join());
 
-let s = s0;
-Object.assign(s.player, {x: exitA.x, y: exitA.y - 1});
-s.world.enemies.length = 0;
-const there = Sim.travel(s, exitA);
-check("cinema -> grotto works", there?.world.region === "cavern", s.notice?.text);
-if (there) {
-  const back = there.world.objects.find(o => o.id === "exit-cinema");
-  check("grotto exit points at the cinema", Boolean(back));
-  for (let i = 0; i < 600 && there.mode === "play"; i++) Sim.tick(there, .033, idle);
-  const mid = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(there))));
-  check("grotto save restores", mid?.world.region === "cavern" && mid.world.objects.some(o => o.id === "exit-cinema" && o.active));
-  if (back) {
-    Object.assign(there.player, {x: back.x, y: back.y - 1});
-    const home = Sim.travel(there, back);
-    check("grotto -> cinema works", home?.world.region === "cinema", there.notice?.text);
-    if (home) for (let i = 0; i < 600 && home.mode === "play"; i++) Sim.tick(home, .033, idle);
+function cross(s, exit, into) {
+  s.world.enemies.length = 0;
+  const side = [[0, -1], [0, 1], [-1, 0], [1, 0]].map(([dx, dy]) => ({x: exit.x + dx, y: exit.y + dy}))
+    .find(p => context.World.clear(s.world, p.x, p.y));
+  Object.assign(s.player, side);
+  const next = Sim.travel(s, exit);
+  check("cross into " + into, next?.world.region === into, s.notice?.text);
+  return next;
+}
+const cinema = cross(s0, s0.world.objects.find(o => o.id === "exit-cinema"), "cinema");
+if (cinema) {
+  check("cinema leads to town and grotto", live(cinema.world).sort().join() === "exit-cavern,exit-coldvale", live(cinema.world).join());
+  const grotto = cross(cinema, cinema.world.objects.find(o => o.id === "exit-cavern"), "cavern");
+  if (grotto) {
+    check("grotto leads back to the cinema", live(grotto.world).join() === "exit-cinema", live(grotto.world).join());
+    for (let i = 0; i < 600 && grotto.mode === "play"; i++) Sim.tick(grotto, .033, idle);
+    const mid = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(grotto))));
+    check("grotto save restores", mid?.world.region === "cavern");
+    const back = cross(grotto, grotto.world.objects.find(o => o.id === "exit-cinema" && o.active), "cinema");
+    if (back) for (let i = 0; i < 600 && back.mode === "play"; i++) Sim.tick(back, .033, idle);
   }
 }
-const snap = JSON.parse(JSON.stringify(Sim.snapshot(s0)));
-check("demo save restores", Sim.restore(snap)?.world.region === "cinema");
+check("demo save restores", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s0))))?.world.region === "coldvale");
 
 let stored = "1790";
 const clock = Demo.clock(() => stored, v => { stored = v; });

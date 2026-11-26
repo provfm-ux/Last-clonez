@@ -223,9 +223,17 @@ const Data = (() => {
     jammed:"Jammed shut. Find a window.",
     frameHolds:"The window frame holds. Keep hitting, or pry it.",
     cinemaEscape:"You are out with the idol. For the first time in days, you feel a little safer.",
+    ridgeNight:"Night at Pine Ridge. No barricades: only what you brought.",
+    ridgeBuilt:"You built a barricade. Pine Ridge only counts nights without one.",
+    ridgeCold:"The cold settles in your chest. Pneumonia. This night will not count; try again tomorrow night.",
+    ridgeLeft:"You left Pine Ridge. The night does not count.",
+    ridgeLate:"You arrived after dark. Only a full night at Pine Ridge counts.",
+    ridgeSurvived:"Night survived at Pine Ridge: ",
+    ridgeDone:"Two nights in the pines. Carved into the firewatch rail: the second coordinate.",
     cinemaBuff:"The idol will watch over your sleep for three nights.",
     cinemaBuffEnds:"The idol feels like an ordinary lump of metal again."
   };
+  const pineRidge = {nights:2, coldLimit:35.2, fullNight:600, sickness:30};
   const cinemaTrap = {horde:50, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
   const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],
     pools:{clinic:["bandage"], fuel:["fuel"], market:["battery"], workshop:["battery"], town:["food", "water"]}};
@@ -425,6 +433,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,campaignText,cinemaTrap,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,campaignText,cinemaTrap,pineRidge,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

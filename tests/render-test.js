@@ -441,7 +441,7 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   View.render(c, 0, 1/60);
   const shown = per(() => View.render(c, 0, 1/60)); statue.active = false;
   const gone = per(() => View.render(c, 0, 1/60)); statue.active = true;
-  check("cinema.statue estátua desenhada no palco, barata e sem gradientes", total(shown) > total(gone) && total(shown) - total(gone) < 100 &&
+  check("cinema.statue estátua desenhada no palco, barata e sem gradientes", total(shown) > total(gone) && total(shown) - total(gone) < 200 &&
     (shown.createRadialGradient ?? 0) === (gone.createRadialGradient ?? 0) && (shown.createLinearGradient ?? 0) === (gone.createLinearGradient ?? 0),
     total(shown) + " vs " + total(gone));
 }

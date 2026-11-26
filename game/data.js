@@ -223,7 +223,8 @@ const Data = (() => {
       "A page behind a wall calendar: \"If you found three of these, you have the first number.\" The handwriting matches the others."
     ],
     housesDone:"The three pages fit together. You have the first coordinate. The rumour is real, or someone wants it to be.",
-    statueTaken:"The altar clicks. The lobby doors slam and jam. In the dark seats, the audience stands up.",
+    statueTaken:"The stand clicks. Both doors slam and lock. In the dark corner by the beer tap, the members' social turns towards you.",
+    cinemaNote:"OXFORD NIGHT REEL · MEMBERS' SOCIAL. Friday, after the raffle: free pints at the tap in the back corner. Please do not touch the golden idol on its stand. Since the last break-in it is wired to the doors. — Management",
     jammed:"Jammed shut. Find a window.",
     frameHolds:"The window frame holds. Keep hitting, or pry it.",
     cinemaEscape:"You are out with the idol. For the first time in days, you feel a little safer.",
@@ -255,7 +256,7 @@ const Data = (() => {
     {tools:["hammer","crowbar"], verb:"Break the chain", done:"The chain snaps. The cage swings open."}]};
   const evaDeparture = {hour:9, gone:6.5};
   const pineRidge = {nights:2, coldLimit:35.2, fullNight:600, sickness:30};
-  const cinemaTrap = {horde:50, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
+  const cinemaTrap = {horde:50, tensionEvery:6, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
   const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],
     pools:{clinic:["bandage"], fuel:["fuel"], market:["battery"], workshop:["battery"], town:["food", "water"]}};
   const legacyRules = {care:"quick", exposure:"off", powerDays:-1, waterDays:-1};

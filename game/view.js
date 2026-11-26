@@ -785,6 +785,11 @@ const View = (() => {
       f(-.23,-.26,18,.12,.12,4,state.atmosphere.awake && state.world.cinema === "projector" ? cream : rubber);
       return;
     }
+    if (kind === "beertap") { // small bar with three brass taps
+      f(-.3,-.2,0,.6,.4,11,["#6a4a33","#4d3626","#362619"]);
+      for (const dx of [-.18,-.03,.12]) f(dx,-.06,11,.05,.05,7,["#d6b25a","#9c7d39","#6b5426"]);
+      return;
+    }
     if (kind === "terminal") {
       f(-.22,-.2,0,.44,.38,10,["#59605a","#3f4540","#2c312d"]);
       f(-.14,-.12,10,.28,.06,9,o.read ? ["#3b4a3c","#2c372d","#1f2720"] : ["#7fd08a","#4f8f5a","#2f5a36"]);

@@ -1894,6 +1894,35 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("ironworks.barricade ferramentas gastas não chegam", !Sim.dismantleCage(worn, wc) && /too worn/.test(worn.messages.at(-1).text));
 }
 
+{ // cinema.scene (pedido do utilizador + skill team-audio): vencedor da rifa a andar, torneira do convívio, nota e sons da armadilha
+  const enter = seed => { const s = Sim.createControl("campaign", "carer", "shelter", undefined, {seed}); Sim.testJump(s, 2, {}, {anyMode: true});
+    const ex = s.world.objects.find(o => o.id === "exit-cinema"); Object.assign(s.player, {x: ex.x - 1, y: ex.y}); return Sim.travel(s, ex); };
+  const winners = [17, 4242, 90009].map(seed => enter(seed).world.enemies.filter(z => z.id === "cinema-winner" && z.hp > 0 && !z.dormant).length);
+  check("cinema.scene o vencedor da rifa anda sempre pelo cinema na campanha", winners.every(n => n === 1), winners.join(","));
+  const c = enter(17), tap = c.world.objects.find(o => o.id === "cinema-tap"), note = c.world.objects.find(o => o.id === "cinema-note");
+  check("cinema.scene há uma torneira de cerveja no canto e a nota do convívio", tap && note && World.tileAt(c.world, tap.x, tap.y).building === c.world.buildings[0].id);
+  Object.assign(c.player, {x: note.x + .8, y: note.y}); c.world.enemies = c.world.enemies.filter(z => z.id !== "cinema-winner");
+  check("cinema.scene a nota lê-se com Use e avisa que o ídolo está ligado às portas", Sim.unreadNote(note) && Sim.readCinemaNote(c, note) && note.read &&
+    /social/i.test(c.messages.at(-1).text) && /wired to the doors/.test(c.messages.at(-1).text));
+  c.sounds = []; Object.assign(c.player, {x: 11.5, y: 6.5}); Sim.takeStatue(c, c.world.objects.find(o => o.id === "cinema-statue"));
+  const cue = kind => c.sounds.filter(x => x.kind === kind);
+  const slams = cue("doorSlam");
+  check("cinema.scene sequência: clique, duas portas a bater uma depois da outra, a horda no canto da torneira e a tensão",
+    cue("idolClick").length === 1 && slams.length === 2 && slams[0].delay < slams[1].delay && cue("horde")[0]?.delay > slams[1].delay &&
+    Math.hypot(cue("horde")[0].x - tap.x, cue("horde")[0].y - tap.y) < .01 && cue("tension").length === 1, c.sounds.map(x => x.kind + "+" + (x.delay ?? 0)).join(" "));
+  check("cinema.scene cada porta mostra SLAM (pista visual dos sons)", c.effects.filter(e => e.text === "SLAM").length === 2);
+  const horde = c.world.enemies.filter(z => z.origin === "cinema-horde"), statue = {x: 11.5, y: 5.5};
+  const mean = point => horde.reduce((n, z) => n + Math.hypot(z.x - point.x, z.y - point.y), 0) / horde.length;
+  check("cinema.scene a horda sai do canto da torneira", horde.length === 50 && mean(tap) < mean(statue), mean(tap).toFixed(1) + " vs " + mean(statue).toFixed(1));
+  c.world.enemies = c.world.enemies.filter(z => z.origin !== "cinema-horde"); c.sounds = []; Object.assign(c.player, {hp: 100});
+  for (let i = 0; i < 30; i++) Sim.tick(c, .25);
+  check("cinema.scene a tensão repete enquanto o jogador está preso", c.sounds.some(x => x.kind === "tension"));
+  const w = c.world.objects.find(o => o.action === "door" && o.kind === "window"); Object.assign(w, {open: true, broken: true, hp: 0, reinforced: 0});
+  Object.assign(c.player, {x: w.x + 1, y: w.y}); run(c, 1); c.sounds = [];
+  for (let i = 0; i < 30; i++) Sim.tick(c, .25);
+  check("cinema.scene depois da fuga a tensão para", c.campaign.completed.includes("cinema.statue") && !c.sounds.some(x => x.kind === "tension"));
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

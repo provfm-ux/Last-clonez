@@ -586,7 +586,7 @@
   }
 
   const taskTarget = o => o && (o.action === "travel" || Sim.isSupplyCache(state, o) || Sim.unreadClueAt(state, o) || o.action === "radio" && state.supplyRun === "return" ||
-    Chronicle.isUnseen(state.ledger,o) && !Sim.sceneProblem(state,o) ||
+    Chronicle.isUnseen(state.ledger,o) && !Sim.sceneProblem(state,o) || Sim.unreadNote(o) ||
     o.action === "garden" || o.action === "campfire" && Sim.fireBatch(state, o));
   const nearbyExit = () => Sim.nearby(state).find(o => o.action === "travel");
 

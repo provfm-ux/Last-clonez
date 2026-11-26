@@ -663,6 +663,10 @@ const Sim = (() => {
     ...(item.id === "flashlight" ? {charge:item.charge ?? 0} : {}),
     ...(item.id === "housekey" ? {lock:item.lock, label:item.label, uid:item.uid} : {})});
 
+  // Loose notes the player has not read yet: the Use button opens them first.
+  const noteActions = new Set(["field-note", "campaign-page", "eva-diary", "ironworks-terminal"]);
+  const unreadNote = o => Boolean(o?.active && noteActions.has(o.action) && !o.read);
+
   function unreadClueAt(s, o) {
     if (o.action !== "loot" || !o.building || o.id.startsWith("built")) return null;
     const building = s.world.buildings.find(b => b.id === o.building);
@@ -3861,7 +3865,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, cinemaBuff, hurt, readEvaDiary, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, unreadNote, cinemaBuff, hurt, readEvaDiary, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

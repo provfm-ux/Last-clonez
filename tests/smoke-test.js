@@ -1839,6 +1839,15 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     C.beats.length === C.length && C.beats.every((b, i) => b.day === i + 1) && !problems.length, problems.join("; "));
 }
 
+{ // ui.use-notes: o botão Use abre primeiro as notas soltas por ler (antes ficavam atrás de portas e contentores)
+  const s = fresh("campaign"), page = s.world.objects.find(o => o.action === "campaign-page"), diary = s.world.objects.find(o => o.id === "eva-diary");
+  const field = [s.world, ...Object.values(s.regionStates)].flatMap(z => z.objects).find(o => o.action === "field-note");
+  const door = s.world.objects.find(o => o.action === "door"), crate = s.world.objects.find(o => o.action === "loot");
+  check("ui.use-notes notas por ler contam como tarefa (página, nota de campo)", Sim.unreadNote(page) && (!field || Sim.unreadNote(field)));
+  check("ui.use-notes notas lidas ou escondidas não", !Sim.unreadNote({...page, read: true}) && !Sim.unreadNote(diary));
+  check("ui.use-notes portas e contentores não são notas", !Sim.unreadNote(door) && !Sim.unreadNote(crate));
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

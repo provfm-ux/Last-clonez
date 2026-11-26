@@ -1420,7 +1420,7 @@ const Sim = (() => {
     spots.sort((a,b) => distance(a,tap) - distance(b,tap) || a.y - b.y || a.x - b.x);
     for (let i = 0; i < Data.cinemaTrap.horde; i++) {
       const z = newInfected(s, spots[i % spots.length], "cinema-horde", rng);
-      Object.assign(z,{alert:1, chaseX:s.player.x, chaseY:s.player.y});
+      Object.assign(z,{alert:1, chaseX:s.player.x, chaseY:s.player.y, replan:i * .03}); // first routes spread over 1.5 s
     }
     s.atmosphere.awake = true;
     s.effects.push({x: statue.x, y: statue.y, text: "CLICK", color: "#e8c25e", life: 1.2, impact: .8});
@@ -3225,6 +3225,8 @@ const Sim = (() => {
     const light = activeLight(s) && dark;
     const vision = (light ? 1.2 : lit ? 1 : s.world.underground ? .43 : dark ? .6 : s.weather === "Rain" ? .85 : 1) * (s.rules.vision ?? 100) / 100 * trait(s,"stealth");
     let ambient = null, bestDistance = 16;
+    // Path budget (performance-optimization): at most a few chase routes per tick; the rest wait one tick.
+    let routes = 0;
     const chooseVoice = s.elapsed >= (s.nextZombieAmbience ?? 0);
     for (const z of s.world.enemies) {
       if (z.hp <= 0 || distance(p, z) > 23 && z.alert <= 0) continue;
@@ -3308,7 +3310,9 @@ const Sim = (() => {
           continue;
         }
       }
-      if (z.alert > 0 && z.replan <= 0) {
+      if (z.alert > 0 && z.replan <= 0 && routes >= Data.routeBudget) z.replan = .02;
+      else if (z.alert > 0 && z.replan <= 0) {
+        routes++;
         z.path = World.route(s.world, z.x, z.y, z.chaseX, z.chaseY, 0, "force");
         z.replan = .7 + s.world.rng() * .4;
       } else if (z.alert <= 0) {

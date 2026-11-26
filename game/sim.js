@@ -453,12 +453,12 @@ const Sim = (() => {
           world.enemies.push(z);
         }
       }
-      if (difficulty === "campaign") {
+      { // The story set-piece is in every mode: idol on its stand, the beer-tap social and its notice, the raffle winner.
         const hall = world.buildings[0], inHall = {building:hall.id, zone:hall.id, active:true};
         world.objects.push({id:"cinema-statue",kind:"statue",name:"Golden idol",action:"cinema-statue",x:11.5,y:5.5,tint:.7,solid:false,...inHall},
           {id:"cinema-tap",kind:"beertap",name:"Members' beer tap",x:6.5,y:15.5,tint:.5,solid:true,...inHall},
           {id:"cinema-note",kind:"record",action:"cinema-note",name:"Members' social notice",x:7.5,y:14.5,tint:.54,read:false,solid:false,...inHall});
-        // The raffle winner always walks the stage in the campaign (its own stream: other modes are unchanged).
+        // The raffle winner always walks the hall (its own random stream, so the rest of the cinema is unchanged).
         if (!world.enemies.some(z => z.id === "cinema-winner") && rules.count) {
           const z = World.infected(world,"cinema-winner",13.5,7.5,"walkers",Level.seeded((seed ^ 0x7a11e) >>> 0),"cinema-winner");
           z.outfit = "hiker";
@@ -512,14 +512,17 @@ const Sim = (() => {
         gardenSeeded: false, harvested: false, gardenMeal: false, gardenHelp: false}, nextEvent: 180, weather: "Overcast",
       exploredAt: 0, radioWave: false, zoom: 1, waypoint: town ? "market" : world.underground ? "exit-ridge" : "exit-" + (Regions.definitions[region].host ?? Regions.home), lookahead: true, roofsHidden: false
     };
+    // Story progress exists in every mode (one game); calendar, hints, Eva's departure, Pine Ridge and goals are campaign rules.
+    s.campaign = newCampaign();
+    if (region === "ironworks") placeIronworks(world);
+    if (town) {
+      placeCampaignPages(world, seed);
+      s.campaign.completed.push("radio.rumour");
+    }
     if (difficulty === "campaign") {
-      s.campaign = newCampaign();
       s.waypoint = "";
-      if (region === "ironworks") placeIronworks(world);
       if (town) {
-        placeCampaignPages(world, seed);
         placeEvaDiary(world);
-        s.campaign.completed.push("radio.rumour");
         CampaignHints.track(s.campaign.hints, "coldvale.houses", s.minutes);
       }
     }
@@ -683,7 +686,7 @@ const Sim = (() => {
   }
 
   function pinnedGoal(s) {
-    if (s.campaign) {
+    if (isCampaign(s)) {
       const goal = campaignGoal(s);
       return goal ? goal.text + (goal.opens ? " · opens on day " + goal.opens : "") : "More of the campaign is on its way.";
     }
@@ -1359,7 +1362,7 @@ const Sim = (() => {
       if (s.world.region === "ridge") return s.world.objects.find(o => o.id === (run.supplied ? "exit-" + Regions.home : longHaulCache));
       if (s.world.region === Regions.home) return {...s.world.start,name:"Shelter"};
     }
-    if (s.campaign && !s.waypoint) {
+    if (isCampaign(s) && !s.waypoint) {
       const target = campaignTarget(s, campaignGoal(s));
       return target ? {...target, name:target.name} : null;
     }
@@ -1403,6 +1406,7 @@ const Sim = (() => {
   // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
   const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:""});
   // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
+  const isCampaign = s => s.difficulty === "campaign";
   const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
   const challengeId = /^[a-z0-9]+(\.[a-z0-9-]+)?$/;
   function restoreCampaign(raw) {
@@ -1535,7 +1539,7 @@ const Sim = (() => {
   }
 
   // Campaign objects added after campaign saves already existed: older saves get them back on load.
-  const campaignFixtures = new Set(["cinema-tap", "cinema-note", "eva-diary", "iron-cage", "iron-toolboard", "iron-terminal-0", "iron-terminal-1", "iron-terminal-2"]);
+  const campaignFixtures = new Set(["cinema-statue", "campaign-page-0", "campaign-page-1", "campaign-page-2", "cinema-tap", "cinema-note", "eva-diary", "iron-cage", "iron-toolboard", "iron-terminal-0", "iron-terminal-1", "iron-terminal-2"]);
 
   // ironworks.barricade: a barricaded weapon cage and a toolboard in the machine shop, and three line-computer terminals.
   function placeIronworks(world) {
@@ -1652,7 +1656,7 @@ const Sim = (() => {
 
   // "" when the calendar lets the player into region `to` now, otherwise the reason shown to the player.
   function campaignProblem(s, to) {
-    const area = s.campaign && Campaign.regions[to];
+    const area = isCampaign(s) && Campaign.regions[to];
     if (!area) return "";
     const bag = s.player.bag, items = [...new Set(bag.map(item => item.id))];
     if (bag.some(item => item.id === "flashlight" && item.charge > 0)) items.push("battery");
@@ -3497,8 +3501,9 @@ const Sim = (() => {
     const raining = s.weather === "Rain";
     updateOutdoor(s, minutes, raining);
     if (s.longHaul && s.player.hp > 0) updateLongHaul(s);
-    if (s.campaign) { updateCinemaTrap(s); updateCinemaBuff(s); updatePineRidge(s); updateEva(s); }
-    if (s.campaign?.hints.objective) {
+    if (s.campaign) { updateCinemaTrap(s); updateCinemaBuff(s); }
+    if (isCampaign(s)) { updatePineRidge(s); updateEva(s); }
+    if (isCampaign(s) && s.campaign.hints.objective) {
       const hint = CampaignHints.next(s.campaign.hints, s.minutes);
       if (hint) notify(s, "Hint: " + hint);
     }
@@ -4073,7 +4078,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, campaignGoals, campaignGoal, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, isCampaign, campaignGoals, campaignGoal, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

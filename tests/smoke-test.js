@@ -1669,7 +1669,28 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   Object.assign(c.player, {x: w.x + 1, y: w.y, hp: 100}); c.world.enemies = c.world.enemies.filter(z => z.origin !== "cinema-horde");
   run(c, 1);
   check("cinema.statue sair pela janela cumpre o desafio e destrava as portas", c.campaign.completed.includes("cinema.statue") &&
-    doors(c).every(o => !o.sealed) && c.campaign.hints.objective === "pineridge.two-nights" && /feel a little safer/.test(c.messages.at(-1).text));
+    doors(c).every(o => !o.sealed) && c.campaign.hints.objective === "pineridge.two-nights" && c.messages.some(m => /feel a little safer/.test(m.text)));
+}
+
+{ // cinema.buff (HISTORIA.md secções 10 e 16): protege enquanto dorme à noite; expira ao fim de 3 noites
+  const s = fresh("campaign"); Sim.testJump(s, 2, {}, {anyMode: true});
+  const exit = s.world.objects.find(o => o.id === "exit-cinema"); Object.assign(s.player, {x: exit.x - 1, y: exit.y});
+  const c = Sim.travel(s, exit); Object.assign(c.player, {x: 11.5, y: 6.5});
+  Sim.takeStatue(c, c.world.objects.find(o => o.id === "cinema-statue"));
+  c.world.enemies = c.world.enemies.filter(z => z.origin !== "cinema-horde");
+  const w = c.world.objects.find(o => o.action === "door" && o.kind === "window"); w.open = true; w.broken = true; w.hp = 0; w.reinforced = 0;
+  Object.assign(c.player, {x: w.x + 1, y: w.y}); run(c, 1);
+  check("cinema.buff ativo depois da fuga, até à manhã do dia 5", Sim.cinemaBuff(c) && c.campaign.buffUntil === 4 * 1440 + 390 &&
+    c.messages.some(m => /three nights/.test(m.text)));
+  c.minutes = 1440 + 23 * 60;
+  const copy = (buff, sleeping) => { const x = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(c)))); if (!buff) x.campaign.buffUntil = 0;
+    Object.assign(x.player, {sleeping, resting: sleeping, flash: 0, hp: 100, grabCool: 5}); Sim.hurt(x, {kind: "walker", stats: Data.infected.walker}); return 100 - x.player.hp; };
+  const shielded = copy(true, true), plain = copy(false, true), awake = copy(true, false);
+  check("cinema.buff a dormir à noite sofre metade do dano", plain > 0 && Math.abs(shielded - plain * Data.cinemaTrap.sleepDamage) < 1e-9, shielded + " vs " + plain);
+  check("cinema.buff acordado não há proteção", Math.abs(awake - plain) < 1e-9);
+  check("cinema.buff fica gravado", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(c)))).campaign.buffUntil === c.campaign.buffUntil);
+  c.minutes = c.campaign.buffUntil + 1; run(c, 1);
+  check("cinema.buff expira ao fim de 3 noites", !Sim.cinemaBuff(c) && c.campaign.buffUntil === 0 && /ordinary lump/.test(c.messages.at(-1).text));
 }
 
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>

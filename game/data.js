@@ -222,9 +222,11 @@ const Data = (() => {
     statueTaken:"The altar clicks. The lobby doors slam and jam. In the dark seats, the audience stands up.",
     jammed:"Jammed shut. Find a window.",
     frameHolds:"The window frame holds. Keep hitting, or pry it.",
-    cinemaEscape:"You are out with the statue. For the first time in days, you feel a little safer."
+    cinemaEscape:"You are out with the statue. For the first time in days, you feel a little safer.",
+    cinemaBuff:"The statue will watch over your sleep for three nights.",
+    cinemaBuffEnds:"The statue feels like an ordinary lump of metal again."
   };
-  const cinemaTrap = {horde:50, windowHits:3};
+  const cinemaTrap = {horde:50, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
   const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],
     pools:{clinic:["bandage"], fuel:["fuel"], market:["battery"], workshop:["battery"], town:["food", "water"]}};
   const legacyRules = {care:"quick", exposure:"off", powerDays:-1, waterDays:-1};

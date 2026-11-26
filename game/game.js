@@ -578,6 +578,7 @@
     const p = state.player, list = Sim.moodles(state);
     if (p.exposure) list.unshift({label:"Viral infection",level:4});
     if (p.resting) list.push({label:"Resting",level:1});
+    if (Sim.cinemaBuff(state)) list.push({label:"Statue's luck",level:1});
     if (state.blueprint) list.push({label:"Build mode",level:1});
     const {pending,time} = state.atmosphere;
     if (pending) list.unshift({label:"Horde · " + Math.max(1,Math.ceil(pending.due-time)) + "s",level:4});

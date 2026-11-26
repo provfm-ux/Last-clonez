@@ -451,8 +451,18 @@ const Sim = (() => {
           world.enemies.push(z);
         }
       }
-      if (difficulty === "campaign") world.objects.push({id:"cinema-statue",kind:"statue",name:"Golden idol",action:"cinema-statue",
-        x:11.5,y:5.5,building:world.buildings[0].id,zone:world.buildings[0].id,tint:.7,active:true,solid:false});
+      if (difficulty === "campaign") {
+        const hall = world.buildings[0], inHall = {building:hall.id, zone:hall.id, active:true};
+        world.objects.push({id:"cinema-statue",kind:"statue",name:"Golden idol",action:"cinema-statue",x:11.5,y:5.5,tint:.7,solid:false,...inHall},
+          {id:"cinema-tap",kind:"beertap",name:"Members' beer tap",x:6.5,y:15.5,tint:.5,solid:true,...inHall},
+          {id:"cinema-note",kind:"record",action:"cinema-note",name:"Members' social notice",x:7.5,y:14.5,tint:.54,read:false,solid:false,...inHall});
+        // The raffle winner always walks the stage in the campaign (its own stream: other modes are unchanged).
+        if (!world.enemies.some(z => z.id === "cinema-winner") && rules.count) {
+          const z = World.infected(world,"cinema-winner",13.5,7.5,"walkers",Level.seeded((seed ^ 0x7a11e) >>> 0),"cinema-winner");
+          z.outfit = "hiker";
+          world.enemies.push(z);
+        }
+      }
       if (world.cinema === "trophy" || !rules.count && world.cinema === "winner") {
         world.objects.push({id:"cinema-trophy",kind:"crate",name:"Abandoned prize case",x:20.5,y:7.5,
           building:world.buildings[0].id,zone:world.buildings[0].id,tint:.65,active:true,solid:false,action:"loot",searched:false,
@@ -665,7 +675,14 @@ const Sim = (() => {
     ...(item.id === "housekey" ? {lock:item.lock, label:item.label, uid:item.uid} : {})});
 
   // Loose notes the player has not read yet: the Use button opens them first.
-  const noteActions = new Set(["field-note", "campaign-page", "eva-diary", "ironworks-terminal"]);
+  const noteActions = new Set(["field-note", "campaign-page", "eva-diary", "ironworks-terminal", "cinema-note"]);
+
+  function readCinemaNote(s, note) {
+    if (s.mode !== "play" || s.player.vehicle || note?.action !== "cinema-note" || !s.world.objects.includes(note) || !reachableObject(s,note)) return false;
+    note.read = true;
+    notify(s, Data.campaignText.cinemaNote);
+    return true;
+  }
   const unreadNote = o => Boolean(o?.active && noteActions.has(o.action) && !o.read);
 
   function unreadClueAt(s, o) {
@@ -1393,13 +1410,24 @@ const Sim = (() => {
       const point = {x:x+.5, y:y+.5};
       if (World.tileAt(s.world,x,y)?.building === hall.id && World.clear(s.world,point.x,point.y,.18) && distance(point,s.player) > 3.5) spots.push(point);
     }
-    for (let i = spots.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [spots[i], spots[j]] = [spots[j], spots[i]]; }
+    // The members' social was by the beer tap: the horde comes out of that corner.
+    const tap = s.world.objects.find(o => o.id === "cinema-tap") ?? statue;
+    spots.sort((a,b) => distance(a,tap) - distance(b,tap) || a.y - b.y || a.x - b.x);
     for (let i = 0; i < Data.cinemaTrap.horde; i++) {
       const z = newInfected(s, spots[i % spots.length], "cinema-horde", rng);
       Object.assign(z,{alert:1, chaseX:s.player.x, chaseY:s.player.y});
     }
     s.atmosphere.awake = true;
     s.effects.push({x: statue.x, y: statue.y, text: "CLICK", color: "#e8c25e", life: 1.2, impact: .8});
+    // Sound sequence (docs/audio/cinema-trap.md): click, both doors slam, the social stirs by the tap, tension under it all.
+    hear(s, "idolClick", statue);
+    for (const [i, door] of s.world.objects.filter(o => o.sealed).entries()) {
+      hear(s, "doorSlam", door, 1, .35 + i * .25);
+      s.effects.push({x: door.x, y: door.y, text: "SLAM", color: "#e3a289", life: 1});
+    }
+    hear(s, "horde", tap, 1, 1.2);
+    hear(s, "tension", s.player, 1, .6);
+    s.nextTension = s.elapsed + Data.cinemaTrap.tensionEvery;
     noise(s, statue.x, statue.y, 14);
     notify(s, Data.campaignText.statueTaken, true);
     return true;
@@ -1408,7 +1436,11 @@ const Sim = (() => {
   function updateCinemaTrap(s) {
     if (s.world.region !== "cinema" || s.campaign.completed.includes("cinema.statue")) return;
     const statue = s.world.objects.find(o => o.id === "cinema-statue"), hall = s.world.buildings.find(b => b.type === "cinema");
-    if (!statue || statue.active || World.tileAt(s.world,s.player.x,s.player.y)?.building === hall.id) return;
+    if (!statue || statue.active) return;
+    if (World.tileAt(s.world,s.player.x,s.player.y)?.building === hall.id) {
+      if (s.elapsed >= (s.nextTension ?? 0)) { hear(s, "tension", s.player); s.nextTension = s.elapsed + Data.cinemaTrap.tensionEvery; }
+      return;
+    }
     for (const o of s.world.objects) if (o.sealed) o.sealed = false;
     s.campaign.completed.push("cinema.statue");
     CampaignHints.track(s.campaign.hints, "pineridge.two-nights", s.minutes);
@@ -1457,7 +1489,7 @@ const Sim = (() => {
   }
 
   // Campaign objects added after campaign saves already existed: older saves get them back on load.
-  const campaignFixtures = new Set(["eva-diary", "iron-cage", "iron-toolboard", "iron-terminal-0", "iron-terminal-1", "iron-terminal-2"]);
+  const campaignFixtures = new Set(["cinema-tap", "cinema-note", "eva-diary", "iron-cage", "iron-toolboard", "iron-terminal-0", "iron-terminal-1", "iron-terminal-2"]);
 
   // ironworks.barricade: a barricaded weapon cage and a toolboard in the machine shop, and three line-computer terminals.
   function placeIronworks(world) {
@@ -1703,9 +1735,9 @@ const Sim = (() => {
     }
   }
 
-  function hear(s, kind, point, intensity = 1) {
+  function hear(s, kind, point, intensity = 1, delay = 0) {
     const zombieVoice = kind === "near" || kind === "distant" || kind === "horde";
-    s.sounds.push({kind,x:point.x,y:point.y,muffled:!lineOfSight(s,s.player,point),zombieVoice,intensity});
+    s.sounds.push({kind,x:point.x,y:point.y,muffled:!lineOfSight(s,s.player,point),zombieVoice,intensity,...(delay ? {delay} : {})});
     if (s.sounds.length > 5) s.sounds.shift();
   }
 
@@ -3925,7 +3957,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, unreadNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

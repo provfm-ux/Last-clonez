@@ -477,5 +477,17 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
     (shown.createRadialGradient ?? 0) === (gone.createRadialGradient ?? 0) && (shown.createLinearGradient ?? 0) === (gone.createLinearGradient ?? 0),
     total(shown) + " vs " + total(gone));
 }
+{ // cinema: a torneira de cerveja do convívio desenha-se, barata e sem gradientes
+  const run = Sim.createControl("campaign","carer","shelter"); Sim.testJump(run, 2, {}, {anyMode: true});
+  const ex = run.world.objects.find(o => o.id === "exit-cinema"); Object.assign(run.player, {x: ex.x - 1, y: ex.y});
+  const c = Sim.travel(run, ex), tap = c.world.objects.find(o => o.id === "cinema-tap"); View.prepare(c.world); c.world.enemies = [];
+  Object.assign(c.player, {x: tap.x + 1.5, y: tap.y - 1}); for (let i = 0; i < 5; i++) Sim.tick(c, .05);
+  const total = r => Object.entries(r).filter(([k]) => !/Gradient/.test(k)).reduce((n, [, v]) => n + v, 0);
+  View.render(c, 0, 1/60);
+  const shown = per(() => View.render(c, 0, 1/60)); tap.active = false;
+  const gone = per(() => View.render(c, 0, 1/60)); tap.active = true;
+  check("cinema torneira de cerveja desenhada, barata e sem gradientes", total(shown) > total(gone) && total(shown) - total(gone) < 120 &&
+    (shown.createRadialGradient ?? 0) === (gone.createRadialGradient ?? 0), total(shown) + " vs " + total(gone));
+}
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

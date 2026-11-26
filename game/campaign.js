@@ -35,6 +35,32 @@ const Campaign = (() => {
     "opt.harvest":{name:"Farm harvest", kind:"optional", from:24}
   };
 
+  // Challenge graph (sections 9 and 16): the area that hosts each mandatory challenge, what it needs and what it grants.
+  // "clue" is one partial coordinate; "start" items exist in the world from day 1. Checked for soft-locks by the tests.
+  const start = ["flashlight", "battery"];
+  const challenges = {
+    "coldvale.houses":{area:"coldvale", grants:["clue"]},
+    "cinema.statue":{area:"cinema", grants:["idol"]},
+    "pineridge.two-nights":{area:"pineridge", days:2, grants:["clue"]},
+    "eva.death":{area:"eva", grants:["diary"]},
+    "ironworks.barricade":{area:"ironworks", grants:["strong-weapon"]},
+    "fathill.bosses":{area:"fathill", grants:["clue"]},
+    "westfields.stealth":{area:"westfields", grants:["clue"]},
+    "cindergrotto.battery":{area:"cindergrotto", needs:["flashlight", "battery"], grants:["clue"]},
+    "amigo1.lockdown-chat":{area:"amigo1", needs:["strong-weapon"], grants:["fortress-map"]},
+    "viragem.zero":{area:"viragem", grants:["patient-zero"]},
+    "fortress.last-boss":{area:"fortress", clues:5}
+  };
+  // Intended intensity per day (level-design pacing, 0..1): teach first, rest before each boss, no long run of peaks.
+  // Later areas can drive spawn density from this table.
+  const beats = [
+    [1,"teach",.2],[2,"set-piece",.8],[3,"survive",.6],[4,"survive",.6],[5,"story",.3],[6,"challenge",.6],[7,"rest",.3],
+    [8,"boss",.9],[9,"rest",.4],[10,"challenge",.7],[11,"rest",.3],[12,"challenge",.7],[13,"rest",.2],[14,"boss",1],
+    [15,"story",.5],[16,"challenge",.5],[17,"challenge",.5],[18,"challenge",.5],[19,"challenge",.5],[20,"challenge",.5],
+    [21,"rest",.3],[22,"challenge",.4],[23,"rest",.3],[24,"rest",.2],[25,"challenge",.7],[26,"rest",.3],[27,"challenge",.8],
+    [28,"rest",.3],[29,"boss",1],[30,"rest",.2]
+  ].map(([day,type,intensity]) => ({day,type,intensity}));
+
   // Game regions that belong to a campaign area (travel there follows the calendar). Other regions stay free.
   const regions = {coldvale:"coldvale", cinema:"cinema", ridge:"pineridge", ironworks:"ironworks", coast:"fathill", fields:"westfields", cavern:"cindergrotto"};
 
@@ -67,5 +93,5 @@ const Campaign = (() => {
     return "";
   }
 
-  return {length, areas, regions, day, weekday, isWeekday, lowTide, closedReason, isOpen, openOn, missing};
+  return {length, areas, regions, start, challenges, beats, day, weekday, isWeekday, lowTide, closedReason, isOpen, openOn, missing};
 })();

@@ -286,7 +286,10 @@ dialog::backdrop { background: #080d0abf; backdrop-filter: blur(3px); }
 select { width:100%; display:block; margin-top:5px; padding:7px 24px 7px 8px; background:#222c21; border:1px solid #4a5740; border-radius:4px; color:#e5dfca; font:600 11px var(--sans); }
 .start-button { max-width:325px; width:100%; background:#dfb579; border-color:#edca93; box-shadow:0 7px 24px #a9853214; }
 .start-button:hover { background:#edca93; }
-#continue-btn:not([hidden]) + #recommended-btn, #advanced-start #start-btn {
+/* game-ui-ux: with a saved game, Continue is the one primary action; new-game buttons step back and sit apart. */
+#continue-btn[hidden] + .setup-divider { display:none; }
+.setup-divider { margin:18px 0 8px; padding-top:12px; border-top:1px solid #3a4636; color:#a4b29a; font:700 11px var(--sans); letter-spacing:.12em; text-transform:uppercase; }
+#continue-btn:not([hidden]) ~ #story-btn, #continue-btn:not([hidden]) ~ #recommended-btn, #advanced-start #start-btn {
   background:#273326; color:#d7dec8; border-color:#52634a; min-height:44px; margin-top:7px; font-size:13px;
 }
 @media (min-width:1100px) {

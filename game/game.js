@@ -564,6 +564,10 @@
 
   function objectives() {
     if (state.longHaul) return Sim.longHaulGoals(state);
+    if (state.campaign) { // the next four campaign goals, starting with the first one not done
+      const goals = Sim.campaignGoals(state), first = Math.max(0, Math.min(goals.findIndex(g => !g.done), goals.length - 4));
+      return goals.slice(first < 0 ? goals.length - 4 : first, (first < 0 ? goals.length - 4 : first) + 4);
+    }
     const reserves = state.flags.supplies;
     return [
       {done: state.flags.barricade, text: "Protect the shelter", detail: "Barricade a door or window."},

@@ -1994,6 +1994,28 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("origins saves da 0.34 carregam com o Sandbox por omissão e sem traços", old.rules.speed === 100 && old.rules.bite === 6 && Object.keys(old.traitEffects).length === 0);
 }
 
+{ // ui.campaign-goals (revisão, sugestão 1): objetivos da campanha no topo, no diário e na seta de direção
+  const s = fresh("campaign");
+  check("ui.campaign-goals começa com as 3 páginas, sem seta (encontrar as casas faz parte do desafio)",
+    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 5);
+  s.campaign.completed.push("coldvale.houses");
+  check("ui.campaign-goals o cinema ainda fechado mostra quando abre e aponta para a saída",
+    Sim.pinnedGoal(s) === "Take the golden idol · opens on day 2" && Sim.destination(s)?.id === "exit-cinema", Sim.pinnedGoal(s));
+  Sim.testJump(s, 2, {}, {anyMode: true});
+  check("ui.campaign-goals no dia 2 o cinema está aberto e a seta aponta para a saída", Sim.pinnedGoal(s) === "Take the golden idol" && Sim.destination(s)?.id === "exit-cinema");
+  const ex = s.world.objects.find(o => o.id === "exit-cinema"); Object.assign(s.player, {x: ex.x - 1, y: ex.y});
+  const c = Sim.travel(s, ex);
+  check("ui.campaign-goals dentro do cinema a seta aponta para o ídolo", Sim.destination(c)?.id === "cinema-statue");
+  Object.assign(c.player, {x: 11.5, y: 6.5}); Sim.takeStatue(c, c.world.objects.find(o => o.id === "cinema-statue"));
+  check("ui.campaign-goals com o ídolo na mão a seta aponta para a janela", Sim.destination(c)?.kind === "window");
+  c.campaign.completed.push("cinema.statue", "pineridge.two-nights"); Sim.testJump(c, 6, {}, {anyMode: true}); c.campaign.eva = "gone";
+  check("ui.campaign-goals depois da Eva: ler o diário", Sim.pinnedGoal(c) === "Read Eva's diary at the shelter" && Sim.destination(c)?.id === "exit-coldvale");
+  c.campaign.completed.push("eva.death", "ironworks.barricade");
+  check("ui.campaign-goals com tudo feito por agora o objetivo avisa que há mais a caminho", /on its way/.test(Sim.pinnedGoal(c)) && Sim.destination(c) === null);
+  const plain = fresh("survival"); plain.pinStory = true;
+  check("ui.campaign-goals fora da campanha nada muda", Sim.pinnedGoal(plain) === "Find Eva" && Sim.campaignGoals === Sim.campaignGoals);
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

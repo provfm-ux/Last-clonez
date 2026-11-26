@@ -12,7 +12,7 @@ const url = process.env.DEMO_URL || "";
 if (url && !/^https:\/\/[^\s"<>]+$/.test(url)) { console.error("DEMO_URL must be an https:// link."); process.exit(1); }
 execFileSync(process.execPath, [path.join(__dirname, "build.js")], {cwd: root, stdio: "inherit"});
 const version = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;
-const config = {email, version, fullGameUrl: url, limitSeconds: 1800};
+const config = {email, version, fullGameUrl: url, pageUrl: url, limitSeconds: 1800};
 let html = fs.readFileSync(path.join(root, "dist", "single.html"), "utf8");
 const script = "<script>\nconst DEMO_CONFIG = " + JSON.stringify(config).replace(/</g, "\\u003c") + ";\n" +
   fs.readFileSync(path.join(root, "demo", "demo.js"), "utf8") + "\n</script>\n";

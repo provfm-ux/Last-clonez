@@ -11,4 +11,6 @@ How it works (no change to `game/*.js`, so the full game and its saves are untou
 - counts live play time in `localStorage` (menus, pause, hidden tabs do not count), shows the time left and an end screen at 30:00;
 - builds the bug mail from the text typed plus play time, in-game clock, area and browser. "Copy report" is the fallback when the mail app does not open.
 
+Marketing and itch page copy: `docs/MARKETING.md`.
+
 Tests: `tests/demo-test.js` (runs in `npm test`).

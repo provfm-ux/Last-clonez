@@ -12,6 +12,8 @@ const Demo = (() => {
   const email = String(config.email || "");
   const version = String(config.version || "demo");
   const fullGameUrl = String(config.fullGameUrl || "");
+  const pageUrl = String(config.pageUrl || fullGameUrl);
+  const shareText = "I just survived the Last CloneZ demo: a cult cinema, a golden idol and a horde that won't stay quiet. Free to play in your browser.";
   const secondsKey = "last-clonez-demo-seconds-v1";
   const point = ([x, y]) => ({x: x + .5, y: y + .5});
   // Arrival tiles (the tile beside each door): cinema foyer and the grotto's lower gallery.
@@ -125,6 +127,15 @@ const Demo = (() => {
       const detail = start.nextElementSibling;
       if (detail) detail.textContent = "30 minutes · Oxford Night Reel cinema + Cinder Grotto";
     }
+    const copy = document.querySelector(".hero-copy");
+    if (copy) {
+      const teaser = document.createElement("p");
+      teaser.className = "demo-teaser";
+      teaser.innerHTML = "<b>Demo:</b> a radio rumour says the preppers built a fortress with years of supplies. " +
+        "Tonight you are in a shuttered cult cinema where the raffle never finished, then underground in the Cinder Grotto. " +
+        "Take the golden idol if you dare. Something in the dark knows the way to the fortress.";
+      copy.append(teaser);
+    }
     const sub = document.querySelector(".brand-sub");
     if (sub) sub.textContent = "DEMO";
     const status = $("save-status");
@@ -143,8 +154,13 @@ const Demo = (() => {
       "<small>" + (email ? "Goes to " + email + ". If your mail app does not open, copy the report and send it yourself." :
         "No email is set for this build.") + "</small>";
     endDialog.innerHTML = "<h2>That's the end of the demo</h2><p>You used your 30 minutes in the Oxford Night Reel and the Cinder Grotto. " +
-      "Thanks for playing.</p><p>Found something broken, or have an opinion? We read every report.</p>" +
-      '<div class="row">' + (fullGameUrl ? '<a href="' + fullGameUrl + '" target="_blank" rel="noopener">More about the game</a>' : "") +
+      "Thanks for playing.</p><p><b>In the full game</b> (30 nights, 11 areas):</p><ul>" +
+      "<li>Eva, the radio and a rumour about a prepper fortress</li>" +
+      "<li>Five coordinates hidden across Pine Ridge, the Ironworks, FatHill, Westfields and the Grotto</li>" +
+      "<li>Bosses, a day-5 loss that stays with you, and a twist about who built the fortress</li></ul>" +
+      "<p>Found something broken, or have an opinion? We read every report.</p>" +
+      '<div class="row">' + (pageUrl ? '<a href="' + pageUrl + '" target="_blank" rel="noopener">Follow the game</a>' : "") +
+      '<button type="button" id="demo-end-share">Share the demo</button>' +
       '<button type="button" id="demo-end-bug">Report a bug</button></div>';
     endDialog.addEventListener("cancel", e => e.preventDefault());
     document.body.append(bugDialog, endDialog);
@@ -170,6 +186,13 @@ const Demo = (() => {
       catch { $("demo-bug-text").value = text; $("demo-bug-text").select(); $("demo-bug-copy").textContent = "Select all and copy"; }
     });
     $("demo-end-bug").addEventListener("click", openBug);
+    $("demo-end-share").addEventListener("click", async () => {
+      const text = shareText + (pageUrl ? " " + pageUrl : "");
+      try {
+        if (navigator.share) await navigator.share({text, url: pageUrl || undefined});
+        else { await navigator.clipboard.writeText(text); $("demo-end-share").textContent = "Copied"; }
+      } catch { /* share cancelled */ }
+    });
 
     const chip = document.createElement("div");
     chip.className = "demo-chip";

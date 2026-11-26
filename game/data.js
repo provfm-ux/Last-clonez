@@ -6,6 +6,8 @@ const Data = (() => {
     pantrycap:{name:"Pantrycap",group:"Food",weight:.08,use:"food",nutrition:16,perish:1.5,icon:"food"},
     mushroommeal:{name:"Roasted Pantrycaps",group:"Food",weight:.13,use:"food",nutrition:38,perish:.8,icon:"food"},
     bitterfold:{name:"Bitterfold",group:"Food",weight:.08,use:"food",toxic:true,perish:1.5,icon:"food"},
+    goldstatue:{name:"Golden statue",group:"Equipment",weight:1.2,icon:"badge",
+      detail:"Left on the cinema altar by two regulars. The rumour ties it to the fortress."},
     raffletrophy:{name:"Golden Raffle Trophy",group:"Equipment",weight:.35,icon:"badge",
       detail:"Congratulations. You survived the raffle. The winner didn't."},
     bat: {combat:"blunt", name:"Wooden bat", group:"Weapons", weight:1.4, damage:25, range:1.4, delay:.55, effort:6, noise:3, wear:.6, icon:"bat"},
@@ -216,8 +218,13 @@ const Data = (() => {
       "A prepper checklist: water, seed, fuel, coordinates. Beside the last word: \"Start where the radio can hear you.\"",
       "A page behind a wall calendar: \"If you found three of these, you have the first number.\" The handwriting matches the others."
     ],
-    housesDone:"The three pages fit together. You have the first coordinate. The rumour is real, or someone wants it to be."
+    housesDone:"The three pages fit together. You have the first coordinate. The rumour is real, or someone wants it to be.",
+    statueTaken:"The altar clicks. The lobby doors slam and jam. In the dark seats, the audience stands up.",
+    jammed:"Jammed shut. Find a window.",
+    frameHolds:"The window frame holds. Keep hitting, or pry it.",
+    cinemaEscape:"You are out with the statue. For the first time in days, you feel a little safer."
   };
+  const cinemaTrap = {horde:50, windowHits:3};
   const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],
     pools:{clinic:["bandage"], fuel:["fuel"], market:["battery"], workshop:["battery"], town:["food", "water"]}};
   const legacyRules = {care:"quick", exposure:"off", powerDays:-1, waterDays:-1};
@@ -416,6 +423,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,campaignText,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,campaignText,cinemaTrap,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

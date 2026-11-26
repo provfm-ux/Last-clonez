@@ -2614,6 +2614,8 @@ const View = (() => {
       }
     }
     if(!menu) {
+      const track = Sim.nearbyTrack(state);
+      if (track) marker(track.x,track.y,4,"Tracks","#c4ad87");
       {
         const hasNote = o => Boolean(Sim.unreadClueAt(state, o));
         const hasCache = o => Sim.isSupplyCache(state, o);

@@ -1,6 +1,7 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Added Tracking. Moving infected leave fading outdoor tracks that reveal direction, age and type as the skill improves.
 - Spread existing infected across quiet landmarks and stocked long travel routes with small caches and patrols on new maps.
 - Renamed the Field Ledger to Logbook and added saved daily summaries of combat and survival activities.
 - Added nine campfire recipes and six pantry ingredients stocked across five regions.

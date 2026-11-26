@@ -3166,6 +3166,51 @@ const Sim = (() => {
     return npc.hp > 0 && !npc.ridingVehicle && npc.mode !== "injured" && npc.mode !== "dead";
   }
 
+  const trackLimit = 48, trackLifetime = 50;
+  const trackTrail = new WeakMap();
+  const directions = ["east","southeast","south","southwest","west","northwest","north","northeast"];
+
+  function leaveTrack(s,z,previousX,previousY) {
+    const world = s.world;
+    if (world.underground || !z.moving || distance(z,s.player)>13) return;
+    const tile = World.tileAt(world,z.x,z.y);
+    if (!tile || tile.building || !["grass","sand","field","trail"].includes(tile.surface)) return;
+    const x = tile.x+.5, y = tile.y+.5, anchor = trackTrail.get(z);
+    if (x<=1 || y<=1 || x>=world.width-1 || y>=world.height-1 || anchor && Math.hypot(anchor.x-x,anchor.y-y)<3) return;
+    trackTrail.set(z,{x,y});
+    const tracks = world.tracks ??= [];
+    if (tracks.some(track => track.x===x && track.y===y && s.minutes-track.minute<=trackLifetime)) return;
+    const direction = (Math.round(Math.atan2(z.y-previousY,z.x-previousX)/(Math.PI/4))+8)%8;
+    tracks.push({x,y,minute:s.minutes,kind:z.kind,direction,examined:false});
+    if (tracks.length>trackLimit) tracks.shift();
+  }
+
+  function nearbyTrack(s,optics) {
+    if (s.mode!=="play" || s.player.vehicle) return null;
+    let selected = null, nearest = 1.85 + level(s,"tracking")*.16;
+    for (const track of s.world.tracks ?? []) {
+      if (track.examined || s.minutes-track.minute>trackLifetime) continue;
+      const reach = distance(s.player,track);
+      if (reach>nearest || !canSee(s,track.x,track.y,optics ??= sight(s))) continue;
+      selected = track;
+      nearest = reach;
+    }
+    return selected;
+  }
+
+  function inspectTrack(s) {
+    const track = nearbyTrack(s);
+    if (!track) return false;
+    const skill = level(s,"tracking");
+    const age = Math.floor(s.minutes-track.minute);
+    const kind = skill>=3 ? Data.infected[track.kind].name+" tracks" : "Infected tracks";
+    const time = skill>=2 ? (age===0 ? "Less than a minute old" : age+" min old") : age<12 ? "Fresh" : "Fading";
+    track.examined = true;
+    notify(s,kind+" · "+time+(skill>=1 ? " · Heading "+directions[track.direction] : "")+".");
+    addXp(s,"tracking",4);
+    return true;
+  }
+
   function updateEnemies(s, dt) {
     const p = s.player, npc = s.world.npc;
     const lit = World.tileAt(s.world, p.x, p.y)?.building && hasPower(s, p);
@@ -3268,7 +3313,9 @@ const Sim = (() => {
           if (World.clear(s.world, x, y)) z.path = World.route(s.world, z.x, z.y, x, y);
         }
       }
+      const previousX = z.x, previousY = z.y;
       z.moving = follow(s, z, z.stats.speed * dt * (z.alert > 0 ? 1 : .45) * (z.origin === "cinema-winner" ? .85 : 1), true);
+      leaveTrack(s,z,previousX,previousY);
       if (chooseVoice && d < bestDistance && s.elapsed >= voice.next && (z.alert <= 0 || z.moving)) {
         bestDistance = d;
         ambient = z;
@@ -3584,6 +3631,7 @@ const Sim = (() => {
   function snapshotZone(s) {
     const a = s.atmosphere;
     return {booksStocked:s.world.booksStocked, coverage:s.world.coverage, routeCoverage:s.world.routeCoverage, mapRevision:Regions.mapRevision,ledgerRevision:Chronicle.revision,fieldRevision:FieldStories.revision,atmosphere:{...a,pending:a.pending?{...a.pending}:null,alarm:a.alarm?{...a.alarm}:null},
+      tracks:(s.world.tracks ?? []).filter(t => s.minutes-t.minute<=trackLifetime).map(t=>({...t})),
       waypoint:s.waypoint,mapPins:s.mapPins.map(pin => ({...pin})),npc:{...s.world.npc,path:[],moving:false},
       objects:s.world.objects,enemies:s.world.enemies.map(({stats,path,...enemy}) => ({...enemy,path:[]})),
       explored:Array.from(s.world.explored),rng:s.world.rng.state()};
@@ -3869,6 +3917,13 @@ const Sim = (() => {
       return {...z, outfit, windup, windupTarget, swing: windup ? 0 : z.swing, stats: Data.infected[z.kind], path: [],
         ...(z.origin === "resident" ? {dormant:z.dormant === true && z.hp > 0} : {})};
     });
+    const tracks = data.tracks === undefined ? [] : data.tracks;
+    if (!Array.isArray(tracks) || tracks.length>trackLimit || tracks.some(t=>!validPosition(t) ||
+        !Number.isInteger(t.x-.5) || !Number.isInteger(t.y-.5) || !Number.isFinite(t.minute) ||
+        t.minute<0 || t.minute>data.minutes || !Object.hasOwn(Data.infected,t.kind) ||
+        !Number.isInteger(t.direction) || t.direction<0 || t.direction>=directions.length ||
+        typeof t.examined!=="boolean")) throw new Error("Invalid infected tracks.");
+    s.world.tracks = tracks.filter(t=>data.minutes-t.minute<=trackLifetime).map(t=>({...t}));
     s.world.npc = {...data.npc, name: s.world.npc.name, path: []};
     if (s.world.npc.ridingVehicle && (s.world.npc.ridingVehicle !== s.player.vehicle ||
         distance(s.world.npc, s.player) > .1)) throw new Error("Invalid passenger position.");
@@ -3965,7 +4020,7 @@ const Sim = (() => {
     threats, notify, level, addXp, moodles, sleep, unstick, season, snapshot, restore, distance, lineOfSight,
     vehicle, enterVehicle, exitVehicle, refuel, repairVehicle, vehicleRepairProblem, vehicleRepairAmount, brake, canListen, listenAtDoor,
     destination, markDestination, markStation, exploredTile, saveMapPin, markPin, removePin,
-    travel, travelProblem, knownMushrooms, isMushroom, itemName, mushroomProblem, harvestMushroom, readFieldNote, wildProblem, useWild, sceneProblem, resolveScene, dispatchProblem, sendDispatch, readDispatchReport, touchFungus, inspectCrib, armWatch, waitWithWatch, isFurniture, dismantleFurniture, moonlight,
+    travel, travelProblem, nearbyTrack, inspectTrack, knownMushrooms, isMushroom, itemName, mushroomProblem, harvestMushroom, readFieldNote, wildProblem, useWild, sceneProblem, resolveScene, dispatchProblem, sendDispatch, readDispatchReport, touchFungus, inspectCrib, armWatch, waitWithWatch, isFurniture, dismantleFurniture, moonlight,
     resumeEncounterWarning,
     minutesToRain, gridPower, mainsWater, hasPower, useTap, useGenerator, isNight, rainBottles, rainDraw, boilingMinutes, startBoiling, collectBoiledWater,
     fireBatch, startFireBatch, collectCookedFood, sow, waterGarden, gardenYield, harvestGarden, evaAtShelter, toggleGardenHelp};

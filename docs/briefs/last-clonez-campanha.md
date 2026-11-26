@@ -1,6 +1,6 @@
 # Brief: campanha de 30 dias do Last CloneZ
 
-Fonte única: `docs/HISTORIA.md` (v23). Regras do repositório: `AGENTS.md`. Este brief diz **o que construir a seguir e como provar que está feito**, uma tarefa por PR.
+Fonte única: `docs/HISTORIA.md` (v24). Regras do repositório: `AGENTS.md`. Este brief diz **o que construir a seguir e como provar que está feito**, uma tarefa por PR.
 
 ## 1. Objetivo e hipótese
 Acreditamos que uma campanha de 30 dias com uma pista por área, um calendário com razões dentro da história e dias de 15 minutos reais prende o jogador em mobile. A primeira prova é a **demo do itch.io** (Cold Vale + cinema, 15 min). Metas para a demo, a ler com `tracking-game-metrics`: ≥ 60% dos jogadores chegam ao cinema e ≥ 35% saem pela janela com a estátua.

@@ -12,6 +12,7 @@ let heldWeapon = null;
 const infectedFrames = [], survivorFrames = [];
 const bagPigments = new Set(["#3b2822","#c4875e","#985b40","#714534","#513629","#e0b784"]);
 const bagPixels = [];
+let lastTranslate = null;
 const smokeFrames = [], canopyPositions = [], rippleFrames = [], propSprites = [];
 let beamOpacity = 1;
 const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
@@ -22,6 +23,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
       counts[k] = (counts[k] || 0) + 1;
       if (k === "fillRect" && (t.fillStyle === "#afc1c66b" || t.fillStyle === "#879fa840")) rippleFrames.push(args);
       if (k === "fillRect" && bagPigments.has(t.fillStyle)) bagPixels.push(t.fillStyle);
+      if (k === "translate" && !lastTranslate) lastTranslate = args;
       if (k === "save") t.savedAlpha.push(t.globalAlpha);
       if (k === "restore") t.globalAlpha = t.savedAlpha.pop() ?? 1;
       if (k === "drawImage" && args.length === 5) {
@@ -442,6 +444,25 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   check("cinema.statue estátua desenhada no palco, barata e sem gradientes", total(shown) > total(gone) && total(shown) - total(gone) < 200 &&
     (shown.createRadialGradient ?? 0) === (gone.createRadialGradient ?? 0) && (shown.createLinearGradient ?? 0) === (gone.createLinearGradient ?? 0),
     total(shown) + " vs " + total(gone));
+}
+{ // game-feel: impactos abanam só o desenho, decaem em tempo real e respeitam "Reduce flicker"
+  const run = Sim.createControl("training","carer","shelter"); View.prepare(run.world); run.visualAtmosphere = "full"; run.reduceFlicker = false;
+  const frame = dt => { lastTranslate = null; View.render(run, 0, dt); return lastTranslate.slice(); };
+  for (let i = 0; i < 30; i++) frame(1/60);
+  const rest = frame(1/60);
+  run.effects.push({x: run.player.x, y: run.player.y, text: "CLICK", color: "#fff", life: 1, impact: .8});
+  frame(.03);
+  run.effects.push({x: run.player.x, y: run.player.y, text: "SMASH", color: "#fff", life: 1, impact: .45});
+  const hit = frame(1/60);
+  check("game-feel dois impactos somam trauma e abanam o ecrã", View.trauma() > .9 && (Math.abs(hit[0] - rest[0]) > .5 || Math.abs(hit[1] - rest[1]) > .5),
+    "trauma " + View.trauma().toFixed(2));
+  for (let t = 0; t < 1 / 1.2; t += 1/60) frame(1/60);
+  const after = frame(1/60);
+  check("game-feel o abanão volta a zero em menos de 1/decaimento segundos", View.trauma() === 0 && after[0] === rest[0] && after[1] === rest[1]);
+  run.reduceFlicker = true;
+  run.effects.push({x: run.player.x, y: run.player.y, text: "CLICK", color: "#fff", life: 1, impact: .8});
+  const calm = frame(1/60);
+  check("game-feel com Reduce flicker o ecrã não abana", calm[0] === rest[0] && calm[1] === rest[1]);
 }
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

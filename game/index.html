@@ -8,7 +8,7 @@
 <title>Last CloneZ</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link id="micro-zombie-atlas" rel="preload" as="image" href="micro-zombies.png?v=0.34">
-<link rel="stylesheet" href="style.css?v=origins-2">
+<link rel="stylesheet" href="style.css?v=menu-1">
 <script src="data.js?v=perf-2" defer></script>
 <script src="research.js?v=logbook-1" defer></script>
 <script src="legacy-level.js?v=0.33" defer></script>
@@ -27,7 +27,7 @@
 <script src="campaign.js?v=campaign-2" defer></script>
 <script src="sim.js?v=story-1" defer></script>
 <script src="view.js?v=idol-2" defer></script>
-<script src="game.js?v=story-1" defer></script>
+<script src="game.js?v=menu-1" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -121,39 +121,47 @@
           </div>
           <div class="hero-setup">
             <button class="start-button" id="continue-btn" hidden><svg class="icon"><use href="#play"/></svg> Continue <svg class="icon end-icon"><use href="#arrow"/></svg></button>
-            <button class="start-button" id="recommended-btn" type="button"><svg class="icon"><use href="#play"/></svg> Recommended start <svg class="icon end-icon"><use href="#arrow"/></svg></button>
-            <p class="recommended-detail">Survival · Shelter · Marked map</p>
-            <button class="start-button" id="longhaul-btn" type="button"><svg class="icon"><use href="#play"/></svg> Easy · 30 Days <svg class="icon end-icon"><use href="#arrow"/></svg></button>
-            <p class="recommended-detail">Guided challenge · Cold Vale shelter</p>
+            <button class="start-button primary-start" id="story-btn" type="button"><svg class="icon"><use href="#play"/></svg> Story campaign <svg class="icon end-icon"><use href="#arrow"/></svg></button>
+            <p class="recommended-detail">30 days · Follow the radio rumour · About 15 minutes per day</p>
+            <button class="start-button" id="recommended-btn" type="button"><svg class="icon"><use href="#play"/></svg> Survival <svg class="icon end-icon"><use href="#arrow"/></svg></button>
+            <p class="recommended-detail">Same world and villains · No calendar · Marked map</p>
             <details id="advanced-start" class="advanced-start">
-              <summary>Advanced</summary>
-              <div class="new-world-options"><label>NAME<input id="survivor-name" type="text" maxlength="56" placeholder="Survivor" autocomplete="off"></label><label>APPEARANCE<select id="appearance"></select></label></div>
-              <details class="advanced-start survivor-style">
-                <summary>Customize survivor</summary>
-                <div class="equipment-overview">
-                  <canvas id="setup-portrait" class="survivor-portrait" width="48" height="48" aria-label="Survivor appearance preview"></canvas>
-                  <div id="setup-style-fields" class="rules-grid"></div>
-                </div>
+              <summary>More modes and options</summary>
+              <button class="small-button" id="longhaul-btn" type="button">Easy · 30 Days (guided)</button>
+              <details id="setup-survivor" class="advanced-start setup-group">
+                <summary>Survivor</summary>
+                <div class="new-world-options"><label>NAME<input id="survivor-name" type="text" maxlength="56" placeholder="Survivor" autocomplete="off"></label><label>APPEARANCE<select id="appearance"></select></label></div>
+                <details class="advanced-start survivor-style">
+                  <summary>Customize survivor</summary>
+                  <div class="equipment-overview">
+                    <canvas id="setup-portrait" class="survivor-portrait" width="48" height="48" aria-label="Survivor appearance preview"></canvas>
+                    <div id="setup-style-fields" class="rules-grid"></div>
+                  </div>
+                </details>
+                <div class="new-world-options"><label>BACKGROUND<select id="role" aria-describedby="background-detail"></select></label></div>
+                <p id="background-detail" class="background-detail"></p>
+                <p id="background-kit" class="background-detail"></p>
+                <details class="survivor-customization">
+                  <summary>Traits</summary>
+                  <p id="trait-points" class="background-detail" aria-live="polite"></p>
+                  <div id="trait-choices" class="trait-choices"></div>
+                </details>
               </details>
-              <div class="new-world-options"><label>BACKGROUND<select id="role" aria-describedby="background-detail"></select></label><label>WORLD PRESET<select id="difficulty" aria-describedby="preset-summary"></select></label></div>
-              <p id="background-detail" class="background-detail"></p>
-              <p id="background-kit" class="background-detail"></p>
-              <details class="survivor-customization">
-                <summary>Traits</summary>
-                <p id="trait-points" class="background-detail" aria-live="polite"></p>
-                <div id="trait-choices" class="trait-choices"></div>
+              <details id="setup-world" class="advanced-start setup-group">
+                <summary>World</summary>
+                <div class="new-world-options"><label>WORLD PRESET<select id="difficulty" aria-describedby="preset-summary"></select></label></div>
+                <div class="preset-line"><p id="preset-summary" class="preset-summary"></p><button type="button" class="small-button" id="rules-btn">Customize</button></div>
+                <button type="button" class="small-button" id="setup-assists">Assists</button>
+                <div class="new-world-options start-options"><label>STARTING POINT<select id="start-point" aria-describedby="start-detail"></select></label><label>MAP SEED<input id="world-seed" type="text" inputmode="numeric" pattern="[0-9]{1,9}" maxlength="9" placeholder="Random" autocomplete="off"></label></div>
+                <p class="start-detail" id="start-detail" aria-live="polite"></p>
+                <label class="navigation-choice">Exploration<select id="navigation-mode">
+                  <option value="locations">Map with marked locations</option>
+                  <option value="discover">Discover without a map</option>
+                </select></label>
+                <label class="onboarding-option"><input id="guide-enabled" type="checkbox" checked> Show beginner hints</label>
+                <label class="onboarding-option"><input id="playtest-enabled" type="checkbox"> Record Recommended playtest milestones locally</label>
               </details>
-              <div class="preset-line"><p id="preset-summary" class="preset-summary"></p><button type="button" class="small-button" id="rules-btn">Customize</button></div>
-              <button type="button" class="small-button" id="setup-assists">Assists</button>
-              <div class="new-world-options start-options"><label>STARTING POINT<select id="start-point" aria-describedby="start-detail"></select></label><label>MAP SEED<input id="world-seed" type="text" inputmode="numeric" pattern="[0-9]{1,9}" maxlength="9" placeholder="Random" autocomplete="off"></label></div>
-              <p class="start-detail" id="start-detail" aria-live="polite"></p>
-              <label class="navigation-choice">Exploration<select id="navigation-mode">
-                <option value="locations">Map with marked locations</option>
-                <option value="discover">Discover without a map</option>
-              </select></label>
-              <label class="onboarding-option"><input id="guide-enabled" type="checkbox" checked> Show beginner hints in Recommended</label>
-              <label class="onboarding-option"><input id="playtest-enabled" type="checkbox"> Record Recommended playtest milestones locally</label>
-              <button class="start-button" id="start-btn"><svg class="icon"><use href="#play"/></svg> Start new run <svg class="icon end-icon"><use href="#arrow"/></svg></button>
+              <button class="start-button" id="start-btn"><svg class="icon"><use href="#play"/></svg> Start with these options <svg class="icon end-icon"><use href="#arrow"/></svg></button>
             </details>
             <button class="small-button" id="opening-btn" type="button">Replay opening</button>
             <button class="small-button" id="intro-btn" type="button">Beginner introduction</button>

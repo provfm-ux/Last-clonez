@@ -326,8 +326,19 @@
   function traitsReady() {
     if (!$("start-btn").disabled) return true;
     $("advanced-start").open = true;
+    $("setup-survivor").open = true;
+    for (const group of $("setup-survivor").querySelectorAll("details.survivor-customization")) group.open = true;
     $("trait-points").scrollIntoView?.({block:"center"});
     return false;
+  }
+
+  // Main menu primary action: the story campaign with the recommended setup (shelter start, marked map, beginner hints).
+  function startStory() {
+    if (!traitsReady()) return;
+    $("difficulty").value = "campaign";
+    $("start-point").value = "shelter";
+    showStartDetail();
+    start();
   }
 
   function startRecommended() {
@@ -520,6 +531,7 @@
     state.mode = "menu";
     $("hero").hidden = false;
     $("advanced-start").open = read(startChoiceKey) === "advanced";
+    requestAnimationFrame(() => { if (!$("hero").hidden && !dialog.open) $("story-btn").focus({preventScroll:true}); }); // game-ui-ux: focus the primary action
     $("intro-btn").textContent = read(introKey) ? "Replay introduction" : "Beginner introduction";
     $("continue-btn").hidden = !savedText && !read(backupKey);
     if (state.controlStart) $("start-point").value = state.controlStart;
@@ -2444,7 +2456,7 @@
 
   const handlers = {
     "opening-btn":opening, "intro-btn":startLesson, "lesson-exit":endLesson, "afterlife-exit":endAfterlife,
-    "start-btn": () => start(), "recommended-btn": startRecommended, "longhaul-btn": () => start(true), "continue-btn": resumeSaved, "rules-btn": () => worldRulesEditor(),
+    "start-btn": () => start(), "story-btn": startStory, "recommended-btn": startRecommended, "longhaul-btn": () => start(true), "continue-btn": resumeSaved, "rules-btn": () => worldRulesEditor(),
     "setup-assists": () => difficultyPanel(), "map-btn": () => map(), "journal-btn": diary, "diary-btn": diary,
     "help-btn": help, "pause-btn": pause, "search-btn": nearbyAction, "attack-btn": () => strike(),
     "shove-btn": shoveOrBrake, "pack-btn": bag, "gear-btn": gear, "craft-btn": crafting,
@@ -2459,6 +2471,7 @@
   document.querySelectorAll("[data-panel]").forEach(button => button.addEventListener("click", health));
   $("navigation-mode").value = navigation;
   $("advanced-start").open = read(startChoiceKey) === "advanced" || !read(startChoiceKey) && Boolean(read(setupKey));
+  requestAnimationFrame(() => { if (!$("hero").hidden && !dialog.open) $("story-btn").focus({preventScroll:true}); });
   $("guide-enabled").checked = read(guideKey) !== "0";
   $("playtest-enabled").checked = read(playtestKey) === "1";
   $("guide-enabled").addEventListener("change", event => write(guideKey, event.target.checked ? "1" : "0"));

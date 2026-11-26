@@ -135,7 +135,7 @@ const scenarios = {
   },
   async "setup-traits"(page) {
     await page.evaluate(helpers);
-    await page.evaluate(() => { for (const d of [document.querySelector("details.advanced-start"), ...document.querySelectorAll("details.survivor-customization")]) if (d) d.open = true;
+    await page.evaluate(() => { for (const d of document.querySelectorAll("#advanced-start, #advanced-start details")) d.open = true;
       document.getElementById("role").value = "doctor"; document.getElementById("role").dispatchEvent(new Event("change")); });
     const count = await page.$$eval("#trait-choices input", inputs => inputs.length);
     await page.check('#trait-choices input[value="light-eater"]');
@@ -152,8 +152,7 @@ const scenarios = {
   },
   async "recommended-traits"(page) {
     await page.evaluate(helpers);
-    await page.evaluate(() => { window.confirm = () => true; const d = document.getElementById("advanced-start"); if (d) d.open = true;
-      for (const c of document.querySelectorAll("details.survivor-customization")) c.open = true;
+    await page.evaluate(() => { window.confirm = () => true; for (const d of document.querySelectorAll("#advanced-start, #advanced-start details")) d.open = true;
       const pick = id => { const i = document.querySelector('#trait-choices input[value="' + id + '"]'); i.checked = true; i.dispatchEvent(new Event("change", {bubbles: true})); };
       pick("light-eater"); document.getElementById("recommended-btn").click(); });
     await page.waitForTimeout(600);
@@ -177,6 +176,23 @@ const scenarios = {
     const kept = await page.evaluate(() => localStorage.getItem("clonez-sound-volumes"));
     return {pass: labels === "vol-music,vol-effects,vol-infected" && /"music":0/.test(kept) && /"effects":0\.6/.test(kept),
       notes: "sliders: " + labels + ", saved after reload: " + kept};
+  },
+  async menu(page) { // game-ui-ux: few choices up front, primary action focused, one click to the story
+    await page.evaluate(helpers);
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(() => {
+      const visible = e => e.checkVisibility ? e.checkVisibility({visibilityProperty: true}) : e.getBoundingClientRect().width > 0;
+      const hero = document.getElementById("story-btn").parentElement; // the start panel only
+      return {controls: [...hero.querySelectorAll("button, select, input, summary")].filter(visible).length,
+        focused: document.activeElement?.id, first: [...hero.querySelectorAll(".start-button")].filter(visible).map(b => b.textContent.trim()).join(" | ")};
+    });
+    await page.screenshot({path: require("path").join(out, "menu.png")});
+    await page.evaluate(() => { window.confirm = () => true; });
+    await page.click("#story-btn");
+    await page.waitForFunction(() => window.__state?.mode === "play").catch(() => {});
+    const mode = await page.evaluate(() => window.__state?.difficulty);
+    return {pass: r.controls <= 9 && r.focused === "story-btn" && /^Story campaign/.test(r.first) && mode === "campaign",
+      notes: r.controls + " controls visible on the title screen, focus on: " + r.focused + ", start buttons: " + r.first + ", Story campaign starts: " + mode};
   },
   async "ironworks-terminal"(page) {
     await startCampaign(page);

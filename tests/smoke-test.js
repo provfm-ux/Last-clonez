@@ -1461,6 +1461,115 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     !restored.world.objects.some(o=>o.id.startsWith("coverage-route-")));
 }
 
+{ // sys.day-end (HISTORIA.md secção 6): cada dia termina com um resumo curto
+  const s = fresh("training");
+  s.daily.walker = 3; s.daily.loot = 5;
+  s.minutes = Math.ceil(s.minutes / 1440) * 1440 - .1;
+  run(s, 2);
+  const last = s.messages.at(-1)?.text ?? "";
+  check("sys.day-end resumo curto ao fechar o dia", /^Day 1 complete: 3 infected down, 5 items looted\./.test(last) && s.daily.day === 2, last);
+  s.minutes = Math.ceil(s.minutes / 1440) * 1440 - .1;
+  run(s, 2);
+  check("sys.day-end dia sem atividade", /Day 2 complete: a quiet day/.test(s.messages.at(-1)?.text ?? ""), s.messages.at(-1)?.text);
+}
+
+{ // sys.test-shortcuts (HISTORIA.md secção 16): saltar para o dia N, dar itens, avançar o relógio
+  const s = fresh("training"), hour = s.minutes % 1440;
+  check("sys.test-shortcuts salta para o dia 12 à mesma hora e dá itens",
+    Sim.testJump(s, 12, {battery: 2, crowbar: 1}) && Math.floor(s.minutes / 1440) + 1 === 12 && s.minutes % 1440 === hour &&
+    Sim.quantity(s.player.bag, "battery") >= 2 && Sim.quantity(s.player.bag, "crowbar") >= 1 && s.daily.day === 12);
+  check("sys.test-shortcuts não volta atrás no tempo", !Sim.testJump(s, 3));
+  const loaded = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  check("sys.test-shortcuts o save depois do salto carrega", loaded.daily.day === 12);
+  const before = s.minutes;
+  Sim.fastForward(s, 300);
+  check("sys.test-shortcuts avança 5 h de jogo sem tempo real", Math.abs(s.minutes - before - 300) < 1e-6 && s.mode === "play");
+  check("sys.test-shortcuts só no modo training (ou forçado em testes)", !Sim.testJump(fresh("survival"), 5) && Sim.testJump(fresh("survival"), 5, {}, {anyMode: true}));
+}
+
+{ // sys.hints (HISTORIA.md secções 14 e 16): 2 dias parado → dica; no máximo uma por dia; três níveis
+  const H = context.CampaignHints, D = 1440, start = 480, s = H.track(H.empty(), "fortress.last-boss", start);
+  check("sys.hints sem dica antes de 2 dias parado", H.next(s, start + 2 * D - 1) === null);
+  const first = H.next(s, start + 2 * D);
+  check("sys.hints 2 dias parado → dica discreta", first === H.hints["fortress.last-boss"][0], String(first));
+  check("sys.hints no máximo uma dica por dia", H.next(s, start + 2 * D + 600) === null);
+  const second = H.next(s, start + 3 * D), third = H.next(s, start + 4 * D);
+  check("sys.hints níveis seguintes, do discreto ao explícito", second === H.hints["fortress.last-boss"][1] && third === "It's mutated. It burns.");
+  check("sys.hints depois do nível 3 não repete", H.next(s, start + 5 * D) === null);
+  H.progress(s, start + 5 * D);
+  check("sys.hints progresso recomeça a contagem", H.next(s, start + 6 * D) === null && H.next(s, start + 7 * D) === H.hints["fortress.last-boss"][0]);
+  H.track(s, "amigo1.lockdown-chat", start + 7 * D + 60);
+  check("sys.hints novo objetivo recomeça do nível 1", s.level === 0 && H.next(s, start + 8 * D) === null);
+  check("sys.hints objetivo sem dicas não dá nada", H.next(H.track(H.empty(), "coldvale.houses", 0), 10 * D) === null);
+  const saved = H.restore(JSON.parse(JSON.stringify(s)));
+  check("sys.hints estado persiste; saves antigos e inválidos começam vazios",
+    JSON.stringify(saved) === JSON.stringify(s) && H.restore(undefined).objective === null && H.restore({objective:3, since:-1}).level === 0);
+}
+
+{ // sys.zombie-carry (HISTORIA.md secções 5 e 16): ~1 em 8 zombies aleatórios leva um recurso da área
+  const s = fresh("survival"), rule = Data.zombieCarry, n = 8000;
+  const at = type => { const b = s.world.buildings.find(b => b.type === type); return {x: b.x + b.w / 2, y: b.y + b.h / 2}; };
+  const street = {x: s.player.x, y: s.player.y}, sample = (origin, point = street) =>
+    Array.from({length: n}, (_, i) => Sim.carriedSupply(s, {id: "a" + i, origin, ...point}));
+  const horde = sample("horde"), share = horde.filter(Boolean).length / n;
+  check("sys.zombie-carry cerca de 1 em 8 leva recurso", share > .1 && share < .15, (share * 100).toFixed(1) + "%");
+  check("sys.zombie-carry é determinístico por zombie", Sim.carriedSupply(s, {id: "a42", origin: "horde", ...street}) === horde[42]);
+  check("sys.zombie-carry bosses e zombies de desafio nunca dão recursos",
+    ["cinema-sleeper", "cinema-winner", "resident", "boss", "challenge"].every(o => sample(o).every(x => x === null)));
+  const every = Object.values(rule.pools).flat();
+  check("sys.zombie-carry nunca dá arma nem item de desafio", every.every(id => Data.items[id] && !Data.items[id].damage && id !== "raffletrophy"));
+  const pool = (type, origin) => new Set(sample(origin, at(type)).filter(Boolean));
+  check("sys.zombie-carry pool por área: clínica bandagens, posto combustível, loja pilhas, rua comida/água",
+    [...pool("clinic", "nest")].join() === "bandage" && [...pool("fuel", "")].join() === "fuel" && [...pool("market", "horde")].join() === "battery" &&
+    [...new Set(horde.filter(Boolean))].sort().join() === "food,water");
+  const id = "a" + horde.findIndex(x => x === "food"), z = {...s.world.enemies.find(e => !e.origin), id, origin: "horde", ...street, hp: 1, dormant: false};
+  s.world.enemies.push(z);
+  for (let i = 0; i < 20 && z.hp > 0; i++) { Sim.attack(s, z); s.player.cooldown = 0; s.player.attackCooldown = 0; }
+  const pile = s.world.objects.find(o => o.kind === "drop" && o.died !== undefined && Math.abs(o.x - z.x) < .01 && Math.abs(o.y - z.y) < .01);
+  check("sys.zombie-carry o recurso cai junto ao corpo", z.hp <= 0 && pile?.loot.some(l => l.id === "food") && !pile.searched, z.hp > 0 ? "zombie vivo" : pile ? "" : "sem pilha");
+}
+
+{ // sys.calendar (HISTORIA.md secções 9 e 16): cada área abre e fecha no dia certo
+  const C = context.Campaign, open = (id, d) => C.isOpen(id, d);
+  check("sys.calendar dia vem dos minutos (08:00 do dia 1, meia-noite = dia 2)", C.day(480) === 1 && C.day(1439) === 1 && C.day(1440) === 2);
+  check("sys.calendar nenhuma área abre antes do seu dia", Object.entries(C.areas).every(([id, a]) => a.from === 1 || !open(id, a.from - 1)),
+    Object.entries(C.areas).filter(([id, a]) => a.from > 1 && open(id, a.from - 1)).map(([id]) => id).join(","));
+  check("sys.calendar cada área abre no seu dia", Object.entries(C.areas).every(([id, a]) => open(id, a.from)),
+    Object.keys(C.areas).filter(id => !open(id, C.areas[id].from)).join(","));
+  check("sys.calendar dias úteis: Ironworks abre no dia 6, fecha no fim de semana (9-10), reabre no 11",
+    C.isWeekday(6) && open("ironworks", 6) && !open("ironworks", 9) && !open("ironworks", 10) && open("ironworks", 11) &&
+    /weekend/.test(C.closedReason("ironworks", 9)));
+  check("sys.calendar mercado opcional (dia 11) só abre em dias úteis", open("opt.market", 11) && !open("opt.market", 16) && open("opt.market", 18));
+  check("sys.calendar maré baixa a cada 2 dias: FatHill no dia 8, 10 e 12, fechada no 9 e 11",
+    open("fathill", 8) && !open("fathill", 9) && open("fathill", 10) && !open("fathill", 11) && /tide/i.test(C.closedReason("fathill", 9)));
+  check("sys.calendar janelas fechadas: Eva só no dia 5, amigo 1 nos dias 14-20, viragem nos dias 15-18",
+    !open("eva", 6) && open("amigo1", 20) && !open("amigo1", 21) && open("viragem", 18) && !open("viragem", 19));
+  check("sys.calendar áreas cumpridas continuam abertas nos seus dias", open("coldvale", 30) && open("cinema", 30) && open("fortress", 30) && open("opt.farm", 24));
+  check("sys.calendar áreas opcionais (dias 7, 9, 11, 13, 21-24) não dão pista",
+    Object.entries(C.areas).filter(([id]) => id.startsWith("opt.")).every(([, a]) => a.kind === "optional" && a.clue === undefined &&
+    [7, 9, 11, 13, 21, 22, 23, 24].includes(a.from)));
+  check("sys.calendar Ironworks fora de horas: fechada às 22:00, aberta às 08:00",
+    !C.isOpen("ironworks", 6, 22) && /opens at 08:00/.test(C.closedReason("ironworks", 6, 22)) && C.isOpen("ironworks", 6, 8));
+  check("sys.calendar Cinder Grotto pede lanterna e pilhas",
+    /flashlight and battery/.test(C.missing("cindergrotto", {items: []})) && /battery/.test(C.missing("cindergrotto", {items: ["flashlight"]})) &&
+    C.missing("cindergrotto", {items: ["flashlight", "battery"]}) === "");
+  check("sys.calendar fortaleza só com as 5 coordenadas", /4 of 5/.test(C.missing("fortress", {clues: 4})) && C.missing("fortress", {clues: 5}) === "" &&
+    C.missing("coldvale") === "");
+  check("sys.calendar 5 coordenadas parciais, uma por área", Object.values(C.areas).map(a => a.clue).filter(Boolean).sort().join() === "1,2,3,4,5");
+}
+
+{ // sys.clock (HISTORIA.md secção 16): 1,6 = 15 min reais por dia (mobile), 0,4 = 60 min (Realista)
+  for (const [clock, realMinutes] of [[1.6, 15], [0.4, 60]]) {
+    const s = Sim.createControl("training", "carer", "shelter", {clock}), start = s.minutes;
+    for (let t = 0; t < realMinutes * 60 && s.mode === "play"; t += .5) Sim.tick(s, .5, idle);
+    check("sys.clock " + clock + ": " + realMinutes + " min reais = 1 dia de jogo", s.rules.clock === clock && Math.abs(s.minutes - start - 1440) < 1e-6,
+      "clock=" + s.rules.clock + " minutos=" + (s.minutes - start));
+    const loaded = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+    check("sys.clock " + clock + " persiste no save", loaded.rules.clock === clock);
+  }
+  check("sys.clock rejeita valores fora da lista", Data.worldRules("survival", {clock:1.5}).clock === Data.worldRules("survival").clock);
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

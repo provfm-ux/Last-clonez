@@ -388,8 +388,27 @@ const Sim = (() => {
     if (day === s.daily.day) return;
     s.dailyHistory.push(s.daily);
     if (s.dailyHistory.length > reportLimit) s.dailyHistory.shift();
+    const done = s.daily, kills = done.walker + done.runner + done.brute;
+    const parts = [[kills,"infected down"],[done.loot,"items looted"],[done.gathered,"gathered"],[done.cooked + done.crafted,"made"]]
+      .filter(([n]) => n > 0).map(([n,label]) => n + " " + label);
     s.daily = newDaily(day);
-    notify(s,"Day "+(day-1)+" complete. Your daily summary is in the journal.");
+    notify(s,"Day "+(day-1)+" complete: "+(parts.length ? parts.join(", ") : "a quiet day")+". Full summary in the journal.");
+  }
+
+  // Test shortcuts (HISTORIA.md section 16). Training mode only, unless a headless test passes {anyMode:true}.
+  function testJump(s, day, items = {}, options = {}) {
+    if (s.difficulty !== "training" && !options.anyMode) return false;
+    if (!Number.isInteger(day) || day < runDay(s.minutes)) return false;
+    s.minutes = (day - 1) * 1440 + s.minutes % 1440;
+    closeDaily(s);
+    for (const [id, qty] of Object.entries(items)) add(s.player.bag, id, qty, {born:s.minutes});
+    return true;
+  }
+  // Runs the simulation for the given in-game minutes without waiting in real time.
+  function fastForward(s, minutes, input) {
+    const end = s.minutes + minutes;
+    while (s.mode === "play" && end - s.minutes > .000001) tick(s, Math.min(.25, (end - s.minutes) / s.rules.clock), input);
+    return s;
   }
 
   function restoreDaily(s, data) {
@@ -2500,15 +2519,30 @@ const Sim = (() => {
     if (side) actor.face = side;
   }
 
+  // Deterministic per run and infected (no shared rng): the same infected always carries the same supply.
+  function carriedSupply(s, enemy) {
+    const rule = Data.zombieCarry;
+    if (!rule.origins.includes(enemy.origin ?? "")) return null;
+    let h = (s.seed >>> 0) ^ 2166136261;
+    for (const c of String(enemy.id)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    h = Math.imul(h ^ h >>> 15, 2246822507) >>> 0;
+    if (h % rule.oneIn) return null;
+    const type = s.world.buildings?.find(b => b.id === World.tileAt(s.world, enemy.x, enemy.y)?.building)?.type;
+    const pool = rule.pools[type] ?? rule.pools.town;
+    return pool[Math.floor(h / rule.oneIn) % pool.length];
+  }
+
   function defeat(s, enemy) {
     s.kills++;
     recordDaily(s,enemy.kind);
     hearZombie(s,"death",enemy);
     const winner = enemy.origin === "cinema-winner";
-    const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item;
+    const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item, supply = winner ? null : carriedSupply(s, enemy);
+    const loot = item ? [{id: item, qty: 1, condition: Data.items[item].damage ? 60 : 100}] : [];
+    if (supply) loot.push({id: supply, qty: 1, condition: 100});
     s.world.objects.push({id: "built" + s.serial++, x: enemy.x, y: enemy.y, kind: "drop",
-      name: winner ? "The El Gordo Winner" : "Fallen infected", active: true, solid: false, action: "loot", searched: !item, corpse: !winner, died: s.minutes,
-      loot: item ? [{id: item, qty: 1, condition: Data.items[item].damage ? 60 : 100}] : []});
+      name: winner ? "The El Gordo Winner" : "Fallen infected", active: true, solid: false, action: "loot", searched: !loot.length, corpse: !winner, died: s.minutes,
+      loot});
   }
 
   function attack(s, z) {
@@ -3598,7 +3632,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

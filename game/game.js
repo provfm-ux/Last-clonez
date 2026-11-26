@@ -292,7 +292,7 @@
   }
 
   function start(longHaul = false) {
-    if (!longHaul && $("start-btn").disabled) return;
+    if (!traitsReady()) return;
     const preset = longHaul ? "longhaul" : $("difficulty").value;
     const role = $("role").value, startPoint = longHaul ? "shelter" : $("start-point").value;
     const profile = survivorProfile("setup");
@@ -319,14 +319,23 @@
     cue(170, 86, .3, .07);
   }
 
+  // Every start path refuses an unpaid or contradictory trait selection instead of silently dropping it.
+  function traitsReady() {
+    if (!$("start-btn").disabled) return true;
+    $("advanced-start").open = true;
+    $("trait-points").scrollIntoView?.({block:"center"});
+    return false;
+  }
+
   function startRecommended() {
-    if (!confirmNewRun()) return;
+    if (!traitsReady() || !confirmNewRun()) return;
     const skip = read(skipKey);
     wakeSound();
     setNavigation("locations");
     const run = Sim.createRecommended(Math.floor(Math.random() * 1000000000), $("playtest-enabled").checked,
       skip ? Number(skip) : null, savedAssists());
     Object.assign(run.player,survivorProfile("setup"));
+    run.traitEffects = Data.traitLoadout(run.player.traits).effects;
     activate(run);
     write(skipKey, "");
     write(startChoiceKey, "recommended");

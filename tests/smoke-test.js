@@ -1974,6 +1974,12 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     Object.entries(rules).every(([key,value]) => again.rules[key] === value));
   const food = {id:"rawfish",born:s.minutes};
   check("origins o Sandbox muda a duração da comida", Math.abs(Sim.freshMinutes(s,food) * 2 - Sim.freshMinutes({...s,rules:{...s.rules,decay:100}},food)) < 1e-8);
+  const sprint = traits => { const r = Sim.createControl("custom","carer","shelter",{count:0,hordes:"off",hearing:50},{seed:17,traits});
+    const z = {hp:10, x:r.player.x + 2, y:r.player.y, alert:0}; r.world.enemies = [z]; Sim.noise(r, r.player.x, r.player.y, 6.5, Data.traits[traits[0]]?.value ?? 1);
+    return {alert: z.alert, ring: r.noiseRings.at(-1).r}; };
+  const graceful = sprint(["graceful","conspicuous"]), plainRun = sprint([]);
+  check("origins Graceful encurta o alcance dos passos mas não o tempo de alerta (code-review)", graceful.alert === plainRun.alert && graceful.alert > 0);
+  check("origins o círculo de ruído mostra o que os infetados ouvem com o Sandbox (code-review)", Math.abs(plainRun.ring - 6.5 * .5) < 1e-9);
   saved.player.traits = ["light-eater"];
   let rejected = false; try { Sim.restore(saved); } catch { rejected = true; }
   check("origins um orçamento de traços inválido no save é recusado", rejected);

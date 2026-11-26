@@ -148,6 +148,21 @@ const scenarios = {
     return {pass: count === 30 && unpaid && traits === "light-eater,needs-more-sleep" && /Lv\. 3/.test(kit),
       notes: count + " traits, start blocked while unpaid: " + unpaid + ", doctor kit: " + kit + ", started with: " + traits};
   },
+  async "recommended-traits"(page) {
+    await page.evaluate(helpers);
+    await page.evaluate(() => { window.confirm = () => true; const d = document.getElementById("advanced-start"); if (d) d.open = true;
+      for (const c of document.querySelectorAll("details.survivor-customization")) c.open = true;
+      const pick = id => { const i = document.querySelector('#trait-choices input[value="' + id + '"]'); i.checked = true; i.dispatchEvent(new Event("change", {bubbles: true})); };
+      pick("light-eater"); document.getElementById("recommended-btn").click(); });
+    await page.waitForTimeout(600);
+    const blocked = await page.evaluate(() => !window.__state || window.__state.mode !== "play");
+    await page.evaluate(() => { const i = document.querySelector('#trait-choices input[value="needs-more-sleep"]'); i.checked = true;
+      i.dispatchEvent(new Event("change", {bubbles: true})); document.getElementById("recommended-btn").click(); });
+    await page.waitForFunction(() => window.__state?.mode === "play").catch(() => {});
+    const effects = await page.evaluate(() => JSON.stringify(window.__state?.traitEffects ?? {}));
+    return {pass: blocked && /"hunger":0\.8/.test(effects) && /"fatigue":1\.25/.test(effects),
+      notes: "unpaid traits block Recommended start: " + blocked + ", trait effects after start: " + effects};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

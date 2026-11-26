@@ -1724,9 +1724,11 @@ const Sim = (() => {
     return true;
   }
 
-  function noise(s, x, y, radius) {
+  // reach scales only how far the noise carries (footstep traits); the alert length still follows the noise itself.
+  function noise(s, x, y, radius, reach = 1) {
+    const audible = radius * reach * (s.rules.hearing ?? 100) / 100;
     s.noiseRings = (s.noiseRings ?? []).filter(r => s.elapsed - r.t < 1.2);
-    s.noiseRings.push({x, y, r: radius, t: s.elapsed});
+    s.noiseRings.push({x, y, r: audible, t: s.elapsed});
     if (s.noiseRings.length > 16) s.noiseRings.shift();
     const wakeAudience = s.world.cinema && radius >= 4 && s.world.enemies.some(z =>
       z.origin === "cinema-sleeper" && z.dormant && z.hp > 0 && Math.hypot(z.x-x,z.y-y) <= radius);
@@ -1734,7 +1736,6 @@ const Sim = (() => {
       if (z.hp <= 0) continue;
       const audience = wakeAudience && z.origin === "cinema-sleeper" && z.dormant;
       const d = Math.hypot(z.x - x, z.y - y);
-      const audible = radius * (s.rules.hearing ?? 100) / 100;
       if (!audience && (d > audible || d > audible * .55 && !World.sees(s.world, x, y, z.x, z.y))) continue;
       z.alert = Math.max(z.alert, (audience || radius > 6 ? 14 : 5) * (s.rules.memory ?? 100) / 100);
       z.chaseX = x; z.chaseY = y; z.replan = 0;
@@ -3146,7 +3147,7 @@ const Sim = (() => {
         const terrain = surface === "cave" ? 1.35 : surface === "grass" || surface === "sand" ? .8 :
           surface === "tile" || surface === "rail" ? 1.15 : 1;
         const rain = s.weather === "Rain" && surface !== "tile" ? .8 : 1;
-        noise(s, p.x, p.y, (s.running ? 6.5 : s.quiet ? 1 : 2.4) * quiet * terrain * rain * trait(s,"noise"));
+        noise(s, p.x, p.y, (s.running ? 6.5 : s.quiet ? 1 : 2.4) * quiet * terrain * rain, trait(s,"noise"));
       }
       // Audible strides follow distance; the separate noise timer drives infected AI.
       let remaining = (audibleStride.get(p) ?? 0) - travelled;
@@ -4020,7 +4021,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

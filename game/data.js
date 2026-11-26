@@ -144,6 +144,7 @@ const Data = (() => {
   const baseline = {count:65, mix:"mixed", hordes:"normal", damage:100, loot:100, needs:100, clock:2, startHour:8,
     weather:"cycle", infection:"bites", care:"gradual", exposure:"on", powerDays:3, waterDays:2, afterlifeChance:60};
   const modes = {
+    campaign:{...baseline, name:"Campaign · 30 Days", desc:"Follow the radio rumour across the region, one area and one clue at a time. Areas open on set days.", clock:1.6},
     survival:{...baseline, name:"Survival", desc:"The standard Cold Vale outbreak."},
     longhaul:{name:"Easy · 30 Days", desc:"Hold the Cold Vale shelter for 30 days with guided objectives and slower needs.",
       count:18, mix:"walkers", damage:45, loot:150, needs:25, clock:4, weather:"showers",
@@ -175,6 +176,7 @@ const Data = (() => {
     waterDays:{label:"Days before water cuts", min:-1, max:14, step:1}
   };
   const modeAdvice = {
+    campaign:"About 15 real minutes per day. Some areas only open on weekdays or at low tide.",
     longhaul:"Follow one suggestion at a time. The shelter has a starter kit.",
     relaxed:"For learning controls and exploring.",
     survival:"For a first full survival run.",

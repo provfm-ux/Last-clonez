@@ -1551,7 +1551,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("sys.calendar Ironworks fora de horas: fechada às 22:00, aberta às 08:00",
     !C.isOpen("ironworks", 6, 22) && /opens at 08:00/.test(C.closedReason("ironworks", 6, 22)) && C.isOpen("ironworks", 6, 8));
   check("sys.calendar Cinder Grotto pede lanterna e pilhas",
-    /flashlight and battery/.test(C.missing("cindergrotto", {items: []})) && /battery/.test(C.missing("cindergrotto", {items: ["flashlight"]})) &&
+    /flashlight with batteries/.test(C.missing("cindergrotto", {items: []})) && /batteries/.test(C.missing("cindergrotto", {items: ["flashlight"]})) &&
     C.missing("cindergrotto", {items: ["flashlight", "battery"]}) === "");
   check("sys.calendar fortaleza só com as 5 coordenadas", /4 of 5/.test(C.missing("fortress", {clues: 4})) && C.missing("fortress", {clues: 5}) === "" &&
     C.missing("coldvale") === "");
@@ -1568,6 +1568,42 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     check("sys.clock " + clock + " persiste no save", loaded.rules.clock === clock);
   }
   check("sys.clock rejeita valores fora da lista", Data.worldRules("survival", {clock:1.5}).clock === Data.worldRules("survival").clock);
+}
+
+{ // sys.campaign (HISTORIA.md secção 16, brief tarefa 8): modo campanha com calendário, dicas e progresso no save
+  const s = fresh("campaign"), round = x => Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(x))));
+  check("sys.campaign modo novo a 15 min reais por dia com progresso vazio",
+    s.rules.clock === 1.6 && s.campaign?.clues === 0 && s.campaign.completed.length === 0 && s.campaign.hints.objective === null);
+  s.campaign.clues = 1; s.campaign.completed.push("coldvale.houses");
+  context.CampaignHints.track(s.campaign.hints, "cinema.statue", s.minutes);
+  const loaded = round(s);
+  check("sys.campaign o progresso grava e carrega", loaded.campaign.clues === 1 && loaded.campaign.completed.join() === "coldvale.houses" &&
+    loaded.campaign.hints.objective === "cinema.statue");
+  const legacy = JSON.parse(JSON.stringify(Sim.snapshot(s))); delete legacy.campaign;
+  check("sys.campaign save de campanha sem progresso começa vazio; outros modos não têm campanha",
+    Sim.restore(legacy).campaign.clues === 0 && round(fresh("survival")).campaign === undefined);
+  const bad = JSON.parse(JSON.stringify(Sim.snapshot(s))); bad.campaign.clues = 9;
+  let refused = false; try { Sim.restore(bad); } catch (e) { refused = /campaign/i.test(e.message); }
+  check("sys.campaign progresso inválido é recusado", refused);
+  const exit = s.world.objects.find(o => o.id === "exit-cinema");
+  Object.assign(s.player, {x: exit.x - 1, y: exit.y});
+  check("sys.campaign o cinema está fechado no dia 1", Sim.travel(s, exit) === null && /opens on day 2/.test(s.messages.at(-1).text), s.messages.at(-1).text);
+  Sim.testJump(s, 2, {}, {anyMode: true});
+  check("sys.campaign no dia 2 entra-se no cinema", Sim.travel(s, exit)?.world.region === "cinema");
+  const weekend = fresh("campaign"); Sim.testJump(weekend, 9, {}, {anyMode: true});
+  check("sys.campaign Ironworks recusada ao fim de semana (dia 9)", /weekend/.test(Sim.campaignProblem(weekend, "ironworks")) &&
+    Sim.campaignProblem(weekend, "quarry") === "");
+  const grotto = fresh("campaign"); Sim.testJump(grotto, 12, {}, {anyMode: true});
+  const lamp = grotto.player.bag.find(i => i.id === "flashlight");
+  if (lamp) lamp.charge = 0;
+  grotto.player.bag = grotto.player.bag.filter(i => i.id !== "battery");
+  const without = Sim.campaignProblem(grotto, "cavern");
+  grotto.player.bag.push({id: "flashlight", qty: 1, condition: 100, born: 0, charge: 60, uid: "test-lamp"});
+  check("sys.campaign Cinder Grotto pede lanterna com pilhas", /flashlight with batteries/.test(without) && Sim.campaignProblem(grotto, "cavern") === "", without);
+  const stuck = fresh("campaign");
+  context.CampaignHints.track(stuck.campaign.hints, "fortress.last-boss", stuck.minutes);
+  Sim.testJump(stuck, 3, {}, {anyMode: true}); run(stuck, 1);
+  check("sys.campaign a dica aparece no jogo depois de 2 dias parado", stuck.messages.some(m => m.text === "Hint: The coat is scorched but whole."));
 }
 
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>

@@ -464,5 +464,18 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   const calm = frame(1/60);
   check("game-feel com Reduce flicker o ecrã não abana", calm[0] === rest[0] && calm[1] === rest[1]);
 }
+{ // ironworks: o terminal do computador da linha desenha-se, barato e sem gradientes
+  const run = Sim.createControl("campaign","carer","shelter"); Sim.testJump(run, 6, {}, {anyMode: true});
+  const ex = run.world.objects.find(o => o.id === "exit-ironworks"); Object.assign(run.player, {x: ex.x, y: ex.y + (ex.y > run.world.height / 2 ? -1 : 1)});
+  const w = Sim.travel(run, ex), t = w.world.objects.find(o => o.id === "iron-terminal-0"); View.prepare(w.world); w.world.enemies = [];
+  Object.assign(w.player, {x: t.x, y: t.y + 1.2}); for (let i = 0; i < 5; i++) Sim.tick(w, .05);
+  const total = r => Object.entries(r).filter(([k]) => !/Gradient/.test(k)).reduce((n, [, v]) => n + v, 0);
+  View.render(w, 0, 1/60);
+  const shown = per(() => View.render(w, 0, 1/60)); t.active = false;
+  const gone = per(() => View.render(w, 0, 1/60)); t.active = true;
+  check("ironworks terminal desenhado, barato e sem gradientes", total(shown) > total(gone) && total(shown) - total(gone) < 80 &&
+    (shown.createRadialGradient ?? 0) === (gone.createRadialGradient ?? 0) && (shown.createLinearGradient ?? 0) === (gone.createLinearGradient ?? 0),
+    total(shown) + " vs " + total(gone));
+}
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

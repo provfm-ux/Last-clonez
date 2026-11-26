@@ -18,7 +18,9 @@ const Campaign = (() => {
     cinema:{name:"Cinema", kind:"clue", from:2},
     pineridge:{name:"Pine Ridge", kind:"clue", from:3, clue:2},
     eva:{name:"Eva leaves", kind:"event", from:5, to:5},
-    ironworks:{name:"Ironworks", kind:"clue", from:6, weekdays:true, hours:[8, 18]},
+    ironworks:{name:"Ironworks", kind:"clue", from:6, weekdays:true, hours:[8, 18],
+      closed:{weekend:"The line computer keeps the Ironworks gates locked at weekends. They reopen on Monday.",
+        hours:"Ironworks opens at 08:00. The line computer keeps the gates shut overnight."}},
     fathill:{name:"FatHill", kind:"clue", from:8, tide:true, clue:3},
     westfields:{name:"Westfields", kind:"clue", from:10, clue:4},
     cindergrotto:{name:"Cinder Grotto", kind:"clue", from:12, clue:5, requires:{items:["flashlight", "battery"], text:"a flashlight with batteries"}},
@@ -75,10 +77,10 @@ const Campaign = (() => {
     if (!area) return "Unknown area.";
     if (d < area.from) return area.name + " opens on day " + area.from + ".";
     if (area.to !== undefined && d > area.to) return area.name + " is past. It closed after day " + area.to + ".";
-    if (area.weekdays && !isWeekday(d)) return area.name + " is closed at the weekend. It reopens on Monday.";
+    if (area.weekdays && !isWeekday(d)) return area.closed?.weekend ?? area.name + " is closed at the weekend. It reopens on Monday.";
     if (area.tide && !lowTide(d)) return "High tide covers the road to " + area.name + ". Low tide tomorrow.";
     if (area.hours && hour !== undefined && (hour < area.hours[0] || hour >= area.hours[1]))
-      return area.name + " is shut for the night. It opens at " + String(area.hours[0]).padStart(2, "0") + ":00.";
+      return area.closed?.hours ?? area.name + " is shut for the night. It opens at " + String(area.hours[0]).padStart(2, "0") + ":00.";
     return "";
   }
   const isOpen = (id, d, hour) => closedReason(id, d, hour) === "";

@@ -8,6 +8,10 @@ const View = (() => {
   const halfW = 32, halfH = 16;
   const wallWidth = .14, wallInset = (1 - wallWidth) / 2;
   const camera = {x: 0, y: 0, zoom: 1, ready: false};
+  // Screen shake (game-feel): effects with an `impact` add trauma; the shake is trauma^2 on the final draw offset only,
+  // decays in real time and never touches the simulation or the cached ground. Off with Reduce flicker.
+  const feltImpacts = new WeakSet(), shakeDecay = 1.2;
+  let trauma = 0, shakeClock = 0;
   const size = {width: 0, height: 0, dpr: 1};
   const objectLabels = [];
   const windowLights = new WeakMap();
@@ -2447,7 +2451,10 @@ const View = (() => {
     } else ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.fillStyle=cave ? "#080a0b" : "#162016";ctx.fillRect(0,0,width,height);
     if (darkLook) ctx.setTransform(1 / pixCss,0,0,1 / pixCss,0,0);
-    ctx.translate(camera.x,camera.y);ctx.scale(zoom,zoom);
+    for (const effect of state.effects) if (effect.impact && !feltImpacts.has(effect)) { feltImpacts.add(effect); trauma = Math.min(1, trauma + effect.impact); }
+    trauma = Math.max(0, trauma - (dt || 0) * shakeDecay); shakeClock += (dt || 0) * 30;
+    const shake = motion ? trauma * trauma : 0;
+    ctx.translate(camera.x + 12 * shake * Math.sin(shakeClock * 1.7), camera.y + 8 * shake * Math.sin(shakeClock * 2.3));ctx.scale(zoom,zoom);
     const optics = Sim.sight(state);
     labelledWorld = world;
     objectLabels.length = 0;
@@ -2800,5 +2807,5 @@ const View = (() => {
     c.font="700 10px monospace";c.fillStyle="#d6d7ba";c.textAlign="center";
     if(world.base)c.fillText("SHELTER",ox+10*unit,oy+40*unit+15);
   }
-  return {prepare,render,renderAfterlife,locate,minimap,mapPoint,visible,weaponIcon,equipmentPortrait};
+  return {prepare,render,renderAfterlife,trauma:() => trauma,locate,minimap,mapPoint,visible,weaponIcon,equipmentPortrait};
 })();

@@ -13,6 +13,7 @@ const infectedFrames = [], survivorFrames = [];
 const bagPigments = new Set(["#3b2822","#c4875e","#985b40","#714534","#513629","#e0b784"]);
 const bagPixels = [];
 let lastTranslate = null;
+const rotations = [];
 const smokeFrames = [], canopyPositions = [], rippleFrames = [], propSprites = [];
 let beamOpacity = 1;
 const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
@@ -24,6 +25,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
       if (k === "fillRect" && (t.fillStyle === "#afc1c66b" || t.fillStyle === "#879fa840")) rippleFrames.push(args);
       if (k === "fillRect" && bagPigments.has(t.fillStyle)) bagPixels.push(t.fillStyle);
       if (k === "translate" && !lastTranslate) lastTranslate = args;
+      if (k === "rotate") rotations.push(args[0]);
       if (k === "save") t.savedAlpha.push(t.globalAlpha);
       if (k === "restore") t.globalAlpha = t.savedAlpha.pop() ?? 1;
       if (k === "drawImage" && args.length === 5) {
@@ -488,6 +490,21 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   const gone = per(() => View.render(c, 0, 1/60)); tap.active = true;
   check("cinema torneira de cerveja desenhada, barata e sem gradientes", total(shown) > total(gone) && total(shown) - total(gone) < 120 &&
     (shown.createRadialGradient ?? 0) === (gone.createRadialGradient ?? 0), total(shown) + " vs " + total(gone));
+}
+{ // animation: infected fall over when they die and squash when hit (Dark Pixel look; view only)
+  const run = Sim.createControl("survival","carer","shelter"); View.prepare(run.world); run.look = "dark";
+  const z = run.world.enemies.find(e => e.hp > 0); Object.assign(z, {x: run.player.x + 1.2, y: run.player.y, flash: 0, dormant: false});
+  run.world.enemies = [z];
+  const at = clock => per(() => View.render(run, clock, 1/60));
+  const tilt = clock => { rotations.length = 0; View.render(run, clock, 1/60); return Math.max(0, ...rotations.map(Math.abs)); };
+  at(1);
+  z.flash = .2; const hit = at(1.1); z.flash = 0;
+  z.hp = 0; const start = tilt(2.05), lying = tilt(2.6), lying2 = at(2.7);
+  const corpse = {...z, phase: .3}; run.world.enemies = [corpse]; const old = tilt(3);
+  check("animation zombie visto vivo cai devagar e acelera (gravidade) até ficar deitado", start > 0 && start < .3 && Math.abs(lying - 1.35) < 1e-6,
+    "ângulo " + start.toFixed(2) + " -> " + lying.toFixed(2));
+  check("animation corpos que já estavam no chão aparecem logo deitados, com o mesmo sprite", Math.abs(old - 1.35) < 1e-6);
+  check("animation a pancada achata o zombie (squash)", (hit.scale ?? 0) > (lying2.scale ?? 0), "scale " + (hit.scale ?? 0) + " vs " + (lying2.scale ?? 0));
 }
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

@@ -164,7 +164,7 @@ const Data = (() => {
     damage:{label:"Infected damage (%)", min:40, max:175, step:5},
     loot:{label:"Loot quantity (%)", min:40, max:180, step:5},
     needs:{label:"Hunger, thirst and fatigue rate (%)", min:25, max:175, step:5},
-    clock:{label:"Game minutes per real second", choices:{1:"1 · 24 minutes per day", 2:"2 · 12 minutes per day", 3:"3 · 8 minutes per day", 4:"4 · 6 minutes per day"}, numeric:true},
+    clock:{label:"Game minutes per real second", choices:{0.4:"0.4 · 60 minutes per day (Realistic)", 1:"1 · 24 minutes per day", 1.6:"1.6 · 15 minutes per day (Mobile)", 2:"2 · 12 minutes per day", 3:"3 · 8 minutes per day", 4:"4 · 6 minutes per day"}, numeric:true},
     startHour:{label:"Starting hour (0–23)", min:0, max:23, step:1},
     weather:{label:"Weather", choices:{cycle:"Passing rain", showers:"Frequent showers", rain:"Steady rain", dry:"Dry"}},
     infection:{label:"Viral transmission", choices:{bites:"Bites only", wounds:"Bites, cuts and scratches", off:"Off"}},
@@ -204,6 +204,10 @@ const Data = (() => {
     }
     return rules;
   }
+  // HISTORIA.md section 5: about 1 in 8 random infected carry a supply, picked by the building where they fall.
+  // Only these origins count (street population, wandering hordes, nests): bosses and challenge infected never carry one.
+  const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],
+    pools:{clinic:["bandage"], fuel:["fuel"], market:["battery"], workshop:["battery"], town:["food", "water"]}};
   const legacyRules = {care:"quick", exposure:"off", powerDays:-1, waterDays:-1};
   const utilities = {tapReserve:5, generatorCapacity:960, minutesPerFuel:240, generatorRange:10, noiseInterval:8};
   const flashlight = {capacity:180, starter:42, range:10, angle:.59};
@@ -400,6 +404,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

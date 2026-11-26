@@ -1932,6 +1932,10 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     const ex = s.world.objects.find(o => o.id === "exit-cinema"); Object.assign(s.player, {x: ex.x - 1, y: ex.y}); return Sim.travel(s, ex); };
   const winners = [17, 4242, 90009].map(seed => enter(seed).world.enemies.filter(z => z.id === "cinema-winner" && z.hp > 0 && !z.dormant).length);
   check("cinema.scene o vencedor da rifa anda sempre pelo cinema na campanha", winners.every(n => n === 1), winners.join(","));
+  { const w = enter(17), z = w.world.enemies.find(e => e.id === "cinema-winner"), seen = {left: false, right: false, back: false};
+    for (let i = 0; i < 3600; i++) { Sim.tick(w, .05, idle); w.player.hp = 100; z.alert = 0;
+      if (z.x < 8.5) seen.left = true; if (z.x > 18.5) seen.right = true; if (z.y > 14) seen.back = true; }
+    check("cinema.scene o vencedor percorre a sala toda (corredores e fundo)", seen.left && seen.right && seen.back, JSON.stringify(seen)); }
   const c = enter(17), tap = c.world.objects.find(o => o.id === "cinema-tap"), note = c.world.objects.find(o => o.id === "cinema-note");
   check("cinema.scene há uma torneira de cerveja no canto e a nota do convívio", tap && note && World.tileAt(c.world, tap.x, tap.y).building === c.world.buildings[0].id);
   Object.assign(c.player, {x: note.x + .8, y: note.y}); c.world.enemies = c.world.enemies.filter(z => z.id !== "cinema-winner");
@@ -1942,7 +1946,10 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   const slams = cue("doorSlam");
   check("cinema.scene sequência: clique, duas portas a bater uma depois da outra, a horda no canto da torneira e a tensão",
     cue("idolClick").length === 1 && slams.length === 2 && slams[0].delay < slams[1].delay && cue("horde")[0]?.delay > slams[1].delay &&
-    Math.hypot(cue("horde")[0].x - tap.x, cue("horde")[0].y - tap.y) < .01 && cue("tension").length === 1, c.sounds.map(x => x.kind + "+" + (x.delay ?? 0)).join(" "));
+    Math.hypot(cue("horde")[0].x - tap.x, cue("horde")[0].y - tap.y) < .01 && cue("tapSocial")[0]?.delay > slams[1].delay &&
+    c.sounds.length <= 5, c.sounds.map(x => x.kind + "+" + (x.delay ?? 0)).join(" "));
+  run(c, 1);
+  check("cinema.scene a tensão começa logo a seguir", c.sounds.some(x => x.kind === "tension"));
   check("cinema.scene cada porta mostra SLAM (pista visual dos sons)", c.effects.filter(e => e.text === "SLAM").length === 2);
   const horde = c.world.enemies.filter(z => z.origin === "cinema-horde"), statue = {x: 11.5, y: 5.5};
   const mean = point => horde.reduce((n, z) => n + Math.hypot(z.x - point.x, z.y - point.y), 0) / horde.length;

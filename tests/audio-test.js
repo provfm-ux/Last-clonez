@@ -68,7 +68,7 @@ async function run() {
   assert.ok(await attackGain(1) > atFour*4);
   assert.ok(await attackGain(8) < atFour*.6);
   assert.ok(await attackGain(1,true) < await attackGain(1));
-  const generated = ["doorOpen","doorClose","windowSlide","glassSmash","pry","hammer","stepSoft","stepHard","strike","shot","crash","idolClick","doorSlam","tension"];
+  const generated = ["doorOpen","doorClose","windowSlide","glassSmash","pry","hammer","stepSoft","stepHard","strike","shot","crash","idolClick","doorSlam","tension","tapSocial"];
   for (const kind of generated) {
     const samples = play(kind).getChannelData(0);
     const peak = samples.reduce((max,value) => Math.max(max,Math.abs(value)),0);

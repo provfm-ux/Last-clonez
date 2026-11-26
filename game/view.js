@@ -798,15 +798,17 @@ const View = (() => {
     if (kind === "statue") {
       if (!o.active) return;
       // A classic squat golden idol on a stone altar: low seated body, big round head, small ears.
-      const gold = ["#e8c25e","#b48a33","#765a22"], shade = ["#c99d3f","#8c6a28","#5a441a"];
-      f(-.24,-.24,0,.48,.48,12,["#6b6257","#4e473f","#37322c"]);
-      f(-.27,-.27,12,.54,.54,2,["#80776a","#5d554c","#433d36"]);
-      f(-.14,-.12,14,.28,.24,3,shade);
-      f(-.07,-.06,17,.14,.12,5,gold);
-      f(-.13,-.12,22,.26,.24,9,gold);
-      f(-.16,-.03,24,.03,.08,5,shade);
-      f(.13,-.03,24,.03,.08,5,shade);
-      f(-.08,.12,26,.16,.015,2,["#2b2418","#2b2418","#2b2418"]);
+      // On a tall stand so it shows above the seats from the back of the hall; a one-pixel glint blinks on its head.
+      const gold = ["#ffd45c","#c9952f","#7d5c1f"], shade = ["#d9a640","#9a7228","#5f4519"], h = 8;
+      f(-.24,-.24,0,.48,.48,12+h,["#6b6257","#4e473f","#37322c"]);
+      f(-.27,-.27,12+h,.54,.54,2,["#80776a","#5d554c","#433d36"]);
+      f(-.14,-.12,14+h,.28,.24,3,shade);
+      f(-.07,-.06,17+h,.14,.12,5,gold);
+      f(-.13,-.12,22+h,.26,.24,9,gold);
+      f(-.16,-.03,24+h,.03,.08,5,shade);
+      f(.13,-.03,24+h,.03,.08,5,shade);
+      f(-.08,.12,26+h,.16,.015,2,["#2b2418","#2b2418","#2b2418"]);
+      if (state.reduceFlicker || Math.sin(clock * 3.1) > .2) f(.02,-.1,31+h,.04,.04,1,["#fffbe6","#fff1b8","#ffe38a"]);
       return;
     }
     if (kind === "cinema-body") {
@@ -2574,6 +2576,11 @@ const View = (() => {
           }
         }
       }
+      // The golden idol glows on its stand so it reads from the back of the hall (cached glow sprite: cheap).
+      if (o.active && o.kind === "statue" && onScreen(o.x,o.y)) {
+        glow(o.x,o.y,"#ffd87a",88,state.reduceFlicker ? .32 : .26+.08*Math.sin(clock*2.2));
+        glow(o.x+1.5,o.y+1.5,"#ffd87a",210,.12); // a wide, faint pool of gold that reaches into the hall
+      }
       if(o.active&&o.kind==="lamp"&&onScreen(o.x,o.y)&&Sim.gridPower(state)&&night)glow(o.x+.5,o.y,"#efdc9d",170,.28);
     }
     if (lit && night) glow(player.x, player.y, "#efdc9d", 190, .28);
@@ -2616,6 +2623,8 @@ const View = (() => {
     if(!menu) {
       const track = Sim.nearbyTrack(state);
       if (track) marker(track.x,track.y,4,"Tracks","#c4ad87");
+      const idol = state.campaign && world.objects.find(o => o.id === "cinema-statue" && o.active);
+      if (idol && onScreen(idol.x,idol.y)) marker(idol.x,idol.y,44,"Golden idol","#ffd87a");
       {
         const hasNote = o => Boolean(Sim.unreadClueAt(state, o));
         const hasCache = o => Sim.isSupplyCache(state, o);

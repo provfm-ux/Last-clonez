@@ -1488,6 +1488,8 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("sys.calendar fortaleza só com as 5 coordenadas", /4 of 5/.test(C.missing("fortress", {clues: 4})) && C.missing("fortress", {clues: 5}) === "" &&
     C.missing("coldvale") === "");
   check("sys.calendar 5 coordenadas parciais, uma por área", Object.values(C.areas).map(a => a.clue).filter(Boolean).sort().join() === "1,2,3,4,5");
+}
+
 { // sys.clock (HISTORIA.md secção 16): 1,6 = 15 min reais por dia (mobile), 0,4 = 60 min (Realista)
   for (const [clock, realMinutes] of [[1.6, 15], [0.4, 60]]) {
     const s = Sim.createControl("training", "carer", "shelter", {clock}), start = s.minutes;

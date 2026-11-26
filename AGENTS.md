@@ -8,6 +8,7 @@ Tone: dark, grim zombie survival. Player-facing text is English.
 - `npm run index` - regenerate `docs/CODE_INDEX.md` after adding/removing/moving functions (CI checks it).
 - `npm run build` - writes `dist/` (static site + `single.html`).
 - `npm run test:compat` - needs the previous release unpacked in `../old-version`; proves old saves still load.
+- `node scripts/playtest.js` - plays scripted scenarios in the real game in a browser (needs Playwright; skill `/playtest`).
 
 ## Save tokens (read first)
 - Never open whole files. `game/sim.js` ~2400 lines, `game/game.js` ~1900, `game/view.js` ~1300.

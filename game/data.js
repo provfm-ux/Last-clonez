@@ -6,7 +6,7 @@ const Data = (() => {
     pantrycap:{name:"Pantrycap",group:"Food",weight:.08,use:"food",nutrition:16,perish:1.5,icon:"food"},
     mushroommeal:{name:"Roasted Pantrycaps",group:"Food",weight:.13,use:"food",nutrition:38,perish:.8,icon:"food"},
     bitterfold:{name:"Bitterfold",group:"Food",weight:.08,use:"food",toxic:true,perish:1.5,icon:"food"},
-    goldstatue:{name:"Golden statue",group:"Equipment",weight:1.2,icon:"badge",
+    goldstatue:{name:"Golden idol",group:"Equipment",weight:1.2,icon:"badge",
       detail:"Left on the cinema altar by two regulars. The rumour ties it to the fortress."},
     raffletrophy:{name:"Golden Raffle Trophy",group:"Equipment",weight:.35,icon:"badge",
       detail:"Congratulations. You survived the raffle. The winner didn't."},
@@ -222,7 +222,7 @@ const Data = (() => {
     statueTaken:"The altar clicks. The lobby doors slam and jam. In the dark seats, the audience stands up.",
     jammed:"Jammed shut. Find a window.",
     frameHolds:"The window frame holds. Keep hitting, or pry it.",
-    cinemaEscape:"You are out with the statue. For the first time in days, you feel a little safer.",
+    cinemaEscape:"You are out with the idol. For the first time in days, you feel a little safer.",
     ridgeNight:"Night at Pine Ridge. No barricades: only what you brought.",
     ridgeBuilt:"You built a barricade. Pine Ridge only counts nights without one.",
     ridgeCold:"The cold settles in your chest. Pneumonia. This night will not count; try again tomorrow night.",
@@ -230,8 +230,8 @@ const Data = (() => {
     ridgeLate:"You arrived after dark. Only a full night at Pine Ridge counts.",
     ridgeSurvived:"Night survived at Pine Ridge: ",
     ridgeDone:"Two nights in the pines. Carved into the firewatch rail: the second coordinate.",
-    cinemaBuff:"The statue will watch over your sleep for three nights.",
-    cinemaBuffEnds:"The statue feels like an ordinary lump of metal again."
+    cinemaBuff:"The idol will watch over your sleep for three nights.",
+    cinemaBuffEnds:"The idol feels like an ordinary lump of metal again."
   };
   const pineRidge = {nights:2, coldLimit:35.2, fullNight:600, sickness:30};
   const cinemaTrap = {horde:50, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};

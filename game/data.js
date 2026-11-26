@@ -204,6 +204,10 @@ const Data = (() => {
     }
     return rules;
   }
+  // HISTORIA.md section 5: about 1 in 8 random infected carry a supply, picked by the building where they fall.
+  // Only these origins count (street population, wandering hordes, nests): bosses and challenge infected never carry one.
+  const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],
+    pools:{clinic:["bandage"], fuel:["fuel"], market:["battery"], workshop:["battery"], town:["food", "water"]}};
   const legacyRules = {care:"quick", exposure:"off", powerDays:-1, waterDays:-1};
   const utilities = {tapReserve:5, generatorCapacity:960, minutesPerFuel:240, generatorRange:10, noiseInterval:8};
   const flashlight = {capacity:180, starter:42, range:10, angle:.59};
@@ -400,6 +404,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

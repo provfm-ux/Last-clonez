@@ -2516,15 +2516,30 @@ const Sim = (() => {
     if (side) actor.face = side;
   }
 
+  // Deterministic per run and infected (no shared rng): the same infected always carries the same supply.
+  function carriedSupply(s, enemy) {
+    const rule = Data.zombieCarry;
+    if (!rule.origins.includes(enemy.origin ?? "")) return null;
+    let h = (s.seed >>> 0) ^ 2166136261;
+    for (const c of String(enemy.id)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    h = Math.imul(h ^ h >>> 15, 2246822507) >>> 0;
+    if (h % rule.oneIn) return null;
+    const type = s.world.buildings?.find(b => b.id === World.tileAt(s.world, enemy.x, enemy.y)?.building)?.type;
+    const pool = rule.pools[type] ?? rule.pools.town;
+    return pool[Math.floor(h / rule.oneIn) % pool.length];
+  }
+
   function defeat(s, enemy) {
     s.kills++;
     recordDaily(s,enemy.kind);
     hearZombie(s,"death",enemy);
     const winner = enemy.origin === "cinema-winner";
-    const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item;
+    const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item, supply = winner ? null : carriedSupply(s, enemy);
+    const loot = item ? [{id: item, qty: 1, condition: Data.items[item].damage ? 60 : 100}] : [];
+    if (supply) loot.push({id: supply, qty: 1, condition: 100});
     s.world.objects.push({id: "built" + s.serial++, x: enemy.x, y: enemy.y, kind: "drop",
-      name: winner ? "The El Gordo Winner" : "Fallen infected", active: true, solid: false, action: "loot", searched: !item, corpse: !winner, died: s.minutes,
-      loot: item ? [{id: item, qty: 1, condition: Data.items[item].damage ? 60 : 100}] : []});
+      name: winner ? "The El Gordo Winner" : "Fallen infected", active: true, solid: false, action: "loot", searched: !loot.length, corpse: !winner, died: s.minutes,
+      loot});
   }
 
   function attack(s, z) {
@@ -3615,6 +3630,9 @@ const Sim = (() => {
   }
 
   return {create, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+}
+
+  return {create, carriedSupply, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

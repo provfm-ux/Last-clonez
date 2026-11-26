@@ -8,6 +8,10 @@ const View = (() => {
   const halfW = 32, halfH = 16;
   const wallWidth = .14, wallInset = (1 - wallWidth) / 2;
   const camera = {x: 0, y: 0, zoom: 1, ready: false};
+  // Screen shake (game-feel): effects with an `impact` add trauma; the shake is trauma^2 on the final draw offset only,
+  // decays in real time and never touches the simulation or the cached ground. Off with Reduce flicker.
+  const feltImpacts = new WeakSet(), shakeDecay = 1.2;
+  let trauma = 0, shakeClock = 0;
   const size = {width: 0, height: 0, dpr: 1};
   const objectLabels = [];
   const windowLights = new WeakMap();
@@ -219,7 +223,7 @@ const View = (() => {
     const {x, y} = t;
     const a = p(x, y), b = p(x + 1, y), c = p(x + 1, y + 1), d = p(x, y + 1);
     const points = [a, b, c, d];
-    poly(points, t.color, t.surface === "water" ? null : "#101b1349");
+    poly(points, t.color, t.surface === "water" ? null : (t.surface === "grass" || t.surface === "field" || t.surface === "sand") ? "#101b1318" : "#101b1349");
     if (t.surface === "asphalt") {
       const town = t.roadLine === undefined;
       if ((town ? x === 29 : t.roadLine === "y") && y % 4 < 2) line(p(x+.5,y+.08),p(x+.5,y+.88),"#c4ae737d",2);
@@ -779,6 +783,30 @@ const View = (() => {
       f(-.26,-.29,0,.53,.55,15,rubber);
       f(-.14,-.20,15,.33,.34,8,olive);
       f(-.23,-.26,18,.12,.12,4,state.atmosphere.awake && state.world.cinema === "projector" ? cream : rubber);
+      return;
+    }
+    if (kind === "beertap") { // small bar with three brass taps
+      f(-.3,-.2,0,.6,.4,11,["#6a4a33","#4d3626","#362619"]);
+      for (const dx of [-.18,-.03,.12]) f(dx,-.06,11,.05,.05,7,["#d6b25a","#9c7d39","#6b5426"]);
+      return;
+    }
+    if (kind === "terminal") {
+      f(-.22,-.2,0,.44,.38,10,["#59605a","#3f4540","#2c312d"]);
+      f(-.14,-.12,10,.28,.06,9,o.read ? ["#3b4a3c","#2c372d","#1f2720"] : ["#7fd08a","#4f8f5a","#2f5a36"]);
+      return;
+    }
+    if (kind === "statue") {
+      if (!o.active) return;
+      // A classic squat golden idol on a stone altar: low seated body, big round head, small ears.
+      const gold = ["#e8c25e","#b48a33","#765a22"], shade = ["#c99d3f","#8c6a28","#5a441a"];
+      f(-.24,-.24,0,.48,.48,12,["#6b6257","#4e473f","#37322c"]);
+      f(-.27,-.27,12,.54,.54,2,["#80776a","#5d554c","#433d36"]);
+      f(-.14,-.12,14,.28,.24,3,shade);
+      f(-.07,-.06,17,.14,.12,5,gold);
+      f(-.13,-.12,22,.26,.24,9,gold);
+      f(-.16,-.03,24,.03,.08,5,shade);
+      f(.13,-.03,24,.03,.08,5,shade);
+      f(-.08,.12,26,.16,.015,2,["#2b2418","#2b2418","#2b2418"]);
       return;
     }
     if (kind === "cinema-body") {
@@ -1630,6 +1658,7 @@ const View = (() => {
     shovel: [[1,0,9,2,lightWood],[9,-2,4,5,steel],[12,-1,2,3,lightSteel]],
     golfclub: [[1,0,3,2,darkSteel],[4,0,9,1,steel],[12,0,3,3,lightSteel]],
     crowbar: [[1,0,11,2,"#87564a"],[11,-2,2,3,"#a56e5b"],[12,-2,2,1,lightSteel]],
+    foundrymaul: [[1,0,11,2,woodGrip],[2,0,9,1,lightWood],[10,-3,5,7,darkSteel],[11,-3,3,1,lightSteel],[14,-2,1,5,steel]],
     hatchet: [[1,0,8,2,woodGrip],[7,-1,3,3,darkSteel],[9,-3,3,6,steel],[12,-2,1,4,lightSteel]],
     wrench: [[1,0,8,2,darkSteel],[2,0,6,1,steel],[8,-2,3,5,steel],[11,-2,2,1,lightSteel],[11,2,2,1,lightSteel]],
     fryingpan: [[1,0,7,2,darkSteel],[7,-2,7,6,darkSteel],[8,-3,5,1,steel],[8,4,5,1,steel],[13,-1,2,4,steel],[9,-1,3,3,"#4c5553"]],
@@ -2433,7 +2462,10 @@ const View = (() => {
     } else ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.fillStyle=cave ? "#080a0b" : "#162016";ctx.fillRect(0,0,width,height);
     if (darkLook) ctx.setTransform(1 / pixCss,0,0,1 / pixCss,0,0);
-    ctx.translate(camera.x,camera.y);ctx.scale(zoom,zoom);
+    for (const effect of state.effects) if (effect.impact && !feltImpacts.has(effect)) { feltImpacts.add(effect); trauma = Math.min(1, trauma + effect.impact); }
+    trauma = Math.max(0, trauma - (dt || 0) * shakeDecay); shakeClock += (dt || 0) * 30;
+    const shake = motion ? trauma * trauma : 0;
+    ctx.translate(camera.x + 12 * shake * Math.sin(shakeClock * 1.7), camera.y + 8 * shake * Math.sin(shakeClock * 2.3));ctx.scale(zoom,zoom);
     const optics = Sim.sight(state);
     labelledWorld = world;
     objectLabels.length = 0;
@@ -2788,5 +2820,5 @@ const View = (() => {
     c.font="700 10px monospace";c.fillStyle="#d6d7ba";c.textAlign="center";
     if(world.base)c.fillText("SHELTER",ox+10*unit,oy+40*unit+15);
   }
-  return {prepare,render,renderAfterlife,locate,minimap,mapPoint,visible,weaponIcon,equipmentPortrait};
+  return {prepare,render,renderAfterlife,trauma:() => trauma,locate,minimap,mapPoint,visible,weaponIcon,equipmentPortrait};
 })();

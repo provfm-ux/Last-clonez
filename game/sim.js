@@ -388,8 +388,27 @@ const Sim = (() => {
     if (day === s.daily.day) return;
     s.dailyHistory.push(s.daily);
     if (s.dailyHistory.length > reportLimit) s.dailyHistory.shift();
+    const done = s.daily, kills = done.walker + done.runner + done.brute;
+    const parts = [[kills,"infected down"],[done.loot,"items looted"],[done.gathered,"gathered"],[done.cooked + done.crafted,"made"]]
+      .filter(([n]) => n > 0).map(([n,label]) => n + " " + label);
     s.daily = newDaily(day);
-    notify(s,"Day "+(day-1)+" complete. Your daily summary is in the journal.");
+    notify(s,"Day "+(day-1)+" complete: "+(parts.length ? parts.join(", ") : "a quiet day")+". Full summary in the journal.");
+  }
+
+  // Test shortcuts (HISTORIA.md section 16). Training mode only, unless a headless test passes {anyMode:true}.
+  function testJump(s, day, items = {}, options = {}) {
+    if (s.difficulty !== "training" && !options.anyMode) return false;
+    if (!Number.isInteger(day) || day < runDay(s.minutes)) return false;
+    s.minutes = (day - 1) * 1440 + s.minutes % 1440;
+    closeDaily(s);
+    for (const [id, qty] of Object.entries(items)) add(s.player.bag, id, qty, {born:s.minutes});
+    return true;
+  }
+  // Runs the simulation for the given in-game minutes without waiting in real time.
+  function fastForward(s, minutes, input) {
+    const end = s.minutes + minutes;
+    while (s.mode === "play" && end - s.minutes > .000001) tick(s, Math.min(.25, (end - s.minutes) / s.rules.clock), input);
+    return s;
   }
 
   function restoreDaily(s, data) {
@@ -429,6 +448,18 @@ const Sim = (() => {
         for (const [i,[x,y]] of sleepers.entries()) {
           const z = World.infected(world,"cinema-sleeper-"+i,x,y,"walkers",rng,"cinema-sleeper");
           z.dormant = true;
+          world.enemies.push(z);
+        }
+      }
+      if (difficulty === "campaign") {
+        const hall = world.buildings[0], inHall = {building:hall.id, zone:hall.id, active:true};
+        world.objects.push({id:"cinema-statue",kind:"statue",name:"Golden idol",action:"cinema-statue",x:11.5,y:5.5,tint:.7,solid:false,...inHall},
+          {id:"cinema-tap",kind:"beertap",name:"Members' beer tap",x:6.5,y:15.5,tint:.5,solid:true,...inHall},
+          {id:"cinema-note",kind:"record",action:"cinema-note",name:"Members' social notice",x:7.5,y:14.5,tint:.54,read:false,solid:false,...inHall});
+        // The raffle winner always walks the stage in the campaign (its own stream: other modes are unchanged).
+        if (!world.enemies.some(z => z.id === "cinema-winner") && rules.count) {
+          const z = World.infected(world,"cinema-winner",13.5,7.5,"walkers",Level.seeded((seed ^ 0x7a11e) >>> 0),"cinema-winner");
+          z.outfit = "hiker";
           world.enemies.push(z);
         }
       }
@@ -477,6 +508,16 @@ const Sim = (() => {
         gardenSeeded: false, harvested: false, gardenMeal: false, gardenHelp: false}, nextEvent: 180, weather: "Overcast",
       exploredAt: 0, radioWave: false, zoom: 1, waypoint: town ? "market" : world.underground ? "exit-ridge" : "exit-" + (Regions.definitions[region].host ?? Regions.home), lookahead: true, roofsHidden: false
     };
+    if (difficulty === "campaign") {
+      s.campaign = newCampaign();
+      if (region === "ironworks") placeIronworks(world);
+      if (town) {
+        placeCampaignPages(world, seed);
+        placeEvaDiary(world);
+        s.campaign.completed.push("radio.rumour");
+        CampaignHints.track(s.campaign.hints, "coldvale.houses", s.minutes);
+      }
+    }
     if (difficulty === "longhaul") {
       s.longHaul = newLongHaul();
       s.waypoint = "";
@@ -490,6 +531,7 @@ const Sim = (() => {
       stockGardenSeeds(s);
       notify(s, "87.6 FM · Keep your doors shut. The dead are getting up.");
       notify(s, "The shelter crate holds supplies. Open your inventory to collect them.");
+      if (s.campaign) notify(s, Data.campaignText.rumour);
     }
     return s;
   }
@@ -631,6 +673,17 @@ const Sim = (() => {
   const itemState = item => ({condition:item.condition ?? 100, born:item.born ?? 0, cold:item.cold ?? 0,
     ...(item.id === "flashlight" ? {charge:item.charge ?? 0} : {}),
     ...(item.id === "housekey" ? {lock:item.lock, label:item.label, uid:item.uid} : {})});
+
+  // Loose notes the player has not read yet: the Use button opens them first.
+  const noteActions = new Set(["field-note", "campaign-page", "eva-diary", "ironworks-terminal", "cinema-note"]);
+
+  function readCinemaNote(s, note) {
+    if (s.mode !== "play" || s.player.vehicle || note?.action !== "cinema-note" || !s.world.objects.includes(note) || !reachableObject(s,note)) return false;
+    note.read = true;
+    notify(s, Data.campaignText.cinemaNote);
+    return true;
+  }
+  const unreadNote = o => Boolean(o?.active && noteActions.has(o.action) && !o.read);
 
   function unreadClueAt(s, o) {
     if (o.action !== "loot" || !o.building || o.id.startsWith("built")) return null;
@@ -1301,9 +1354,271 @@ const Sim = (() => {
     return true;
   }
 
+  // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:""});
+  // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
+  const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
+  const challengeId = /^[a-z0-9]+(\.[a-z0-9-]+)?$/;
+  function restoreCampaign(raw) {
+    if (raw === undefined) return newCampaign();
+    if (!raw || !Number.isInteger(raw.clues) || raw.clues < 0 || raw.clues > 5 || !Array.isArray(raw.completed) || raw.completed.length > 64 ||
+        raw.completed.some((id,i) => typeof id !== "string" || !challengeId.test(id) || raw.completed.indexOf(id) !== i)) throw new Error("Invalid campaign progress.");
+    if (raw.buffUntil !== undefined && (!Number.isFinite(raw.buffUntil) || raw.buffUntil < 0)) throw new Error("Invalid campaign progress.");
+    const ridge = raw.ridge ?? {nights:0, night:null}, night = ridge.night;
+    if (!Number.isInteger(ridge.nights) || ridge.nights < 0 || ridge.nights > Data.pineRidge.nights ||
+        night !== null && (!night || !Number.isFinite(night.start) || night.start < 0 || !["","cold","barricade"].includes(night.fail) ||
+          !Number.isInteger(night.built) || night.built < 0)) throw new Error("Invalid campaign progress.");
+    if (raw.eva !== undefined && !["", "left", "gone"].includes(raw.eva)) throw new Error("Invalid campaign progress.");
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "",
+      ridge:{nights:ridge.nights, night:night && {start:night.start, fail:night.fail, built:night.built}}};
+  }
+  // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
+  function placeCampaignPages(world, seed) {
+    const hash = text => [...String(seed) + ":" + text].reduce((h,c) => Math.imul(h ^ c.charCodeAt(0),16777619) >>> 0,2166136261);
+    const homes = world.buildings.filter(b => b.type === "home").sort((a,b) => hash(a.id) - hash(b.id) || String(a.id).localeCompare(String(b.id)));
+    let page = 0;
+    for (const b of homes) {
+      if (page === Data.campaignText.pages.length) break;
+      const tiles = [];
+      for (let y = b.y + 1; y < b.y + b.h - 1; y++) for (let x = b.x + 1; x < b.x + b.w - 1; x++) tiles.push(World.tileAt(world,x,y));
+      const tile = tiles.filter(Boolean).sort((a,c) => hash(b.id + ":" + a.x + ":" + a.y) - hash(b.id + ":" + c.x + ":" + c.y)).find(t =>
+        t.building === b.id && World.clear(world,t.x+.5,t.y+.5,.28) &&
+        !world.objects.some(o => Math.floor(o.x) === t.x && Math.floor(o.y) === t.y) &&
+        World.route(world,world.start.x,world.start.y,t.x+.5,t.y+.5,0,true).length);
+      if (!tile) continue;
+      world.objects.push({id:"campaign-page-" + page, x:tile.x+.5, y:tile.y+.5, building:b.id, zone:tile.zone, tint:.54,
+        kind:"record", action:"campaign-page", name:"Torn page", page, read:false, active:true, solid:false});
+      page++;
+    }
+  }
+
+  // cinema.statue: taking the statue jams the doors, wakes a horde of 50 and leaves the windows as the only way out.
+  function takeStatue(s, statue) {
+    if (!s.campaign || s.mode !== "play" || statue?.action !== "cinema-statue" || !statue.active ||
+        !s.world.objects.includes(statue) || !reachableObject(s,statue)) return false;
+    statue.active = false;
+    add(s.player.bag,"goldstatue",1,{born:s.minutes});
+    const hall = s.world.buildings.find(b => b.type === "cinema");
+    for (const o of s.world.objects) {
+      if (o.action !== "door" || o.building !== hall.id) continue;
+      if (o.kind === "window") { if (!o.open) o.reinforced = Data.cinemaTrap.windowHits; }
+      else Object.assign(o,{open:false, sealed:true});
+    }
+    World.sync(s.world);
+    const rng = Level.seeded((s.seed ^ 0x51a7e) >>> 0), spots = [];
+    for (let y = hall.y + 1; y < hall.y + hall.h - 1; y++) for (let x = hall.x + 1; x < hall.x + hall.w - 1; x++) {
+      const point = {x:x+.5, y:y+.5};
+      if (World.tileAt(s.world,x,y)?.building === hall.id && World.clear(s.world,point.x,point.y,.18) && distance(point,s.player) > 3.5) spots.push(point);
+    }
+    // The members' social was by the beer tap: the horde comes out of that corner.
+    const tap = s.world.objects.find(o => o.id === "cinema-tap") ?? statue;
+    spots.sort((a,b) => distance(a,tap) - distance(b,tap) || a.y - b.y || a.x - b.x);
+    for (let i = 0; i < Data.cinemaTrap.horde; i++) {
+      const z = newInfected(s, spots[i % spots.length], "cinema-horde", rng);
+      Object.assign(z,{alert:1, chaseX:s.player.x, chaseY:s.player.y});
+    }
+    s.atmosphere.awake = true;
+    s.effects.push({x: statue.x, y: statue.y, text: "CLICK", color: "#e8c25e", life: 1.2, impact: .8});
+    // Sound sequence (docs/audio/cinema-trap.md): click, both doors slam, the social stirs by the tap, tension under it all.
+    hear(s, "idolClick", statue);
+    for (const [i, door] of s.world.objects.filter(o => o.sealed).entries()) {
+      hear(s, "doorSlam", door, 1, .35 + i * .25);
+      s.effects.push({x: door.x, y: door.y, text: "SLAM", color: "#e3a289", life: 1});
+    }
+    hear(s, "horde", tap, 1, 1.2);
+    hear(s, "tension", s.player, 1, .6);
+    s.nextTension = s.elapsed + Data.cinemaTrap.tensionEvery;
+    noise(s, statue.x, statue.y, 14);
+    notify(s, Data.campaignText.statueTaken, true);
+    return true;
+  }
+
+  function updateCinemaTrap(s) {
+    if (s.world.region !== "cinema" || s.campaign.completed.includes("cinema.statue")) return;
+    const statue = s.world.objects.find(o => o.id === "cinema-statue"), hall = s.world.buildings.find(b => b.type === "cinema");
+    if (!statue || statue.active) return;
+    if (World.tileAt(s.world,s.player.x,s.player.y)?.building === hall.id) {
+      if (s.elapsed >= (s.nextTension ?? 0)) { hear(s, "tension", s.player); s.nextTension = s.elapsed + Data.cinemaTrap.tensionEvery; }
+      return;
+    }
+    for (const o of s.world.objects) if (o.sealed) o.sealed = false;
+    s.campaign.completed.push("cinema.statue");
+    CampaignHints.track(s.campaign.hints, "pineridge.two-nights", s.minutes);
+    s.campaign.buffUntil = (runDay(s.minutes) + Data.cinemaTrap.buffNights - 1) * 1440 + 390;
+    notify(s, Data.campaignText.cinemaEscape);
+    notify(s, Data.campaignText.cinemaBuff);
+  }
+
+  // pineridge.two-nights: two full nights (20:00-06:30) at Pine Ridge with no barricades. Getting cold means pneumonia: the night repeats.
+  const builtDefences = s => s.world.objects.reduce((n,o) => n + (o.action === "door" ? o.boards ?? 0 : 0) + (isBarrier(o) && o.active ? 1 : 0), 0);
+  function updatePineRidge(s) {
+    const c = s.campaign, r = c.ridge, rule = Data.pineRidge, text = Data.campaignText;
+    if (c.completed.includes("pineridge.two-nights")) return;
+    const night = isNight(s), here = s.world.region === "ridge";
+    if (!r.night) {
+      if (night && here && Campaign.isOpen("pineridge", runDay(s.minutes))) {
+        r.night = {start:s.minutes, fail:"", built:builtDefences(s)};
+        notify(s, text.ridgeNight);
+      }
+      return;
+    }
+    if (!here) { r.night = null; notify(s, text.ridgeLeft, true); return; }
+    if (!r.night.fail && builtDefences(s) > r.night.built) { r.night.fail = "barricade"; notify(s, text.ridgeBuilt, true); }
+    if (!r.night.fail && s.rules.exposure !== "off" && s.player.temperature < rule.coldLimit) {
+      r.night.fail = "cold";
+      s.player.sick = Math.max(s.player.sick ?? 0, rule.sickness);
+      notify(s, text.ridgeCold, true);
+    }
+    if (night) return;
+    const full = s.minutes - r.night.start >= rule.fullNight, ok = full && !r.night.fail;
+    r.night = null;
+    if (!full) { notify(s, text.ridgeLate); return; }
+    if (!ok) return;
+    r.nights++;
+    if (r.nights < rule.nights) { notify(s, text.ridgeSurvived + r.nights + " of " + rule.nights + "."); return; }
+    c.completed.push("pineridge.two-nights");
+    c.clues = Math.min(5, c.clues + 1);
+    CampaignHints.track(c.hints, "ironworks.barricade", s.minutes);
+    notify(s, text.ridgeDone);
+  }
+
+  function updateCinemaBuff(s) {
+    if (!s.campaign.buffUntil || s.minutes < s.campaign.buffUntil) return;
+    s.campaign.buffUntil = 0;
+    notify(s, Data.campaignText.cinemaBuffEnds);
+  }
+
+  // Campaign objects added after campaign saves already existed: older saves get them back on load.
+  const campaignFixtures = new Set(["cinema-tap", "cinema-note", "eva-diary", "iron-cage", "iron-toolboard", "iron-terminal-0", "iron-terminal-1", "iron-terminal-2"]);
+
+  // ironworks.barricade: a barricaded weapon cage and a toolboard in the machine shop, and three line-computer terminals.
+  function placeIronworks(world) {
+    const used = new Set(world.objects.map(o => Math.floor(o.x) + ":" + Math.floor(o.y)));
+    const spot = b => {
+      const tiles = [];
+      for (let y = b.y + 1; y < b.y + b.h - 1; y++) for (let x = b.x + 1; x < b.x + b.w - 1; x++) tiles.push(World.tileAt(world,x,y));
+      const centre = {x:b.x + b.w / 2, y:b.y + b.h / 2};
+      return tiles.filter(t => t && t.building === b.id && !used.has(t.x + ":" + t.y) && World.clear(world,t.x+.5,t.y+.5,.32) &&
+        World.route(world,world.start.x,world.start.y,t.x+.5,t.y+.5,0,true).length)
+        .sort((a,c) => distance({x:a.x+.5,y:a.y+.5},centre) - distance({x:c.x+.5,y:c.y+.5},centre) || a.y - c.y || a.x - c.x)[0];
+    };
+    const put = (b, data) => {
+      const t = b && spot(b);
+      if (!t) return;
+      used.add(t.x + ":" + t.y);
+      world.objects.push({x:t.x+.5, y:t.y+.5, building:b.id, zone:t.zone, tint:.5, active:true, ...data});
+    };
+    const named = name => world.buildings.find(b => b.name === name);
+    const shop = named("Machine shop");
+    put(shop, {id:"iron-cage", kind:"locker", action:"ironworks-cage", name:"Barricaded weapon cage", stage:0, solid:true});
+    put(shop, {id:"iron-toolboard", kind:"toolrack", action:"loot", name:"Line toolboard", searched:false, solid:true,
+      loot:[{id:"hammer", qty:1, condition:Data.ironworks.toolCondition}, {id:"crowbar", qty:1, condition:Data.ironworks.toolCondition}]});
+    for (const [line, name] of ["Machine shop", "Power substation", "Dispatch office"].entries())
+      put(named(name), {id:"iron-terminal-" + line, kind:"terminal", action:"ironworks-terminal", name:"Line computer terminal", line, read:false, solid:true});
+  }
+
+  function dismantleCage(s, cage) {
+    const rule = Data.ironworks, stage = rule.stages[cage?.stage];
+    if (!s.campaign || s.mode !== "play" || s.player.vehicle || cage?.action !== "ironworks-cage" || !stage ||
+        !s.world.objects.includes(cage) || !reachableObject(s,cage)) return false;
+    const tools = s.player.bag.filter(item => stage.tools.includes(item.id));
+    const tool = tools.find(item => (item.condition ?? 100) >= rule.wear);
+    if (!tool) {
+      notify(s, tools.length ? Data.campaignText.ironWorn : Data.campaignText.ironTools + stage.verb.toLowerCase() + " needs a " +
+        stage.tools.map(id => Data.items[id].name.toLowerCase()).join(" or a ") + ".", true);
+      return false;
+    }
+    tool.condition = (tool.condition ?? 100) - rule.wear;
+    cage.stage++;
+    noise(s, cage.x, cage.y, 9);
+    hear(s, "hammer", cage);
+    s.effects.push({x:cage.x, y:cage.y, text:cage.stage < rule.stages.length ? "CLANG" : "OPEN", color:"#c9d6ae", life:.8, impact:.3});
+    notify(s, stage.done);
+    if (cage.stage < rule.stages.length) return true;
+    add(s.player.bag, "foundrymaul", 1, {born:s.minutes, condition:100});
+    if (!s.campaign.completed.includes("ironworks.barricade")) s.campaign.completed.push("ironworks.barricade");
+    CampaignHints.track(s.campaign.hints, "fathill.bosses", s.minutes);
+    notify(s, Data.campaignText.ironDone);
+    return true;
+  }
+
+  function readTerminal(s, terminal) {
+    if (s.mode !== "play" || s.player.vehicle || terminal?.action !== "ironworks-terminal" ||
+        !s.world.objects.includes(terminal) || !reachableObject(s,terminal)) return false;
+    terminal.read = true;
+    notify(s, Data.campaignText.ironTerminals[terminal.line] ?? "The screen is dark.");
+    return true;
+  }
+  // eva.death: Eva's diary waits, hidden, in the shelter from the first day; it appears on the morning of day 6.
+  function placeEvaDiary(world) {
+    const b = world.base, crate = world.objects.find(o => o.storage && o.building === b.id), tiles = [];
+    for (let y = b.y + 1; y < b.y + b.h - 1; y++) for (let x = b.x + 1; x < b.x + b.w - 1; x++) tiles.push(World.tileAt(world,x,y));
+    const tile = tiles.filter(t => t && t.building === b.id && World.clear(world,t.x+.5,t.y+.5,.28) &&
+      !world.objects.some(o => Math.floor(o.x) === t.x && Math.floor(o.y) === t.y) && !(Math.floor(world.start.x) === t.x && Math.floor(world.start.y) === t.y))
+      .sort((a,c) => distance({x:a.x+.5,y:a.y+.5}, crate ?? world.start) - distance({x:c.x+.5,y:c.y+.5}, crate ?? world.start))[0];
+    if (tile) world.objects.push({id:"eva-diary", x:tile.x+.5, y:tile.y+.5, building:b.id, zone:tile.zone, tint:.54,
+      kind:"record", action:"eva-diary", name:"Eva's diary", read:false, active:false, solid:false});
+  }
+
+  // Day 5, 09:00: Eva goes out for a snack and never comes back. Day 6, 06:30: her diary is found at the shelter.
+  function updateEva(s) {
+    const c = s.campaign, rule = Data.evaDeparture, day = runDay(s.minutes), hour = s.minutes % 1440 / 60, from = Campaign.areas.eva.from;
+    if (c.eva === "" && (day > from || day === from && hour >= rule.hour)) {
+      const npcs = [s.world.npc, ...Object.values(s.regionStates).map(zone => zone?.npc)].filter(Boolean);
+      const alive = npcs.some(n => n.mode !== "dead" && n.mode !== "away" && n.hp > 0);
+      for (const n of npcs) if (n.mode !== "dead" && n.mode !== "away") Object.assign(n, {mode:"away", hp:0, path:[], moving:false, ridingVehicle:null});
+      c.eva = "left";
+      if (alive) notify(s, Data.campaignText.evaLeaves);
+    }
+    if (c.eva === "left" && (day > from + 1 || day === from + 1 && hour >= rule.gone)) {
+      c.eva = "gone";
+      const zone = s.world.region === Regions.home ? s.world : s.regionStates[Regions.home];
+      const diary = zone?.objects.find(o => o.id === "eva-diary");
+      if (diary) diary.active = true;
+      notify(s, Data.campaignText.evaGone, true);
+    }
+  }
+
+  function readEvaDiary(s, diary) {
+    if (!s.campaign || s.mode !== "play" || s.player.vehicle || diary?.action !== "eva-diary" || !diary.active ||
+        !s.world.objects.includes(diary) || !reachableObject(s,diary)) return false;
+    if (!diary.read) { diary.read = true; add(s.player.bag,"evadiary",1,{born:s.minutes}); }
+    if (!s.campaign.completed.includes("eva.death")) s.campaign.completed.push("eva.death");
+    notify(s, Data.campaignText.evaDiary);
+    return true;
+  }
+
+  function readCampaignPage(s, note) {
+    if (!s.campaign || s.mode !== "play" || s.player.vehicle || note?.action !== "campaign-page" ||
+        !s.world.objects.includes(note) || !reachableObject(s,note)) return false;
+    note.read = true;
+    notify(s, Data.campaignText.pages[note.page] ?? "The page is blank.");
+    const read = s.world.objects.filter(o => o.action === "campaign-page" && o.read).length;
+    if (read < Data.campaignText.pages.length) { notify(s, "Torn pages found: " + read + " of " + Data.campaignText.pages.length + "."); return true; }
+    if (!s.campaign.completed.includes("coldvale.houses")) {
+      s.campaign.completed.push("coldvale.houses");
+      s.campaign.clues = Math.min(5, s.campaign.clues + 1);
+      CampaignHints.track(s.campaign.hints, "cinema.statue", s.minutes);
+      notify(s, Data.campaignText.housesDone);
+    }
+    return true;
+  }
+
+  // "" when the calendar lets the player into region `to` now, otherwise the reason shown to the player.
+  function campaignProblem(s, to) {
+    const area = s.campaign && Campaign.regions[to];
+    if (!area) return "";
+    const bag = s.player.bag, items = [...new Set(bag.map(item => item.id))];
+    if (bag.some(item => item.id === "flashlight" && item.charge > 0)) items.push("battery");
+    return Campaign.closedReason(area, runDay(s.minutes), Math.floor(s.minutes % 1440 / 60)) ||
+      Campaign.missing(area, {items, clues:s.campaign.clues});
+  }
+
   function travelProblem(s, exit) {
     const connection = exit?.action === "travel" && Regions.connection(s.world.region, exit.id.slice(5));
     if (s.mode !== "play" || !connection || !s.world.objects.includes(exit) || !reachableObject(s, exit)) return "Move closer to the crossing.";
+    const closed = campaignProblem(s, exit.id.slice(5));
+    if (closed) return closed;
     const car = vehicle(s), npc = s.world.npc;
     if (car && !connection.vehicles) return "The trail is on foot. Park and get out here.";
     if (car && s.player.driveSpeed > .15) return "Brake before crossing.";
@@ -1420,9 +1735,9 @@ const Sim = (() => {
     }
   }
 
-  function hear(s, kind, point, intensity = 1) {
+  function hear(s, kind, point, intensity = 1, delay = 0) {
     const zombieVoice = kind === "near" || kind === "distant" || kind === "horde";
-    s.sounds.push({kind,x:point.x,y:point.y,muffled:!lineOfSight(s,s.player,point),zombieVoice,intensity});
+    s.sounds.push({kind,x:point.x,y:point.y,muffled:!lineOfSight(s,s.player,point),zombieVoice,intensity,...(delay ? {delay} : {})});
     if (s.sounds.length > 5) s.sounds.shift();
   }
 
@@ -1801,6 +2116,7 @@ const Sim = (() => {
 
   function breachProblem(s, o, method) {
     if (s.player.vehicle || !reachableObject(s, o) || o.action !== "door" || o.open || o.boards || o.broken) return "The opening is blocked.";
+    if (o.sealed) return Data.campaignText.jammed;
     if (method === "pry") {
       if (!(o.locked || o.kind === "window")) return "This opening does not need prying.";
       if (!crowbar(s)) return "Carry a crowbar in usable condition.";
@@ -1814,10 +2130,19 @@ const Sim = (() => {
     const tool = method === "pry" ? crowbar(s) : smashTool(s), p = s.player;
     p.stamina -= 9 * staminaCost(s);
     if (tool) tool.condition = Math.max(0, tool.condition - (method === "pry" ? 2.5 : 1.5));
+    if (method === "smash" && o.reinforced > 1) {
+      o.reinforced--;
+      s.effects.push({x: o.x, y: o.y, text: "CRACK", color: "#c9d6ae", life: .7, impact: .3});
+      noise(s, o.x, o.y, 13);
+      hear(s,"glassSmash",o);
+      notify(s, Data.campaignText.frameHolds);
+      return true;
+    }
+    o.reinforced = 0;
     o.open = true;
     o.locked = false;
     o.latched = false;
-    if (method === "smash") { o.broken = true; o.hp = 0; }
+    if (method === "smash") { o.broken = true; o.hp = 0; s.effects.push({x: o.x, y: o.y, text: "SMASH", color: "#e3a289", life: .8, impact: .45}); }
     World.sync(s.world);
     noise(s, o.x, o.y, method === "pry" ? 6.5 : 13);
     hear(s,method === "pry" ? "pry" : "glassSmash",o);
@@ -1842,6 +2167,10 @@ const Sim = (() => {
     if (!o?.active || o.action !== "door" || o.kind === "fence" || o.broken || o.kind === "gate" && o.hp === 0) return false;
     if (o.boards > 0) {
       if (!auto) notify(s, "The barricade blocks the opening. Remove a plank from the door or window panel.", true);
+      return false;
+    }
+    if (o.sealed) {
+      if (!auto) notify(s, Data.campaignText.jammed, true);
       return false;
     }
     if (o.open && openingOccupied(s, o)) {
@@ -2500,15 +2829,30 @@ const Sim = (() => {
     if (side) actor.face = side;
   }
 
+  // Deterministic per run and infected (no shared rng): the same infected always carries the same supply.
+  function carriedSupply(s, enemy) {
+    const rule = Data.zombieCarry;
+    if (!rule.origins.includes(enemy.origin ?? "")) return null;
+    let h = (s.seed >>> 0) ^ 2166136261;
+    for (const c of String(enemy.id)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    h = Math.imul(h ^ h >>> 15, 2246822507) >>> 0;
+    if (h % rule.oneIn) return null;
+    const type = s.world.buildings?.find(b => b.id === World.tileAt(s.world, enemy.x, enemy.y)?.building)?.type;
+    const pool = rule.pools[type] ?? rule.pools.town;
+    return pool[Math.floor(h / rule.oneIn) % pool.length];
+  }
+
   function defeat(s, enemy) {
     s.kills++;
     recordDaily(s,enemy.kind);
     hearZombie(s,"death",enemy);
     const winner = enemy.origin === "cinema-winner";
-    const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item;
+    const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item, supply = winner ? null : carriedSupply(s, enemy);
+    const loot = item ? [{id: item, qty: 1, condition: Data.items[item].damage ? 60 : 100}] : [];
+    if (supply) loot.push({id: supply, qty: 1, condition: 100});
     s.world.objects.push({id: "built" + s.serial++, x: enemy.x, y: enemy.y, kind: "drop",
-      name: winner ? "The El Gordo Winner" : "Fallen infected", active: true, solid: false, action: "loot", searched: !item, corpse: !winner, died: s.minutes,
-      loot: item ? [{id: item, qty: 1, condition: Data.items[item].damage ? 60 : 100}] : []});
+      name: winner ? "The El Gordo Winner" : "Fallen infected", active: true, solid: false, action: "loot", searched: !loot.length, corpse: !winner, died: s.minutes,
+      loot});
   }
 
   function attack(s, z) {
@@ -2620,7 +2964,8 @@ const Sim = (() => {
       item.condition = Math.max(0,(item.condition ?? 100)-wear);
     }
     guard = Math.min(.7,guard);
-    const amount = z.stats.damage * infectedDamage(s) * (1 - guard);
+    const shielded = p.sleeping && isNight(s) && cinemaBuff(s);
+    const amount = z.stats.damage * infectedDamage(s) * (1 - guard) * (shielded ? Data.cinemaTrap.sleepDamage : 1);
     const absorbed = guard > 0 && s.world.rng() < guard * .9;
     p.hp = Math.max(0, p.hp - amount); p.flash = .75; p.resting = false;
     if (!p.hp) s.deathCause = "a " + z.stats.name.toLowerCase();
@@ -3030,19 +3375,22 @@ const Sim = (() => {
   }
 
   function updateNeeds(s, dt) {
-    const p = s.player, rate = s.rules.needs / 100 * pressure(s), gradual = s.rules.care === "gradual";
+    // Needs follow game time on clocks slower than the default 2 (1.6 campaign, 0.4 Realistic), so a day costs the same food,
+    // water and sleep at any of those paces. Clocks 2-4 are unchanged.
+    const pace = Math.min(1, s.rules.clock / 2);
+    const p = s.player, rate = s.rules.needs / 100 * pressure(s) * pace, gradual = s.rules.care === "gradual";
     const inDanger = threats(s).length > 0;
     const floor = Data.modes[s.difficulty]?.noStarve ? 8 : 0;
     p.hunger = Math.max(floor, p.hunger - dt * .07 * rate * (p.sleeping ? .5 : 1));
     p.hydration = Math.max(floor, p.hydration - dt * (s.running ? .15 : .1) * rate * (p.sleeping ? .5 : 1));
-    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 : p.resting ? -1.6 : (s.running ? .075 : .04) * rate), 0, 100);
+    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 * pace : p.resting ? -1.6 * pace : (s.running ? .075 : .04) * rate), 0, 100);
     if (p.resting) {
       if (inDanger) { p.resting = false; notify(s, "Danger interrupted your rest.", true); }
       else if (p.hunger > 25 && p.hydration > 25 && (!gradual || !p.wounds.some(w => !w.bandaged))) {
         p.hp = Math.min(100, p.hp + dt * (gradual ? .38 : .12) * (p.sleeping ? .5 : 1));
       }
     }
-    p.panic = clamp(p.panic + dt * (inDanger ? 6 : -9), 0, 100);
+    p.panic = clamp(p.panic + dt * (inDanger ? 6 * (cinemaBuff(s) ? Data.cinemaTrap.panicRate : 1) : -9), 0, 100);
     let pain = 0;
     for (const w of p.wounds) {
       w.age += dt;
@@ -3090,6 +3438,11 @@ const Sim = (() => {
     const raining = s.weather === "Rain";
     updateOutdoor(s, minutes, raining);
     if (s.longHaul && s.player.hp > 0) updateLongHaul(s);
+    if (s.campaign) { updateCinemaTrap(s); updateCinemaBuff(s); updatePineRidge(s); updateEva(s); }
+    if (s.campaign?.hints.objective) {
+      const hint = CampaignHints.next(s.campaign.hints, s.minutes);
+      if (hint) notify(s, "Hint: " + hint);
+    }
     const interval = Data.garden.dutyInterval;
     if (!raining && Math.floor(previousMinutes / interval) !== Math.floor(s.minutes / interval)) tendShelterGarden(s);
     for (const effect of s.effects) effect.life -= dt;
@@ -3294,6 +3647,8 @@ const Sim = (() => {
       guideStep:s.guideStep, firstSleep:s.firstSleep, pinStory:s.pinStory, playtest:s.playtest,
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
+      campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}, buffUntil:s.campaign.buffUntil,
+        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
@@ -3410,7 +3765,8 @@ const Sim = (() => {
       return coverageCrate(o) && (!s.world.coverage || routeCrate(o) && !s.world.routeCoverage) || legacy && utilityIds.has(o.id) || data.region === undefined && o.action === "travel" ||
         region === "ridge" && data.mapRevision !== Regions.mapRevision && ["exit-" + Regions.cavern,"cave-gear"].includes(o.id) ||
         Chronicle.isFixture(o) && (ledgerVersion === 0 || ledgerVersion === 1 && entry?.extra || ledgerVersion < (entry?.added ?? 0)) ||
-        data.fieldRevision === undefined && FieldStories.isFixture(o) || oldMap && Atmosphere.isFixture(o);
+        data.fieldRevision === undefined && FieldStories.isFixture(o) || oldMap && Atmosphere.isFixture(o) ||
+        campaignFixtures.has(o.id);
     };
     const validTimer = (until, recipe) => Number.isFinite(until) && until > 0 && until <= data.minutes + recipe.minutes;
     const validStation = (o, original) => {
@@ -3466,6 +3822,8 @@ const Sim = (() => {
       (o.locked === undefined || typeof o.locked === "boolean" && (!o.locked || original?.locked && !o.open)) &&
       (o.latched === undefined || typeof o.latched === "boolean" && (!o.latched || original?.latched && !o.open)) &&
       (o.alarmArmed === undefined || typeof o.alarmArmed === "boolean" && (!o.alarmArmed || original?.alarmArmed)) &&
+      (o.sealed === undefined || typeof o.sealed === "boolean" && (!o.sealed || !o.open)) &&
+      (o.reinforced === undefined || Number.isInteger(o.reinforced) && o.reinforced >= 0 && o.reinforced <= Data.cinemaTrap.windowHits) &&
       (o.broken === undefined || typeof o.broken === "boolean" && (!o.broken || (o.boards > 0 ? !o.open : o.open && o.hp === 0)));
     const foreignCar = o => o.kind === "car" && o.action === "loot" && o.active && !o.away && o.homeRegion !== region &&
       (o.homeRegion === Regions.home ? /^o\d{1,3}$/.test(o.id) : Object.hasOwn(Regions.vehicleNames, o.id) && o.id.startsWith(o.homeRegion + "-"));
@@ -3600,6 +3958,7 @@ const Sim = (() => {
             longHaulFields.some(key => !run[key]))) throw new Error("Invalid 30-day challenge progress.");
       s.longHaul = {days:run.days,...Object.fromEntries(longHaulFields.map(key => [key,run[key]]))};
     }
+    if (s.campaign) s.campaign = restoreCampaign(data.campaign);
     if (data.guideStep !== undefined) {
       if (!Number.isInteger(data.guideStep) || data.guideStep < 0 || data.guideStep > 6) throw new Error("Invalid beginner guide step.");
       s.guideStep = data.guideStep;
@@ -3653,7 +4012,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

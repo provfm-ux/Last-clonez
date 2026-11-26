@@ -18,7 +18,8 @@ const Soundscape = (() => {
     pry:{seconds:.29,gain:.17,cut:3300}, hammer:{seconds:.45,gain:.17,cut:2800},
     stepSoft:{seconds:.14,gain:.026,cut:1350}, stepHard:{seconds:.15,gain:.030,cut:2300},
     strike:{seconds:.15,gain:.18,cut:2400}, shot:{seconds:.42,gain:.26,cut:4700},
-    crash:{seconds:.49,gain:.23,cut:2700}
+    crash:{seconds:.49,gain:.23,cut:2700},
+    idolClick:{seconds:.9,gain:.24,cut:2600}, doorSlam:{seconds:.75,gain:.3,cut:1900}, tension:{seconds:6.5,gain:.2,cut:700}
   };
 
   const tone = (hz,t) => Math.sin(tau*hz*t);
@@ -109,6 +110,16 @@ const Soundscape = (() => {
           sample = (.5*grain+.35*tone(43,t))*(.55*tap(t,.06,5)+.45*tap(t,.55,7)+.27*tap(t,.87,10)); break;
         case "crib":
           sample = (.4*tone(313+27*Math.sin(5*t),t)+.2*tone(681,t)+.29*grain)*breath(t,config.seconds,11); break;
+        case "idolClick": // stone grinding under the idol, then the click of the mechanism and a low thud
+          sample = (.5*texture+.12*tone(180,t))*breath(Math.min(t,.36),.36,23)*Number(t < .36) +
+            (.7*edge+.25*tone(1830,t))*tap(t,.42,95) + (.5*tone(71,t)+.3*body)*tap(t,.45,9); break;
+        case "doorSlam": // heavy door slammed shut, then the bolt throwing
+          sample = .75*((.45*tone(68,t)+.3*tone(110,t)+.55*body)*tap(t,.02,14) + (.6*edge+.4*texture)*tap(t,.015,60) +
+            (.35*tone(1400,t)+.4*edge)*tap(t,.28,120)); break;
+        case "tension": { // low dissonant cluster that swells and pulses; retriggered every 6 s while trapped
+          const swell = Math.sin(Math.PI*Math.min(1,t/config.seconds)) ** .8, pulse = .72+.28*Math.sin(tau*.55*t) ** 2;
+          sample = (.32*tone(55,t)+.22*tone(58.3,t)+.15*tone(82.4,t)+.1*tone(116.5+3*Math.sin(t*.7),t)+.25*grain)*swell*pulse; break;
+        }
         case "alarm":
           sample = .5*(tone(910,t)+.4*tone(1710,t))*Number(t% .46 < .17)*Math.min(1,(config.seconds-t)*12); break;
       }
@@ -234,7 +245,8 @@ const Soundscape = (() => {
     if (!sources) { sources = new Set(); playing.set(ctx,sources); }
     sources.add(source);
     source.onended = () => sources.delete(source);
-    source.start();
+    const delay = Math.min(2, Math.max(0, cue.delay ?? 0));
+    if (delay) source.start((ctx.currentTime ?? 0) + delay); else source.start();
   }
 
   function stop(ctx) {

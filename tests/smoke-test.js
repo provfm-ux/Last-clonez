@@ -1712,6 +1712,45 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     days[0.4].sede < days[0.4].fome, show);
 }
 
+{ // pineridge.two-nights (HISTORIA.md secções 10 e 16): 2 noites sem barricadas → pista 2; com exposição a noite repete-se
+  const start = fresh("campaign"); Sim.testJump(start, 3, {}, {anyMode: true});
+  const exit = start.world.objects.find(o => o.id === "exit-ridge"); Object.assign(start.player, {x: exit.x, y: exit.y + (exit.y > start.world.height / 2 ? -1 : 1)});
+  let s = Sim.travel(start, exit);
+  const calm = x => { x.world.enemies = []; x.rules.hordes = "off"; x.atmosphere.pending = null; x.rules.clock = 4; // relógio rápido só no teste
+    Object.assign(x.player, {hp: 100, hunger: 90, hydration: 90, fatigue: 10, temperature: 37, wetness: 0}); };
+  const seen = []; // o jogo só guarda as últimas 7 mensagens: registar todas durante as noites
+  const night = (x, day, during) => { // das 19:50 do dia até às 06:40 do dia seguinte
+    x.minutes = (day - 1) * 1440 + 1190; calm(x);
+    for (let t = 0; t < 22; t++) { if (t === 8 && during) during(x); Sim.fastForward(x, 30); seen.push(...x.messages.map(m => m.text));
+      if (t !== 8 || !during) calm(x); else x.player.hp = 100; }
+  };
+  const said = pattern => seen.some(text => pattern.test(text));
+  const ridge = () => s.campaign.ridge;
+  check("pineridge.two-nights começa no campo de Pine Ridge", s?.world.region === "ridge" && ridge().nights === 0);
+  night(s, 3);
+  check("pineridge.two-nights noite inteira sem barricadas conta", ridge().nights === 1 && said(/Night survived at Pine Ridge: 1 of 2/) &&
+    ridge().night === null);
+  check("pineridge.two-nights o progresso fica gravado", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s)))).campaign.ridge.nights === 1);
+  const opening = s.world.objects.find(o => o.action === "door");
+  night(s, 4, x => { x.world.objects.find(o => o.id === opening.id).boards = 1; });
+  check("pineridge.two-nights com barricada a noite não conta", ridge().nights === 1 && said(/only counts nights without one/), "noites " + ridge().nights);
+  s.world.objects.find(o => o.id === opening.id).boards = 0;
+  night(s, 5, x => { x.player.temperature = 35; });
+  check("pineridge.two-nights com frio: pneumonia e a noite repete-se", ridge().nights === 1 && s.player.sick > 0 &&
+    said(/Pneumonia/), "noites " + ridge().nights + ", doença " + s.player.sick);
+  const before = s.campaign.clues;
+  s.player.sick = 0; night(s, 6);
+  check("pineridge.two-nights segunda noite válida → coordenada 2", ridge().nights === 2 && s.campaign.completed.includes("pineridge.two-nights") &&
+    s.campaign.clues === before + 1 && said(/second coordinate/) && s.campaign.hints.objective === "ironworks.barricade");
+  const away = fresh("campaign"); Sim.testJump(away, 3, {}, {anyMode: true});
+  const ex = away.world.objects.find(o => o.id === "exit-ridge"); Object.assign(away.player, {x: ex.x, y: ex.y + (ex.y > away.world.height / 2 ? -1 : 1)});
+  let a = Sim.travel(away, ex); a.minutes = 2 * 1440 + 1210; calm(a); Sim.fastForward(a, 5);
+  const back = a.world.objects.find(o => o.id === "exit-coldvale"); Object.assign(a.player, {x: back.x, y: back.y + (back.y > a.world.height / 2 ? -1 : 1)});
+  const home = Sim.travel(a, back); Sim.fastForward(home, 2);
+  check("pineridge.two-nights sair a meio da noite não conta", a.campaign.ridge.night !== null && home.campaign.ridge.night === null &&
+    home.messages.some(m => /left Pine Ridge/.test(m.text)));
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

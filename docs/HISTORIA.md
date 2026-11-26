@@ -1,4 +1,4 @@
-# Last CloneZ: história, áreas e desafios (rascunho v23)
+# Last CloneZ: história, áreas e desafios (rascunho v24)
 
 Documento de design copiado do Project "Clone do project zomboid". O texto do jogo é em inglês; este documento é em português.
 
@@ -222,6 +222,7 @@ O utilizador deixou estas decisões ao critério do Claude. Ficam como proposta 
 - **Áreas abertas:** depois de cumpridas, as áreas continuam acessíveis nos seus dias.
 - **Dias opcionais:** os dias 7, 9, 11, 13 e 21–24 têm áreas opcionais sem pista (secção 9), propostas pelo Claude.
 - **Zombies com recursos:** cerca de 1 em cada 8 zombies aleatórios leva um recurso. Recursos nunca são obrigatórios, e os zombies de boss ou de desafio não os dão.
+- **Espera de tokens (decidido pelo utilizador):** são **5 minutos reais**, sempre, qualquer que seja a opção de tempo (1,6 ou 0,4). Nos testes automáticos usa-se um relógio simulado, para não esperar 5 minutos de verdade.
 
 ## 15. Por definir
 - Número exato de pistas e de noites de cada área, a ajustar em testes.
@@ -249,7 +250,7 @@ Cada desafio é um registo com id estável, testado isoladamente em modo headles
 | `westfields.stealth` | 10 | Passar sem ruído → pista 4; com ruído → horda atraída |
 | `cindergrotto.battery` | 12 | Lanterna com pilhas → sai a tempo; sem pilhas → falha |
 | `viragem.zero` | 15–18 | Ler o diário ou o laboratório → confirma paciente 0 |
-| `amigo1.lockdown-chat` | 14–20 | Sem arma forte → não vence. Com arma forte: 5 prompts → pausa de tokens simulada (5 min de tempo do jogo, nunca real) → prompt 5 com "stand down" e "token" → proteção cai; sem isso → espera e recomeço |
+| `amigo1.lockdown-chat` | 14–20 | Sem arma forte → não vence. Com arma forte: 5 prompts → pausa de tokens de 5 minutos reais (no teste, um relógio simulado avança os 5 minutos sem esperar) → prompt 5 com "stand down" e "token" → proteção cai; sem isso → espera e recomeço |
 | `fortress.last-boss` | 25–30 | Sem todas as coordenadas → não entra. Com elas: proteção cai com dano; fogo causa dano extra |
 | `fortress.endgame` | depois do último boss | Entradas controladas funcionam; jogador pode ficar sem limite de dias |
 | `opt.*` (dias 7, 9, 11, 13, 21–24) | ver secção 9 | Cada área abre no dia marcado, dá recursos e não dá pista |

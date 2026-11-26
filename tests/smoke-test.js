@@ -1994,6 +1994,18 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("origins saves da 0.34 carregam com o Sandbox por omissão e sem traços", old.rules.speed === 100 && old.rules.bite === 6 && Object.keys(old.traitEffects).length === 0);
 }
 
+{ // perf.routes (skill performance-optimization): a horda não calcula 50 caminhos no mesmo instante
+  const s = fresh("campaign"); Sim.testJump(s, 2, {}, {anyMode: true});
+  const ex = s.world.objects.find(o => o.id === "exit-cinema"); Object.assign(s.player, {x: ex.x - 1, y: ex.y});
+  const c = Sim.travel(s, ex); Object.assign(c.player, {x: 11.5, y: 6.5}); Sim.takeStatue(c, c.world.objects.find(o => o.id === "cinema-statue"));
+  const original = World.route; let chase = 0, worst = 0;
+  World.route = (...a) => { if (a[6] === "force") chase++; return original(...a); };
+  try { for (let i = 0; i < 120; i++) { chase = 0; Sim.tick(c, 1/60, idle); c.player.hp = 100; worst = Math.max(worst, chase); } } finally { World.route = original; }
+  const horde = c.world.enemies.filter(z => z.origin === "cinema-horde");
+  check("perf.routes no máximo " + Data.routeBudget + " caminhos de perseguição por imagem com a horda", worst > 0 && worst <= Data.routeBudget, "pior imagem: " + worst);
+  check("perf.routes a horda continua a perseguir (todos têm caminho ou estão a chegar)", horde.filter(z => z.path.length || Math.hypot(z.x - c.player.x, z.y - c.player.y) < 2).length > 40);
+}
+
 { // ui.campaign-goals (revisão, sugestão 1): objetivos da campanha no topo, no diário e na seta de direção
   const s = fresh("campaign");
   check("ui.campaign-goals começa com as 3 páginas, sem seta (encontrar as casas faz parte do desafio)",

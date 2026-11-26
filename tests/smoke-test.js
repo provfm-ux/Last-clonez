@@ -1500,7 +1500,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("sys.hints progresso recomeça a contagem", H.next(s, start + 6 * D) === null && H.next(s, start + 7 * D) === H.hints["fortress.last-boss"][0]);
   H.track(s, "amigo1.lockdown-chat", start + 7 * D + 60);
   check("sys.hints novo objetivo recomeça do nível 1", s.level === 0 && H.next(s, start + 8 * D) === null);
-  check("sys.hints objetivo sem dicas não dá nada", H.next(H.track(H.empty(), "coldvale.houses", 0), 10 * D) === null);
+  check("sys.hints objetivo sem dicas não dá nada", H.next(H.track(H.empty(), "opt.fuel", 0), 10 * D) === null);
   const saved = H.restore(JSON.parse(JSON.stringify(s)));
   check("sys.hints estado persiste; saves antigos e inválidos começam vazios",
     JSON.stringify(saved) === JSON.stringify(s) && H.restore(undefined).objective === null && H.restore({objective:3, since:-1}).level === 0);
@@ -1573,11 +1573,11 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
 { // sys.campaign (HISTORIA.md secção 16, brief tarefa 8): modo campanha com calendário, dicas e progresso no save
   const s = fresh("campaign"), round = x => Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(x))));
   check("sys.campaign modo novo a 15 min reais por dia com progresso vazio",
-    s.rules.clock === 1.6 && s.campaign?.clues === 0 && s.campaign.completed.length === 0 && s.campaign.hints.objective === null);
+    s.rules.clock === 1.6 && s.campaign?.clues === 0 && s.campaign.completed.join() === "radio.rumour" && s.campaign.hints.objective === "coldvale.houses");
   s.campaign.clues = 1; s.campaign.completed.push("coldvale.houses");
   context.CampaignHints.track(s.campaign.hints, "cinema.statue", s.minutes);
   const loaded = round(s);
-  check("sys.campaign o progresso grava e carrega", loaded.campaign.clues === 1 && loaded.campaign.completed.join() === "coldvale.houses" &&
+  check("sys.campaign o progresso grava e carrega", loaded.campaign.clues === 1 && loaded.campaign.completed.join() === "radio.rumour,coldvale.houses" &&
     loaded.campaign.hints.objective === "cinema.statue");
   const legacy = JSON.parse(JSON.stringify(Sim.snapshot(s))); delete legacy.campaign;
   check("sys.campaign save de campanha sem progresso começa vazio; outros modos não têm campanha",
@@ -1604,6 +1604,35 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   context.CampaignHints.track(stuck.campaign.hints, "fortress.last-boss", stuck.minutes);
   Sim.testJump(stuck, 3, {}, {anyMode: true}); run(stuck, 1);
   check("sys.campaign a dica aparece no jogo depois de 2 dias parado", stuck.messages.some(m => m.text === "Hint: The coat is scorched but whole."));
+}
+
+{ // coldvale.houses (HISTORIA.md secções 10 e 16): 3 casas com pistas → pista 1 e rumor do rádio
+  const s = fresh("campaign"), pages = s.world.objects.filter(o => o.action === "campaign-page");
+  const homes = new Set(pages.map(o => o.building));
+  check("coldvale.houses 3 páginas em 3 casas diferentes", pages.length === 3 && homes.size === 3 &&
+    pages.every(o => s.world.buildings.find(b => b.id === o.building)?.type === "home"), pages.length + " páginas, " + homes.size + " casas");
+  check("coldvale.houses o rumor do rádio fica registado no início", s.campaign.completed.includes("radio.rumour") &&
+    s.messages.some(m => m.text === Data.campaignText.rumour));
+  const again = fresh("campaign");
+  check("coldvale.houses mesma semente, mesmas casas; outros modos não têm páginas",
+    again.world.objects.filter(o => o.action === "campaign-page").map(o => o.building + "@" + o.x + "," + o.y).join() ===
+    pages.map(o => o.building + "@" + o.x + "," + o.y).join() && !fresh("survival").world.objects.some(o => o.action === "campaign-page"));
+  const others = Sim.create(4242, "campaign", "carer", context.Expedition.generator).world.objects.filter(o => o.action === "campaign-page");
+  check("coldvale.houses outra semente também tem 3 páginas", others.length === 3);
+  const reach = o => { const near = [[0,1],[1,0],[0,-1],[-1,0],[.6,.6],[-.6,-.6],[.6,-.6],[-.6,.6]].map(([dx,dy]) => ({x:o.x+dx*.7, y:o.y+dy*.7}))
+    .find(p => World.clear(s.world,p.x,p.y,.18)) ?? {x:o.x, y:o.y}; Object.assign(s.player, near); };
+  const far = pages.filter(o => Math.hypot(s.player.x - o.x, s.player.y - o.y) > 3);
+  check("coldvale.houses ler de longe não conta", far.length > 0 && far.every(o => !Sim.readCampaignPage(s, o) && !o.read));
+  for (const [i, page] of pages.slice(0, 2).entries()) { reach(page); Sim.readCampaignPage(s, page); }
+  check("coldvale.houses 2 de 3 páginas ainda não dão pista", s.campaign.clues === 0 && /2 of 3/.test(s.messages.at(-1).text), s.messages.at(-1).text);
+  const mid = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  check("coldvale.houses páginas lidas ficam gravadas", mid.world.objects.filter(o => o.action === "campaign-page" && o.read).length === 2);
+  reach(pages[2]);
+  check("coldvale.houses 3 páginas → coordenada 1", Sim.readCampaignPage(s, pages[2]) && s.campaign.clues === 1 &&
+    s.campaign.completed.includes("coldvale.houses") && s.messages.at(-1).text === Data.campaignText.housesDone);
+  check("coldvale.houses a dica seguinte passa para o cinema", s.campaign.hints.objective === "cinema.statue");
+  reach(pages[0]); Sim.readCampaignPage(s, pages[0]);
+  check("coldvale.houses reler não repete a recompensa", s.campaign.completed.filter(id => id === "coldvale.houses").length === 1 && s.campaign.clues === 1);
 }
 
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>

@@ -208,6 +208,16 @@ const Data = (() => {
   }
   // HISTORIA.md section 5: about 1 in 8 random infected carry a supply, picked by the building where they fall.
   // Only these origins count (street population, wandering hordes, nests): bosses and challenge infected never carry one.
+  // Campaign texts (HISTORIA.md sections 1 and 10). Player-facing, English.
+  const campaignText = {
+    rumour:"87.6 FM · A rumour keeps repeating: preppers hid clues to a fortress with food, water and weapons. Eva has not stopped talking about it.",
+    pages:[
+      "A torn page taped under a drawer: \"Five numbers, five places. Never all in one.\" Someone drew a small fort in the margin.",
+      "A prepper checklist: water, seed, fuel, coordinates. Beside the last word: \"Start where the radio can hear you.\"",
+      "A page behind a wall calendar: \"If you found three of these, you have the first number.\" The handwriting matches the others."
+    ],
+    housesDone:"The three pages fit together. You have the first coordinate. The rumour is real, or someone wants it to be."
+  };
   const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],
     pools:{clinic:["bandage"], fuel:["fuel"], market:["battery"], workshop:["battery"], town:["food", "water"]}};
   const legacyRules = {care:"quick", exposure:"off", powerDays:-1, waterDays:-1};
@@ -406,6 +416,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,campaignText,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

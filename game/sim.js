@@ -496,7 +496,14 @@ const Sim = (() => {
         gardenSeeded: false, harvested: false, gardenMeal: false, gardenHelp: false}, nextEvent: 180, weather: "Overcast",
       exploredAt: 0, radioWave: false, zoom: 1, waypoint: town ? "market" : world.underground ? "exit-ridge" : "exit-" + (Regions.definitions[region].host ?? Regions.home), lookahead: true, roofsHidden: false
     };
-    if (difficulty === "campaign") s.campaign = newCampaign();
+    if (difficulty === "campaign") {
+      s.campaign = newCampaign();
+      if (town) {
+        placeCampaignPages(world, seed);
+        s.campaign.completed.push("radio.rumour");
+        CampaignHints.track(s.campaign.hints, "coldvale.houses", s.minutes);
+      }
+    }
     if (difficulty === "longhaul") {
       s.longHaul = newLongHaul();
       s.waypoint = "";
@@ -510,6 +517,7 @@ const Sim = (() => {
       stockGardenSeeds(s);
       notify(s, "87.6 FM · Keep your doors shut. The dead are getting up.");
       notify(s, "The shelter crate holds supplies. Open your inventory to collect them.");
+      if (s.campaign) notify(s, Data.campaignText.rumour);
     }
     return s;
   }
@@ -1330,6 +1338,42 @@ const Sim = (() => {
         raw.completed.some((id,i) => typeof id !== "string" || !challengeId.test(id) || raw.completed.indexOf(id) !== i)) throw new Error("Invalid campaign progress.");
     return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints)};
   }
+  // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
+  function placeCampaignPages(world, seed) {
+    const hash = text => [...String(seed) + ":" + text].reduce((h,c) => Math.imul(h ^ c.charCodeAt(0),16777619) >>> 0,2166136261);
+    const homes = world.buildings.filter(b => b.type === "home").sort((a,b) => hash(a.id) - hash(b.id) || String(a.id).localeCompare(String(b.id)));
+    let page = 0;
+    for (const b of homes) {
+      if (page === Data.campaignText.pages.length) break;
+      const tiles = [];
+      for (let y = b.y + 1; y < b.y + b.h - 1; y++) for (let x = b.x + 1; x < b.x + b.w - 1; x++) tiles.push(World.tileAt(world,x,y));
+      const tile = tiles.filter(Boolean).sort((a,c) => hash(b.id + ":" + a.x + ":" + a.y) - hash(b.id + ":" + c.x + ":" + c.y)).find(t =>
+        t.building === b.id && World.clear(world,t.x+.5,t.y+.5,.28) &&
+        !world.objects.some(o => Math.floor(o.x) === t.x && Math.floor(o.y) === t.y) &&
+        World.route(world,world.start.x,world.start.y,t.x+.5,t.y+.5,0,true).length);
+      if (!tile) continue;
+      world.objects.push({id:"campaign-page-" + page, x:tile.x+.5, y:tile.y+.5, building:b.id, zone:tile.zone, tint:.54,
+        kind:"record", action:"campaign-page", name:"Torn page", page, read:false, active:true, solid:false});
+      page++;
+    }
+  }
+
+  function readCampaignPage(s, note) {
+    if (!s.campaign || s.mode !== "play" || s.player.vehicle || note?.action !== "campaign-page" ||
+        !s.world.objects.includes(note) || !reachableObject(s,note)) return false;
+    note.read = true;
+    notify(s, Data.campaignText.pages[note.page] ?? "The page is blank.");
+    const read = s.world.objects.filter(o => o.action === "campaign-page" && o.read).length;
+    if (read < Data.campaignText.pages.length) { notify(s, "Torn pages found: " + read + " of " + Data.campaignText.pages.length + "."); return true; }
+    if (!s.campaign.completed.includes("coldvale.houses")) {
+      s.campaign.completed.push("coldvale.houses");
+      s.campaign.clues = Math.max(s.campaign.clues, Campaign.areas.coldvale.clue);
+      CampaignHints.track(s.campaign.hints, "cinema.statue", s.minutes);
+      notify(s, Data.campaignText.housesDone);
+    }
+    return true;
+  }
+
   // "" when the calendar lets the player into region `to` now, otherwise the reason shown to the player.
   function campaignProblem(s, to) {
     const area = s.campaign && Campaign.regions[to];
@@ -3660,7 +3704,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, campaignProblem, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, campaignProblem, readCampaignPage, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

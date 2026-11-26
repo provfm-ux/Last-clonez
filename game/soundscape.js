@@ -19,7 +19,8 @@ const Soundscape = (() => {
     stepSoft:{seconds:.14,gain:.026,cut:1350}, stepHard:{seconds:.15,gain:.030,cut:2300},
     strike:{seconds:.15,gain:.18,cut:2400}, shot:{seconds:.42,gain:.26,cut:4700},
     crash:{seconds:.49,gain:.23,cut:2700},
-    idolClick:{seconds:.9,gain:.24,cut:2600}, doorSlam:{seconds:.75,gain:.3,cut:1900}, tension:{seconds:6.5,gain:.2,cut:700}
+    idolClick:{seconds:.9,gain:.24,cut:2600}, doorSlam:{seconds:.75,gain:.3,cut:1900}, tension:{seconds:6.5,gain:.2,cut:700},
+    tapSocial:{seconds:2.6,gain:.3,cut:3800}
   };
 
   const tone = (hz,t) => Math.sin(tau*hz*t);
@@ -119,6 +120,13 @@ const Soundscape = (() => {
         case "tension": { // low dissonant cluster that swells and pulses; retriggered every 6 s while trapped
           const swell = Math.sin(Math.PI*Math.min(1,t/config.seconds)) ** .8, pulse = .72+.28*Math.sin(tau*.55*t) ** 2;
           sample = (.32*tone(55,t)+.22*tone(58.3,t)+.15*tone(82.4,t)+.1*tone(116.5+3*Math.sin(t*.7),t)+.25*grain)*swell*pulse; break;
+        }
+        case "tapSocial": { // pint glasses knocked over at the tap, then the social's murmur sinks into groans
+          const clinks = tap(t,.03,38)+.8*tap(t,.17,45)+.65*tap(t,.29,40)+.9*tap(t,.42,30)+.5*tap(t,.61,42);
+          const glass = (.32*tone(2210,t)+.22*tone(3170,t)+.14*tone(4380,t)+.3*edge)*clinks;
+          const murmur = (.42*grain+.18*voice)*breath(t,config.seconds,6)*Math.min(1,t*1.5);
+          const groan = .32*tone(88+14*Math.sin(t*2.3),t)*Math.max(0,Math.min(1,(t-1)*1.6))*Math.min(1,(config.seconds-t)*3);
+          sample = .7*(glass + murmur + groan); break;
         }
         case "alarm":
           sample = .5*(tone(910,t)+.4*tone(1710,t))*Number(t% .46 < .17)*Math.min(1,(config.seconds-t)*12); break;

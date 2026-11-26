@@ -1430,9 +1430,9 @@ const Sim = (() => {
       hear(s, "doorSlam", door, 1, .35 + i * .25);
       s.effects.push({x: door.x, y: door.y, text: "SLAM", color: "#e3a289", life: 1});
     }
-    hear(s, "horde", tap, 1, 1.2);
-    hear(s, "tension", s.player, 1, .6);
-    s.nextTension = s.elapsed + Data.cinemaTrap.tensionEvery;
+    hear(s, "tapSocial", tap, 1, .9);
+    hear(s, "horde", tap, 1, 1.4);
+    s.nextTension = s.elapsed; // the tension bed starts on the next tick (the queue holds 5 cues and the burst uses all 5)
     noise(s, statue.x, statue.y, 14);
     notify(s, Data.campaignText.statueTaken, true);
     return true;
@@ -3316,7 +3316,14 @@ const Sim = (() => {
         if (z.wander <= 0) {
           z.wander = 3 + s.world.rng() * 8;
           const width = z.origin === "cinema-winner" ? 9 : 5;
-          const x = z.homeX + (s.world.rng() - .5) * width, y = z.homeY + (s.world.rng() - .5) * 5;
+          let x = z.homeX + (s.world.rng() - .5) * width, y = z.homeY + (s.world.rng() - .5) * 5;
+          if (z.origin === "cinema-winner" && s.campaign) { // walk the whole hall: next patrol point once the current one is reached
+            const point = Data.cinemaPatrol[z.patrolStep ?? 0];
+            if (z.patrolStep === undefined || !z.path.length || Math.hypot(z.x - point[0], z.y - point[1]) < 1.2)
+              z.patrolStep = ((z.patrolStep ?? -1) + 1) % Data.cinemaPatrol.length;
+            [x, y] = Data.cinemaPatrol[z.patrolStep];
+            z.wander = 4;
+          }
           if (World.clear(s.world, x, y)) z.path = World.route(s.world, z.x, z.y, x, y);
         }
       }

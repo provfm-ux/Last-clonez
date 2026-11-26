@@ -392,6 +392,22 @@ const Sim = (() => {
     notify(s,"Day "+(day-1)+" complete. Your daily summary is in the journal.");
   }
 
+  // Test shortcuts (HISTORIA.md section 16). Training mode only, unless a headless test passes {anyMode:true}.
+  function testJump(s, day, items = {}, options = {}) {
+    if (s.difficulty !== "training" && !options.anyMode) return false;
+    if (!Number.isInteger(day) || day < runDay(s.minutes)) return false;
+    s.minutes = (day - 1) * 1440 + s.minutes % 1440;
+    closeDaily(s);
+    for (const [id, qty] of Object.entries(items)) add(s.player.bag, id, qty, {born:s.minutes});
+    return true;
+  }
+  // Runs the simulation for the given in-game minutes without waiting in real time.
+  function fastForward(s, minutes, input) {
+    const end = s.minutes + minutes;
+    while (s.mode === "play" && end - s.minutes > .000001) tick(s, Math.min(.25, (end - s.minutes) / s.rules.clock), input);
+    return s;
+  }
+
   function restoreDaily(s, data) {
     const day = runDay(data.minutes);
     const valid = entry => entry && Number.isSafeInteger(entry.day) && entry.day >= 1 &&
@@ -3613,7 +3629,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, carriedSupply, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

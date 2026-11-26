@@ -1461,6 +1461,20 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     !restored.world.objects.some(o=>o.id.startsWith("coverage-route-")));
 }
 
+{ // sys.test-shortcuts (HISTORIA.md secção 16): saltar para o dia N, dar itens, avançar o relógio
+  const s = fresh("training"), hour = s.minutes % 1440;
+  check("sys.test-shortcuts salta para o dia 12 à mesma hora e dá itens",
+    Sim.testJump(s, 12, {battery: 2, crowbar: 1}) && Math.floor(s.minutes / 1440) + 1 === 12 && s.minutes % 1440 === hour &&
+    Sim.quantity(s.player.bag, "battery") >= 2 && Sim.quantity(s.player.bag, "crowbar") >= 1 && s.daily.day === 12);
+  check("sys.test-shortcuts não volta atrás no tempo", !Sim.testJump(s, 3));
+  const loaded = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  check("sys.test-shortcuts o save depois do salto carrega", loaded.daily.day === 12);
+  const before = s.minutes;
+  Sim.fastForward(s, 300);
+  check("sys.test-shortcuts avança 5 h de jogo sem tempo real", Math.abs(s.minutes - before - 300) < 1e-6 && s.mode === "play");
+  check("sys.test-shortcuts só no modo training (ou forçado em testes)", !Sim.testJump(fresh("survival"), 5) && Sim.testJump(fresh("survival"), 5, {}, {anyMode: true}));
+}
+
 { // sys.hints (HISTORIA.md secções 14 e 16): 2 dias parado → dica; no máximo uma por dia; três níveis
   const H = context.CampaignHints, D = 1440, start = 480, s = H.track(H.empty(), "fortress.last-boss", start);
   check("sys.hints sem dica antes de 2 dias parado", H.next(s, start + 2 * D - 1) === null);

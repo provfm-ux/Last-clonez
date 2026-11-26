@@ -2,7 +2,7 @@
 
 Use `grep -n "name" docs/CODE_INDEX.md` to find a function, then open only that line range of the file.
 
-Load order (index.html): data -> research -> legacy-level -> level -> expedition -> regions -> homes -> chronicle -> world -> atmosphere -> recordings -> soundscape -> afterlife -> field-stories -> campaign -> sim -> view -> game
+Load order (index.html): data -> research -> legacy-level -> level -> expedition -> regions -> homes -> chronicle -> world -> atmosphere -> recordings -> soundscape -> afterlife -> field-stories -> campaign-hints -> campaign -> sim -> view -> game
 
 ## game/data.js (410 lines)
 worldRules:197 | character:315
@@ -45,6 +45,9 @@ search:35 | pathTo:49 | start:55 | range:111 | finish:117 | objective:124 | read
 
 ## game/field-stories.js (253 lines)
 place:184
+
+## game/campaign-hints.js (43 lines)
+track:18 | progress:23 | next:28 | restore:35
 
 ## game/campaign.js (69 lines)
 closedReason:44 | missing:58

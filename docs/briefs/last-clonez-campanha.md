@@ -21,13 +21,13 @@ Cada desafio é um registo com id `<area>.<desafio>` (secção 16) que declara a
 
 | # | Sistema | Secção | Estado |
 |---|---|---|---|
-| 1 | `docs/HISTORIA.md` | — | PR #25 |
-| 2 | Opções de tempo 1,6 / 0,4 (`sys.clock`) | 6, 16 | PR #26 |
-| 3 | Calendário, horas e pré-requisitos (`sys.calendar`) | 9, 10, 16 | PR #27 |
-| 4 | Recursos aleatórios ~1 em 8 (`sys.zombie-carry`) | 5, 16 | PR #28 |
-| 5 | Dicas de campanha (`sys.hints`) | 4, 14, 16 | PR #29 |
-| 6 | Atalhos de teste (`sys.test-shortcuts`) | 16 | PR #30 |
-| 7 | Resumo curto no fim do dia (`sys.day-end`) | 6 | PR #31 |
+| 1 | `docs/HISTORIA.md` | — | feito (#25) |
+| 2 | Opções de tempo 1,6 / 0,4 (`sys.clock`) | 6, 16 | feito (#26) |
+| 3 | Calendário, horas e pré-requisitos (`sys.calendar`) | 9, 10, 16 | feito (#27) |
+| 4 | Recursos aleatórios ~1 em 8 (`sys.zombie-carry`) | 5, 16 | feito (#28) |
+| 5 | Dicas de campanha (`sys.hints`) | 4, 14, 16 | feito (#29) |
+| 6 | Atalhos de teste (`sys.test-shortcuts`) | 16 | feito (#30) |
+| 7 | Resumo curto no fim do dia (`sys.day-end`) | 6 | feito (#31) |
 | 8 | Modo campanha: ligar calendário, dicas e estado ao save | 4, 16 | a fazer |
 | 9 | `coldvale.houses` | 10 | a fazer |
 | 10 | `cinema.statue`, depois `cinema.buff` | 10 | a fazer |
@@ -48,7 +48,7 @@ Nada na campanha. Para a demo e o Play Store: uma única interface `Ads.showRewa
 JavaScript sem dependências e sem bundler; `sim.js` nunca toca no DOM; sem chamadas novas a `rng()` na geração do mundo; desenho por frame barato (`AGENTS.md`, regras 1–6). Alvos: browser desktop e Android (WebView/PWA). Demo: `dist/single.html` em zip.
 
 ## 10. Marcos e critérios de aceitação
-- **M0, sistemas base:** PRs #25–#31 com merge; `npm test`, `npm run index:check` e `npm run test:compat` passam.
+- **M0, sistemas base (feito):** PRs #25–#31 com merge; `npm test`, `npm run index:check` e `npm run test:compat` passam.
 - **M1, modo campanha:** tarefa 8 feita; uma campanha nova chega ao dia 30 com `Sim.testJump` e grava e carrega em cada dia.
 - **M2, demo:** `coldvale.houses`, `cinema.statue` e `cinema.buff` passam; partindo de uma campanha nova, com `fastForward` chega-se ao cinema e sai-se dele em menos de 15 minutos de jogo real ao ritmo 1,6.
 - **M3, cadeia completa:** os 14 ids da secção 16 têm teste e passam.
@@ -58,7 +58,7 @@ JavaScript sem dependências e sem bundler; `sim.js` nunca toca no DOM; sem cham
 Cada PR: `npm test` (só falhas), `npm run index:check`, `npm run test:compat` com a release anterior em `../old-version`. Para os desafios, o teste do id na tabela da secção 16. Para o desenho, `tests/render-test.js`.
 
 ## 12. Questões em aberto (com o valor a usar se ninguém responder)
-1. **Espera de tokens do Amigo 1:** as secções 6, 7 e 10 dizem 5 minutos **reais**; a secção 16 diz "5 min de tempo do jogo, nunca real". Por omissão: 5 minutos reais no jogo e um relógio injetável nos testes.
+1. ~~Espera de tokens do Amigo 1~~ **Decidido pelo utilizador:** 5 minutos **reais**, sempre (HISTORIA v24, PR #33). Nos testes, um relógio simulado.
 2. **Ritmo padrão:** 1,6 só no modo campanha; os outros modos continuam com 2.
 3. **Dia da semana:** o dia 1 é sexta-feira (os dias 6 e 11 são úteis; 9 e 10 são fim de semana).
 4. **Maré baixa:** nos dias pares.

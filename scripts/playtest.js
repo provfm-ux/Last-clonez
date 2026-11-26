@@ -131,6 +131,38 @@ const scenarios = {
       notes: "winner walking: " + winner + ", notice read with Use: " + note + ", idol taken: " + r.taken + ", horde: " + r.horde +
         ", doors sealed: " + r.sealed + ", frame rate with the horde: " + fps.toFixed(0) + " fps", shot: true, fps};
   },
+  async "setup-traits"(page) {
+    await page.evaluate(helpers);
+    await page.evaluate(() => { for (const d of [document.querySelector("details.advanced-start"), ...document.querySelectorAll("details.survivor-customization")]) if (d) d.open = true;
+      document.getElementById("role").value = "doctor"; document.getElementById("role").dispatchEvent(new Event("change")); });
+    const count = await page.$$eval("#trait-choices input", inputs => inputs.length);
+    await page.check('#trait-choices input[value="light-eater"]');
+    const unpaid = await page.evaluate(() => document.getElementById("start-btn").disabled);
+    await page.check('#trait-choices input[value="needs-more-sleep"]');
+    const kit = await page.evaluate(() => document.getElementById("background-kit").textContent);
+    await page.locator("#trait-choices").scrollIntoViewIfNeeded();
+    await page.screenshot({path: require("path").join(out, "setup-traits.png")});
+    await page.evaluate(() => { window.confirm = () => true; document.getElementById("start-btn").click(); });
+    await page.waitForFunction(() => window.__state?.mode === "play").catch(() => {});
+    const traits = await page.evaluate(() => pt.s()?.player.traits.join(",") ?? "");
+    return {pass: count === 30 && unpaid && traits === "light-eater,needs-more-sleep" && /Lv\. 3/.test(kit),
+      notes: count + " traits, start blocked while unpaid: " + unpaid + ", doctor kit: " + kit + ", started with: " + traits};
+  },
+  async "recommended-traits"(page) {
+    await page.evaluate(helpers);
+    await page.evaluate(() => { window.confirm = () => true; const d = document.getElementById("advanced-start"); if (d) d.open = true;
+      for (const c of document.querySelectorAll("details.survivor-customization")) c.open = true;
+      const pick = id => { const i = document.querySelector('#trait-choices input[value="' + id + '"]'); i.checked = true; i.dispatchEvent(new Event("change", {bubbles: true})); };
+      pick("light-eater"); document.getElementById("recommended-btn").click(); });
+    await page.waitForTimeout(600);
+    const blocked = await page.evaluate(() => !window.__state || window.__state.mode !== "play");
+    await page.evaluate(() => { const i = document.querySelector('#trait-choices input[value="needs-more-sleep"]'); i.checked = true;
+      i.dispatchEvent(new Event("change", {bubbles: true})); document.getElementById("recommended-btn").click(); });
+    await page.waitForFunction(() => window.__state?.mode === "play").catch(() => {});
+    const effects = await page.evaluate(() => JSON.stringify(window.__state?.traitEffects ?? {}));
+    return {pass: blocked && /"hunger":0\.8/.test(effects) && /"fatigue":1\.25/.test(effects),
+      notes: "unpaid traits block Recommended start: " + blocked + ", trait effects after start: " + effects};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

@@ -7,10 +7,12 @@ const Sim = (() => {
   const lineOfSight = (s, a, b) => World.sees(s.world, a.x, a.y, b.x, b.y);
   const quantity = (bag, id, accepts) => bag.filter(item => item.id === id && (!accepts || accepts(item))).reduce((sum, item) => sum + item.qty, 0);
   const weight = bag => bag.reduce((sum, item) => sum + Data.items[item.id].weight * item.qty, 0);
-  const capacity = s => (s.player.backpack ? 26 : 16) + Math.floor(level(s, "strength") / 2);
+  // Survivor traits (Data.traits): effect multipliers chosen at setup; 1 when the survivor has none.
+  const trait = (s,effect) => s.traitEffects?.[effect] ?? 1;
+  const capacity = s => Math.round(((s.player.backpack ? 26 : 16) + Math.floor(level(s, "strength") / 2)) * trait(s,"carry"));
   const canCarryBundle = (s, bundle) => weight(s.player.bag) +
     Object.entries(bundle).reduce((sum, [id, qty]) => sum + Data.items[id].weight * qty, 0) <= capacity(s) + .00001;
-  const freshMinutes = (s, item) => Data.items[item.id].perish * 1440 - s.minutes + (item.born ?? 0) + (item.cold ?? 0);
+  const freshMinutes = (s, item) => Data.items[item.id].perish * 1440 * (s.rules.decay ?? 100) / 100 - s.minutes + (item.born ?? 0) + (item.cold ?? 0);
   const isSpoiled = (s, item) => Boolean(Data.items[item.id].perish && freshMinutes(s, item) <= 0);
   const roomFor = (s, id) => Math.max(0, Math.floor((capacity(s) - weight(s.player.bag) + .00001) / Data.items[id].weight));
   const reachableObject = (s, o, radius = 1.85) => o?.active && distance(s.player, o) <= radius &&
@@ -493,12 +495,14 @@ const Sim = (() => {
     for (const [id, qty] of [["bat", 1], ["bandage", 2], ["cloth", 2], ["food", 2], ["water", 2], ["jeans", 1], ["boots", 1]]) add(bag, id, qty);
     for (const [id,qty] of Object.entries(Data.roles[role]?.kit ?? {})) add(bag,id,qty);
     add(bag, "flashlight", 1, {charge:Data.flashlight.starter});
+    const survivor = Data.character(profile), startingSkills = profile ? Data.roles[role]?.levels : null;
     const s = {
       schema: Data.saveVersion, seed, difficulty, role, rules, world, regionStates:{}, mode: "play", elapsed: 0, minutes: rules.startHour * 60, controlStart: null,
-      player: {...world.start, ...Data.character(profile), hp: 100, stamina: 100, hunger: 92, hydration: 92, fatigue: 8, panic: 0, pain: 0, sick: 0, grabbed: 0, grabCool: 0, fracture: 0, splinted: false,
+      traitEffects:Data.traitLoadout(survivor.traits).effects,
+      player: {...world.start, ...survivor, hp: 100, stamina: 100, hunger: 92, hydration: 92, fatigue: 8, panic: 0, pain: 0, sick: 0, grabbed: 0, grabCool: 0, fracture: 0, splinted: false,
         bag, weapon: "bat", weaponUid: bag[0].uid, backpack: false, gear: {head: null, hands: null, wrist: null, arms: null, body: null, legs: "jeans", feet: "boots"}, wounds: [], exposure: 0, medicine: 0,
         wetness:0, temperature:37, pinned:[], belt:[...Data.beltDefaults], lightUid:null, headingX:0, headingY:1,
-        skills: Object.fromEntries(Object.keys(Data.skills).map(k => [k, 0])), path: [], face: 1, flash: 0, swing: 0,
+        skills: Object.fromEntries(Object.keys(Data.skills).map(k => [k, Data.skillXp(startingSkills?.[k] ?? 0)])), path: [], face: 1, flash: 0, swing: 0,
         cooldown: 0, staminaDelay: 0, footstep: 0, moving: false, resting: false,
         vehicle: null, driveSpeed: 0, velocityX: 0, velocityY: 0},
       quiet: false, running: false, dash: false, target: null, interaction: null, replan: 0,
@@ -863,8 +867,9 @@ const Sim = (() => {
       if (threats(s).length || p.grabbed > 0) { notify(s,"Find a safe place to read."); return false; }
       const skill = Data.skillBooks[item.id].skill;
       (p.readBooks ??= []).push(item.id);
-      addXp(s,skill,24);
-      notify(s,data.name + " studied. +24 " + Data.skills[skill].name + " XP.");
+      const xp = 24 * trait(s,"study");
+      addXp(s,skill,xp);
+      notify(s,data.name + " studied. +" + xp + " " + Data.skills[skill].name + " XP.");
       return true;
     }
     if (data.use === "food") {
@@ -1719,9 +1724,11 @@ const Sim = (() => {
     return true;
   }
 
-  function noise(s, x, y, radius) {
+  // reach scales only how far the noise carries (footstep traits); the alert length still follows the noise itself.
+  function noise(s, x, y, radius, reach = 1) {
+    const audible = radius * reach * (s.rules.hearing ?? 100) / 100;
     s.noiseRings = (s.noiseRings ?? []).filter(r => s.elapsed - r.t < 1.2);
-    s.noiseRings.push({x, y, r: radius, t: s.elapsed});
+    s.noiseRings.push({x, y, r: audible, t: s.elapsed});
     if (s.noiseRings.length > 16) s.noiseRings.shift();
     const wakeAudience = s.world.cinema && radius >= 4 && s.world.enemies.some(z =>
       z.origin === "cinema-sleeper" && z.dormant && z.hp > 0 && Math.hypot(z.x-x,z.y-y) <= radius);
@@ -1729,8 +1736,8 @@ const Sim = (() => {
       if (z.hp <= 0) continue;
       const audience = wakeAudience && z.origin === "cinema-sleeper" && z.dormant;
       const d = Math.hypot(z.x - x, z.y - y);
-      if (!audience && (d > radius || d > radius * .55 && !World.sees(s.world, x, y, z.x, z.y))) continue;
-      z.alert = Math.max(z.alert, audience || radius > 6 ? 14 : 5);
+      if (!audience && (d > audible || d > audible * .55 && !World.sees(s.world, x, y, z.x, z.y))) continue;
+      z.alert = Math.max(z.alert, (audience || radius > 6 ? 14 : 5) * (s.rules.memory ?? 100) / 100);
       z.chaseX = x; z.chaseY = y; z.replan = 0;
     }
   }
@@ -2266,7 +2273,7 @@ const Sim = (() => {
     const p = s.player, inside = World.tileAt(s.world, p.x, p.y)?.building;
     const dark = isNight(s) && !(inside && hasPower(s, p));
     const fires = (s.world.underground || dark) ? s.world.objects.filter(o => o.active && o.kind === "campfire" && distance(p,o) <= 5) : null;
-    return {radius:s.world.underground ? 1.25 : dark ? .65 + moonlight(s) * 4.55 : 8.5, lamp:activeLight(s),fires};
+    return {radius:(s.world.underground ? 1.25 : dark ? .65 + moonlight(s) * 4.55 : 8.5) * trait(s,"sight"), lamp:activeLight(s),fires};
   }
 
   function canSee(s, x, y, optics = sight(s)) {
@@ -2768,7 +2775,7 @@ const Sim = (() => {
 
   function aimChance(s, enemy = s.target) {
     const aim = enemy && enemy === s.target ? s.aim : 0;
-    return clamp(.5 + aim * .45 + level(s, "marksmanship") * .015 - s.player.panic * .0015 - s.player.fatigue * .001, .2, .98);
+    return clamp(.5 * trait(s,"aim") + aim * .45 + level(s, "marksmanship") * .015 - s.player.panic * .0015 - s.player.fatigue * .001, .2, .98);
   }
 
   function inAttackRange(s, enemy, range = weaponData(s).range) {
@@ -2949,7 +2956,7 @@ const Sim = (() => {
       notify(s, "An infected grabs you. Shove it or struggle free!", true);
     }
     if (z.kind === "brute" && !(p.fracture > 0) && s.world.rng() < .08) breakLeg(s, "A heavy blow breaks your leg.");
-    const roll = s.world.rng(), type = roll < .06 ? "bite" : roll < .46 ? "cut" : "scratch";
+    const roll = s.world.rng(), bite = (s.rules.bite ?? 6) / 100, type = roll < bite ? "bite" : roll < bite + .4 ? "cut" : "scratch";
     const part = s.world.rng() < .5 ? "arm" : "leg";
     let guard = 0;
     const wear = Math.max(1, Math.round(z.stats.damage * infectedDamage(s) * .45));
@@ -3140,7 +3147,7 @@ const Sim = (() => {
         const terrain = surface === "cave" ? 1.35 : surface === "grass" || surface === "sand" ? .8 :
           surface === "tile" || surface === "rail" ? 1.15 : 1;
         const rain = s.weather === "Rain" && surface !== "tile" ? .8 : 1;
-        noise(s, p.x, p.y, (s.running ? 6.5 : s.quiet ? 1 : 2.4) * quiet * terrain * rain);
+        noise(s, p.x, p.y, (s.running ? 6.5 : s.quiet ? 1 : 2.4) * quiet * terrain * rain, trait(s,"noise"));
       }
       // Audible strides follow distance; the separate noise timer drives infected AI.
       let remaining = (audibleStride.get(p) ?? 0) - travelled;
@@ -3153,7 +3160,7 @@ const Sim = (() => {
       }
       audibleStride.set(p,remaining);
     }
-    const fit = 1 + level(s, "fitness") * .05;
+    const fit = (1 + level(s, "fitness") * .05) * trait(s,"fitness");
     if (s.running && p.moving) {
       p.stamina = Math.max(0, p.stamina - 13 * dt * staminaCost(s) / (Data.roles[s.role].fitness * fit * (1 + level(s,"running") * .035)));
       p.staminaDelay = .4;
@@ -3216,7 +3223,7 @@ const Sim = (() => {
     const lit = World.tileAt(s.world, p.x, p.y)?.building && hasPower(s, p);
     const dark = isNight(s) || s.world.underground;
     const light = activeLight(s) && dark;
-    const vision = light ? 1.2 : lit ? 1 : s.world.underground ? .43 : dark ? .6 : s.weather === "Rain" ? .85 : 1;
+    const vision = (light ? 1.2 : lit ? 1 : s.world.underground ? .43 : dark ? .6 : s.weather === "Rain" ? .85 : 1) * (s.rules.vision ?? 100) / 100 * trait(s,"stealth");
     let ambient = null, bestDistance = 16;
     const chooseVoice = s.elapsed >= (s.nextZombieAmbience ?? 0);
     for (const z of s.world.enemies) {
@@ -3314,7 +3321,7 @@ const Sim = (() => {
         }
       }
       const previousX = z.x, previousY = z.y;
-      z.moving = follow(s, z, z.stats.speed * dt * (z.alert > 0 ? 1 : .45) * (z.origin === "cinema-winner" ? .85 : 1), true);
+      z.moving = follow(s, z, z.stats.speed * (s.rules.speed ?? 100) / 100 * dt * (z.alert > 0 ? 1 : .45) * (z.origin === "cinema-winner" ? .85 : 1), true);
       leaveTrack(s,z,previousX,previousY);
       if (chooseVoice && d < bestDistance && s.elapsed >= voice.next && (z.alert <= 0 || z.moving)) {
         bestDistance = d;
@@ -3368,7 +3375,7 @@ const Sim = (() => {
     const rain = !shelter && s.weather === "Rain", jacket = p.gear.body === "raincoat" ? wearableCondition(wornItem(s,"body")) : 0;
     const wetRate = rain ? (2.1 - 1.55*jacket) : shelter ? -1.4 : -.45;
     p.wetness = clamp(p.wetness + dt * wetRate, 0, 100);
-    const target = shelter ? 37 - p.wetness * .007 : 36.6 - p.wetness * .016 - Number(isNight(s)) * .7 - (Regions.definitions[s.world.region].cold || 0) +
+    const target = shelter ? 37 - p.wetness * .007 : 36.6 - (p.wetness * .016 + Number(isNight(s)) * .7 + (Regions.definitions[s.world.region].cold || 0)) * trait(s,"warmth") +
       clothingWarmth(s) + (s.running ? .35 : 0) - season(s).chill;
     p.temperature = clamp(p.temperature + (target - p.temperature) * Math.min(1, dt * .025), 33, 37.3);
     if (p.temperature < 34.5) { p.hp -= dt * .16; s.harm = "hypothermia"; }
@@ -3381,24 +3388,24 @@ const Sim = (() => {
     const p = s.player, rate = s.rules.needs / 100 * pressure(s) * pace, gradual = s.rules.care === "gradual";
     const inDanger = threats(s).length > 0;
     const floor = Data.modes[s.difficulty]?.noStarve ? 8 : 0;
-    p.hunger = Math.max(floor, p.hunger - dt * .07 * rate * (p.sleeping ? .5 : 1));
-    p.hydration = Math.max(floor, p.hydration - dt * (s.running ? .15 : .1) * rate * (p.sleeping ? .5 : 1));
-    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 * pace : p.resting ? -1.6 * pace : (s.running ? .075 : .04) * rate), 0, 100);
+    p.hunger = Math.max(floor, p.hunger - dt * .07 * rate * trait(s,"hunger") * (p.sleeping ? .5 : 1));
+    p.hydration = Math.max(floor, p.hydration - dt * (s.running ? .15 : .1) * rate * trait(s,"thirst") * (p.sleeping ? .5 : 1));
+    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 * pace : p.resting ? -1.6 * pace : (s.running ? .075 : .04) * rate * trait(s,"fatigue")), 0, 100);
     if (p.resting) {
       if (inDanger) { p.resting = false; notify(s, "Danger interrupted your rest.", true); }
       else if (p.hunger > 25 && p.hydration > 25 && (!gradual || !p.wounds.some(w => !w.bandaged))) {
         p.hp = Math.min(100, p.hp + dt * (gradual ? .38 : .12) * (p.sleeping ? .5 : 1));
       }
     }
-    p.panic = clamp(p.panic + dt * (inDanger ? 6 * (cinemaBuff(s) ? Data.cinemaTrap.panicRate : 1) : -9), 0, 100);
+    p.panic = clamp(p.panic + dt * (inDanger ? 6 * trait(s,"panic") * (cinemaBuff(s) ? Data.cinemaTrap.panicRate : 1) : -9), 0, 100);
     let pain = 0;
     for (const w of p.wounds) {
       w.age += dt;
-      if (!w.bandaged) { p.hp -= w.bleed * dt * (assist(s, "bleed") ? .55 : 1); s.harm = "blood loss"; }
+      if (!w.bandaged) { p.hp -= w.bleed * dt * trait(s,"bleeding") * (assist(s, "bleed") ? .55 : 1); s.harm = "blood loss"; }
       if (!w.clean) w.infection = Math.min(100, w.infection + dt * (gradual ? w.bandaged ? .04 : .24 : .018));
       if (gradual && w.infection >= 40) { p.hp -= dt * .08; s.harm = "a wound infection"; }
       if (gradual && w.bandaged) {
-        const progress = (p.resting ? 1.8 : 1) * (w.clean ? 1 : .5) * Data.roles[s.role].medical;
+        const progress = (p.resting ? 1.8 : 1) * (w.clean ? 1 : .5) * Data.roles[s.role].medical * trait(s,"heal");
         w.healing = (w.healing ?? 0) + dt * progress;
       }
       pain += (w.bandaged ? 6 : 14) + w.infection * .1;
@@ -3531,7 +3538,7 @@ const Sim = (() => {
     let rise = near >= 2 ? .02 * Math.min(near, 8) : 0;
     if (p.temperature < 35.5 && p.wetness >= 45) rise += .04;
     const fall = rise ? 0 : p.sleeping ? .2 : p.resting ? .15 : .06;
-    p.sick = clamp(before + dt * (rise - fall), 0, 100);
+    p.sick = clamp(before + dt * (rise * trait(s,"illness") - fall), 0, 100);
     if (before < 20 && p.sick >= 20) notify(s, near >= 2 ? "The smell of the dead is making you queasy. Move away from the bodies." : "You are catching a chill. Dry off and warm up.", true);
     if (p.sick >= 40) p.fatigue = clamp(p.fatigue + dt * .02 * (p.sick / 100), 0, 100);
     if (p.sick > 70) { p.hp -= dt * .03 * (p.sick - 70) / 30; s.harm = "illness"; }
@@ -3697,7 +3704,7 @@ const Sim = (() => {
     const legacy = data.rules === undefined;
     const oldMap = data.mapRevision === undefined;
     const rules = Data.worldRules(data.difficulty, legacy ? Data.legacyRules : data.rules);
-    if (!legacy && Object.keys(rules).some(key => rules[key] !== data.rules?.[key] && !(key === "afterlifeChance" && data.rules[key] === undefined) && !(oldMap && key === "hordes" && data.rules.hordes === undefined))) throw new Error("Invalid world rules.");
+    if (!legacy && Object.keys(rules).some(key => rules[key] !== data.rules?.[key] && !((key === "afterlifeChance" || Object.hasOwn(Data.sandboxTuning,key)) && data.rules[key] === undefined) && !(oldMap && key === "hordes" && data.rules.hordes === undefined))) throw new Error("Invalid world rules.");
     const s = crossing?.template ?? create(data.seed, data.difficulty, data.role, data.generator, rules, region), p = data.player;
     s.regionStates = {...regionStates};
     s.ledger = Chronicle.restore(data.ledger,data.minutes);
@@ -3737,6 +3744,7 @@ const Sim = (() => {
           ["bleed", "infection", "age"].every(k => Number.isFinite(w[k]) && w[k] >= 0) &&
           (w.healing === undefined || Number.isFinite(w.healing) && w.healing >= 0)) ||
         p.wetness !== undefined && (!Number.isFinite(p.wetness) || p.wetness < 0 || p.wetness > 100) ||
+        p.traits !== undefined && (!Array.isArray(p.traits) || !Data.traitLoadout(p.traits).valid || Data.traitLoadout(p.traits).ids.length !== p.traits.length) ||
         p.temperature !== undefined && (!Number.isFinite(p.temperature) || p.temperature < 33 || p.temperature > 37.3) ||
         p.pinned !== undefined && (!Array.isArray(p.pinned) || p.pinned.length > Object.keys(Data.items).length ||
           !p.pinned.every(id => typeof id === "string" && Object.hasOwn(Data.items, id)))) throw new Error("Invalid character data.");
@@ -3866,6 +3874,7 @@ const Sim = (() => {
     s.player = {...s.player, ...p, ...Data.character(p), bag:p.bag.map(item => ({...item})), skills: {...s.player.skills, ...p.skills}, gear, wounds, pinned:[...new Set(p.pinned ?? [])],
       belt:[...(p.belt ?? Data.beltDefaults)], headingX:validHeading ? p.headingX / heading : 0, headingY:validHeading ? p.headingY / heading : 1,
       lightUid:null, path:[], moving:false, resting:false, grabbed:0, grabCool:0};
+    s.traitEffects = Data.traitLoadout(s.player.traits).effects;
     s.player.weapon = p.weapon;
     s.player.weaponUid = p.weaponUid;
     if (weapon(s).id === "fists") unequipWeapon(s);
@@ -4012,7 +4021,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

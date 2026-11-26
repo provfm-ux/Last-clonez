@@ -774,3 +774,8 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
   .viewport { --touch-stick:52px; }
   .stick-guide { display:none; }
 }
+
+.survivor-customization { max-width:325px; margin-bottom:10px; }
+.trait-choices { display:grid; gap:4px; max-height:240px; overflow:auto; }
+.trait-choices label { display:flex; align-items:center; gap:8px; min-height:44px; font-size:13px; }
+.trait-choices small { display:block; color:#a4b29a; }

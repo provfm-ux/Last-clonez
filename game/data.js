@@ -267,6 +267,14 @@ const Data = (() => {
   const pineRidge = {nights:2, coldLimit:35.2, fullNight:600, sickness:30};
   // The raffle winner patrols the hall in the campaign (stage, right aisle, back rows, left aisle, centre).
   const routeBudget = 6;
+  // Campaign goals shown in the journal and the pinned objective (only challenges that exist in the game so far).
+  const campaignGoals = [
+    {id:"coldvale.houses", area:"coldvale", text:"Find the three torn pages", detail:"Search the family houses in Cold Vale. Read each page with Use."},
+    {id:"cinema.statue", area:"cinema", text:"Take the golden idol", detail:"Oxford Night Reel cinema, from day 2. Then get out through a window."},
+    {id:"pineridge.two-nights", area:"pineridge", text:"Survive two nights at Pine Ridge", detail:"From day 3. No barricades: bring a bedroll, wood and water. Stay warm."},
+    {id:"eva.death", area:"eva", text:"Look after Eva", detail:"Until day 5. She keeps talking about the fortress rumour.", gone:"Read Eva's diary at the shelter"},
+    {id:"ironworks.barricade", area:"ironworks", text:"Get the strong weapon", detail:"Ironworks machine shop, weekdays 08:00-18:00. The toolboard hammer and crowbar wear out: do not waste them."}
+  ];
   const cinemaPatrol = [[13.5,8.5],[19.5,12.5],[14.5,17.5],[7.5,12.5],[12.5,10.5]];
   const cinemaTrap = {horde:50, tensionEvery:6, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
   const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],
@@ -523,6 +531,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

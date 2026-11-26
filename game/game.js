@@ -2572,7 +2572,7 @@
   startPoint.value = "shelter";
   startPoint.addEventListener("change", showStartDetail);
   const presets = $("difficulty");
-  const headline = ["longhaul","relaxed","survival","harsh"];
+  const headline = ["campaign","longhaul","relaxed","survival","harsh"];
   const presetOption = id => '<option value="' + id + '">' + Data.modes[id].name + '</option>';
   presets.innerHTML = headline.map(presetOption).join("") + '<optgroup label="More modes">' +
     Object.keys(Data.modes).filter(id => !headline.includes(id)).map(presetOption).join("") +

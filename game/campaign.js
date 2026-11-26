@@ -21,7 +21,7 @@ const Campaign = (() => {
     ironworks:{name:"Ironworks", kind:"clue", from:6, weekdays:true, hours:[8, 18]},
     fathill:{name:"FatHill", kind:"clue", from:8, tide:true, clue:3},
     westfields:{name:"Westfields", kind:"clue", from:10, clue:4},
-    cindergrotto:{name:"Cinder Grotto", kind:"clue", from:12, clue:5, requires:{items:["flashlight", "battery"]}},
+    cindergrotto:{name:"Cinder Grotto", kind:"clue", from:12, clue:5, requires:{items:["flashlight", "battery"], text:"a flashlight with batteries"}},
     amigo1:{name:"The first friend", kind:"clue", from:14, to:20},
     viragem:{name:"Patient zero", kind:"event", from:15, to:18},
     fortress:{name:"The fortress", kind:"clue", from:25, requires:{clues:5}},
@@ -34,6 +34,9 @@ const Campaign = (() => {
     "opt.station":{name:"Train station", kind:"optional", from:23},
     "opt.harvest":{name:"Farm harvest", kind:"optional", from:24}
   };
+
+  // Game regions that belong to a campaign area (travel there follows the calendar). Other regions stay free.
+  const regions = {coldvale:"coldvale", cinema:"cinema", ridge:"pineridge", ironworks:"ironworks", coast:"fathill", fields:"westfields", cavern:"cindergrotto"};
 
   const day = minutes => Math.floor(minutes / 1440) + 1;
   const weekday = d => weekdays[(d - 1 + firstWeekday) % 7];
@@ -59,10 +62,10 @@ const Campaign = (() => {
     const need = areas[id]?.requires;
     if (!need) return "";
     const lacking = (need.items ?? []).filter(item => !(have.items ?? []).includes(item));
-    if (lacking.length) return "You need " + lacking.map(item => Data.items[item]?.name.toLowerCase() ?? item).join(" and ") + " first.";
+    if (lacking.length) return "You need " + (need.text ?? lacking.map(item => Data.items[item]?.name.toLowerCase() ?? item).join(" and ")) + " first.";
     if (need.clues && (have.clues ?? 0) < need.clues) return "The coordinates are incomplete: " + (have.clues ?? 0) + " of " + need.clues + ".";
     return "";
   }
 
-  return {length, areas, day, weekday, isWeekday, lowTide, closedReason, isOpen, openOn, missing};
+  return {length, areas, regions, day, weekday, isWeekday, lowTide, closedReason, isOpen, openOn, missing};
 })();

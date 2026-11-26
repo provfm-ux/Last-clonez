@@ -496,6 +496,7 @@ const Sim = (() => {
         gardenSeeded: false, harvested: false, gardenMeal: false, gardenHelp: false}, nextEvent: 180, weather: "Overcast",
       exploredAt: 0, radioWave: false, zoom: 1, waypoint: town ? "market" : world.underground ? "exit-ridge" : "exit-" + (Regions.definitions[region].host ?? Regions.home), lookahead: true, roofsHidden: false
     };
+    if (difficulty === "campaign") s.campaign = newCampaign();
     if (difficulty === "longhaul") {
       s.longHaul = newLongHaul();
       s.waypoint = "";
@@ -1320,9 +1321,30 @@ const Sim = (() => {
     return true;
   }
 
+  // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty()});
+  const challengeId = /^[a-z0-9]+(\.[a-z0-9-]+)?$/;
+  function restoreCampaign(raw) {
+    if (raw === undefined) return newCampaign();
+    if (!raw || !Number.isInteger(raw.clues) || raw.clues < 0 || raw.clues > 5 || !Array.isArray(raw.completed) || raw.completed.length > 64 ||
+        raw.completed.some((id,i) => typeof id !== "string" || !challengeId.test(id) || raw.completed.indexOf(id) !== i)) throw new Error("Invalid campaign progress.");
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints)};
+  }
+  // "" when the calendar lets the player into region `to` now, otherwise the reason shown to the player.
+  function campaignProblem(s, to) {
+    const area = s.campaign && Campaign.regions[to];
+    if (!area) return "";
+    const bag = s.player.bag, items = [...new Set(bag.map(item => item.id))];
+    if (bag.some(item => item.id === "flashlight" && item.charge > 0)) items.push("battery");
+    return Campaign.closedReason(area, runDay(s.minutes), Math.floor(s.minutes % 1440 / 60)) ||
+      Campaign.missing(area, {items, clues:s.campaign.clues});
+  }
+
   function travelProblem(s, exit) {
     const connection = exit?.action === "travel" && Regions.connection(s.world.region, exit.id.slice(5));
     if (s.mode !== "play" || !connection || !s.world.objects.includes(exit) || !reachableObject(s, exit)) return "Move closer to the crossing.";
+    const closed = campaignProblem(s, exit.id.slice(5));
+    if (closed) return closed;
     const car = vehicle(s), npc = s.world.npc;
     if (car && !connection.vehicles) return "The trail is on foot. Park and get out here.";
     if (car && s.player.driveSpeed > .15) return "Brake before crossing.";
@@ -3077,6 +3099,10 @@ const Sim = (() => {
     const raining = s.weather === "Rain";
     updateOutdoor(s, minutes, raining);
     if (s.longHaul && s.player.hp > 0) updateLongHaul(s);
+    if (s.campaign?.hints.objective) {
+      const hint = CampaignHints.next(s.campaign.hints, s.minutes);
+      if (hint) notify(s, "Hint: " + hint);
+    }
     const interval = Data.garden.dutyInterval;
     if (!raining && Math.floor(previousMinutes / interval) !== Math.floor(s.minutes / interval)) tendShelterGarden(s);
     for (const effect of s.effects) effect.life -= dt;
@@ -3280,6 +3306,7 @@ const Sim = (() => {
       guideStep:s.guideStep, firstSleep:s.firstSleep, pinStory:s.pinStory, playtest:s.playtest,
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
+      campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
@@ -3579,6 +3606,7 @@ const Sim = (() => {
             longHaulFields.some(key => !run[key]))) throw new Error("Invalid 30-day challenge progress.");
       s.longHaul = {days:run.days,...Object.fromEntries(longHaulFields.map(key => [key,run[key]]))};
     }
+    if (s.campaign) s.campaign = restoreCampaign(data.campaign);
     if (data.guideStep !== undefined) {
       if (!Number.isInteger(data.guideStep) || data.guideStep < 0 || data.guideStep > 6) throw new Error("Invalid beginner guide step.");
       s.guideStep = data.guideStep;
@@ -3632,7 +3660,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, campaignProblem, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

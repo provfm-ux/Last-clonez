@@ -1766,6 +1766,37 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     home.messages.some(m => /left Pine Ridge/.test(m.text)));
 }
 
+{ // eva.death (HISTORIA.md secções 2 e 16): a Eva sai no dia 5, não volta no dia 6, o diário é dado ao jogador
+  const s = fresh("campaign"), npc = () => s.world.npc, seen = [];
+  const watch = () => seen.push(...s.messages.map(m => m.text));
+  const diary = s.world.objects.find(o => o.id === "eva-diary");
+  check("eva.death o diário está escondido no abrigo desde o início", diary && !diary.active &&
+    s.world.buildings.find(b => b.id === diary.building) === s.world.base);
+  Object.assign(npc(), {mode: "follow", hp: 100, x: s.player.x + 1, y: s.player.y});
+  Sim.testJump(s, 5, {}, {anyMode: true}); run(s, 2); watch();
+  check("eva.death no dia 5 às 08:00 a Eva ainda está", npc().mode !== "away" && npc().hp > 0 && s.campaign.eva === "", npc().mode);
+  Sim.fastForward(s, 70); watch();
+  check("eva.death às 09:00 do dia 5 a Eva sai para ir buscar Sunny Puffs", npc().mode === "away" && npc().hp === 0 && s.campaign.eva === "left" &&
+    seen.some(t => /Sunny Puffs/.test(t)));
+  const saved = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  check("eva.death a saída fica gravada", saved.campaign.eva === "left" && saved.world.npc.mode === "away");
+  Sim.testJump(s, 6, {}, {anyMode: true}); run(s, 2); watch();
+  check("eva.death no dia 6 não volta e o diário aparece no abrigo", npc().mode === "away" && s.campaign.eva === "gone" && diary.active &&
+    seen.some(t => /did not come back/.test(t)));
+  Object.assign(s.player, {x: diary.x, y: diary.y + .6});
+  check("eva.death ler o diário dá-o ao jogador e cumpre o desafio", Sim.readEvaDiary(s, diary) && Sim.quantity(s.player.bag, "evadiary") === 1 &&
+    s.campaign.completed.includes("eva.death") && /whole rumour/.test(s.messages.at(-1).text));
+  Sim.readEvaDiary(s, diary);
+  check("eva.death reler não duplica o diário", Sim.quantity(s.player.bag, "evadiary") === 1);
+  const old = Sim.restore(JSON.parse(require("zlib").gunzipSync(fs.readFileSync(path.join(__dirname, "fixtures", "main-2026-11-campaign.json.gz"))).toString("utf8")));
+  check("eva.death um save de campanha anterior recebe o diário escondido", old.world.objects.some(o => o.id === "eva-diary" && !o.active) && old.campaign.eva === "");
+  const away = fresh("campaign"); Object.assign(away.world.npc, {mode: "refuge", hp: 100}); Sim.testJump(away, 5, {}, {anyMode: true});
+  const ex = away.world.objects.find(o => o.id === "exit-ridge"); Object.assign(away.player, {x: ex.x, y: ex.y + (ex.y > away.world.height / 2 ? -1 : 1)});
+  const ridge = Sim.travel(away, ex); ridge.world.enemies = []; Sim.fastForward(ridge, 70);
+  check("eva.death a Eva sai mesmo com o jogador noutra região", ridge.campaign.eva === "left" &&
+    ridge.regionStates.coldvale.npc.mode === "away" && ridge.world.npc.mode === "away");
+}
+
 { // sys.campaign-graph (skill level-design): sem bloqueios (soft-locks), prazos possíveis e ritmo com descansos
   const C = context.Campaign, ids = Object.keys(C.challenges);
   // Jogador que faz um desafio por dia a partir do dia `first`, sempre o primeiro que o calendário e o inventário deixam.

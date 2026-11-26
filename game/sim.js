@@ -502,6 +502,7 @@ const Sim = (() => {
       s.campaign = newCampaign();
       if (town) {
         placeCampaignPages(world, seed);
+        placeEvaDiary(world);
         s.campaign.completed.push("radio.rumour");
         CampaignHints.track(s.campaign.hints, "coldvale.houses", s.minutes);
       }
@@ -1332,7 +1333,7 @@ const Sim = (() => {
   }
 
   // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
-  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}});
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:""});
   // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
   const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
   const challengeId = /^[a-z0-9]+(\.[a-z0-9-]+)?$/;
@@ -1345,7 +1346,8 @@ const Sim = (() => {
     if (!Number.isInteger(ridge.nights) || ridge.nights < 0 || ridge.nights > Data.pineRidge.nights ||
         night !== null && (!night || !Number.isFinite(night.start) || night.start < 0 || !["","cold","barricade"].includes(night.fail) ||
           !Number.isInteger(night.built) || night.built < 0)) throw new Error("Invalid campaign progress.");
-    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0,
+    if (raw.eva !== undefined && !["", "left", "gone"].includes(raw.eva)) throw new Error("Invalid campaign progress.");
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "",
       ridge:{nights:ridge.nights, night:night && {start:night.start, fail:night.fail, built:night.built}}};
   }
   // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
@@ -1447,6 +1449,47 @@ const Sim = (() => {
     if (!s.campaign.buffUntil || s.minutes < s.campaign.buffUntil) return;
     s.campaign.buffUntil = 0;
     notify(s, Data.campaignText.cinemaBuffEnds);
+  }
+
+  // Campaign objects added after campaign saves already existed: older saves get them back on load.
+  const campaignFixtures = new Set(["eva-diary"]);
+  // eva.death: Eva's diary waits, hidden, in the shelter from the first day; it appears on the morning of day 6.
+  function placeEvaDiary(world) {
+    const b = world.base, crate = world.objects.find(o => o.storage && o.building === b.id), tiles = [];
+    for (let y = b.y + 1; y < b.y + b.h - 1; y++) for (let x = b.x + 1; x < b.x + b.w - 1; x++) tiles.push(World.tileAt(world,x,y));
+    const tile = tiles.filter(t => t && t.building === b.id && World.clear(world,t.x+.5,t.y+.5,.28) &&
+      !world.objects.some(o => Math.floor(o.x) === t.x && Math.floor(o.y) === t.y) && !(Math.floor(world.start.x) === t.x && Math.floor(world.start.y) === t.y))
+      .sort((a,c) => distance({x:a.x+.5,y:a.y+.5}, crate ?? world.start) - distance({x:c.x+.5,y:c.y+.5}, crate ?? world.start))[0];
+    if (tile) world.objects.push({id:"eva-diary", x:tile.x+.5, y:tile.y+.5, building:b.id, zone:tile.zone, tint:.54,
+      kind:"record", action:"eva-diary", name:"Eva's diary", read:false, active:false, solid:false});
+  }
+
+  // Day 5, 09:00: Eva goes out for a snack and never comes back. Day 6, 06:30: her diary is found at the shelter.
+  function updateEva(s) {
+    const c = s.campaign, rule = Data.evaDeparture, day = runDay(s.minutes), hour = s.minutes % 1440 / 60, from = Campaign.areas.eva.from;
+    if (c.eva === "" && (day > from || day === from && hour >= rule.hour)) {
+      const npcs = [s.world.npc, ...Object.values(s.regionStates).map(zone => zone?.npc)].filter(Boolean);
+      const alive = npcs.some(n => n.mode !== "dead" && n.mode !== "away" && n.hp > 0);
+      for (const n of npcs) if (n.mode !== "dead" && n.mode !== "away") Object.assign(n, {mode:"away", hp:0, path:[], moving:false, ridingVehicle:null});
+      c.eva = "left";
+      if (alive) notify(s, Data.campaignText.evaLeaves);
+    }
+    if (c.eva === "left" && (day > from + 1 || day === from + 1 && hour >= rule.gone)) {
+      c.eva = "gone";
+      const zone = s.world.region === Regions.home ? s.world : s.regionStates[Regions.home];
+      const diary = zone?.objects.find(o => o.id === "eva-diary");
+      if (diary) diary.active = true;
+      notify(s, Data.campaignText.evaGone, true);
+    }
+  }
+
+  function readEvaDiary(s, diary) {
+    if (!s.campaign || s.mode !== "play" || s.player.vehicle || diary?.action !== "eva-diary" || !diary.active ||
+        !s.world.objects.includes(diary) || !reachableObject(s,diary)) return false;
+    if (!diary.read) { diary.read = true; add(s.player.bag,"evadiary",1,{born:s.minutes}); }
+    if (!s.campaign.completed.includes("eva.death")) s.campaign.completed.push("eva.death");
+    notify(s, Data.campaignText.evaDiary);
+    return true;
   }
 
   function readCampaignPage(s, note) {
@@ -3252,7 +3295,7 @@ const Sim = (() => {
     const raining = s.weather === "Rain";
     updateOutdoor(s, minutes, raining);
     if (s.longHaul && s.player.hp > 0) updateLongHaul(s);
-    if (s.campaign) { updateCinemaTrap(s); updateCinemaBuff(s); updatePineRidge(s); }
+    if (s.campaign) { updateCinemaTrap(s); updateCinemaBuff(s); updatePineRidge(s); updateEva(s); }
     if (s.campaign?.hints.objective) {
       const hint = CampaignHints.next(s.campaign.hints, s.minutes);
       if (hint) notify(s, "Hint: " + hint);
@@ -3461,7 +3504,7 @@ const Sim = (() => {
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
       campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}, buffUntil:s.campaign.buffUntil,
-        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}} : undefined,
+        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
@@ -3578,7 +3621,8 @@ const Sim = (() => {
       return coverageCrate(o) && (!s.world.coverage || routeCrate(o) && !s.world.routeCoverage) || legacy && utilityIds.has(o.id) || data.region === undefined && o.action === "travel" ||
         region === "ridge" && data.mapRevision !== Regions.mapRevision && ["exit-" + Regions.cavern,"cave-gear"].includes(o.id) ||
         Chronicle.isFixture(o) && (ledgerVersion === 0 || ledgerVersion === 1 && entry?.extra || ledgerVersion < (entry?.added ?? 0)) ||
-        data.fieldRevision === undefined && FieldStories.isFixture(o) || oldMap && Atmosphere.isFixture(o);
+        data.fieldRevision === undefined && FieldStories.isFixture(o) || oldMap && Atmosphere.isFixture(o) ||
+        campaignFixtures.has(o.id);
     };
     const validTimer = (until, recipe) => Number.isFinite(until) && until > 0 && until <= data.minutes + recipe.minutes;
     const validStation = (o, original) => {
@@ -3817,7 +3861,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, cinemaBuff, hurt, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, cinemaBuff, hurt, readEvaDiary, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

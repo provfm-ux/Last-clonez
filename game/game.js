@@ -619,7 +619,7 @@
     if (o.action === "bed") return state.player.fatigue >= 35 ? "Sleep" : "Rest";
     return ({bed:"Rest", barrel:"Collector", campfire:"Campfire", radio:"Radio", garden:"Garden", tap:"Tap", generator:"Generator",
       harvest:"Chop", dismantle:"Salvage", workbench:"Build", travel:"Cross", spring:"Fill", forage:"Forage", fish:"Fish",
-      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read","campaign-page":"Read","cinema-statue":"Take",crib:"Look"}[o.action] || "Use");
+      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read","campaign-page":"Read","cinema-statue":"Take","eva-diary":"Read",crib:"Look"}[o.action] || "Use");
   }
 
   function canTalk() {
@@ -1699,6 +1699,10 @@
     const result = feedback ? '<p class="bag-feedback" role="status">' + esc(feedback) + "</p>" : "";
     if (o.action === "field-note") {
       if (Sim.readFieldNote(state,o)) save();
+      return;
+    }
+    if (o.action === "eva-diary") {
+      if (Sim.readEvaDiary(state,o)) save();
       return;
     }
     if (o.action === "cinema-statue") {

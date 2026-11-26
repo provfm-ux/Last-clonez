@@ -451,7 +451,7 @@ const Sim = (() => {
           world.enemies.push(z);
         }
       }
-      if (difficulty === "campaign") world.objects.push({id:"cinema-statue",kind:"statue",name:"Golden statue",action:"cinema-statue",
+      if (difficulty === "campaign") world.objects.push({id:"cinema-statue",kind:"statue",name:"Golden idol",action:"cinema-statue",
         x:11.5,y:5.5,building:world.buildings[0].id,zone:world.buildings[0].id,tint:.7,active:true,solid:false});
       if (world.cinema === "trophy" || !rules.count && world.cinema === "winner") {
         world.objects.push({id:"cinema-trophy",kind:"crate",name:"Abandoned prize case",x:20.5,y:7.5,
@@ -1332,7 +1332,7 @@ const Sim = (() => {
   }
 
   // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
-  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0});
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}});
   // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
   const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
   const challengeId = /^[a-z0-9]+(\.[a-z0-9-]+)?$/;
@@ -1341,7 +1341,12 @@ const Sim = (() => {
     if (!raw || !Number.isInteger(raw.clues) || raw.clues < 0 || raw.clues > 5 || !Array.isArray(raw.completed) || raw.completed.length > 64 ||
         raw.completed.some((id,i) => typeof id !== "string" || !challengeId.test(id) || raw.completed.indexOf(id) !== i)) throw new Error("Invalid campaign progress.");
     if (raw.buffUntil !== undefined && (!Number.isFinite(raw.buffUntil) || raw.buffUntil < 0)) throw new Error("Invalid campaign progress.");
-    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0};
+    const ridge = raw.ridge ?? {nights:0, night:null}, night = ridge.night;
+    if (!Number.isInteger(ridge.nights) || ridge.nights < 0 || ridge.nights > Data.pineRidge.nights ||
+        night !== null && (!night || !Number.isFinite(night.start) || night.start < 0 || !["","cold","barricade"].includes(night.fail) ||
+          !Number.isInteger(night.built) || night.built < 0)) throw new Error("Invalid campaign progress.");
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0,
+      ridge:{nights:ridge.nights, night:night && {start:night.start, fail:night.fail, built:night.built}}};
   }
   // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
   function placeCampaignPages(world, seed) {
@@ -1387,6 +1392,7 @@ const Sim = (() => {
       Object.assign(z,{alert:1, chaseX:s.player.x, chaseY:s.player.y});
     }
     s.atmosphere.awake = true;
+    s.effects.push({x: statue.x, y: statue.y, text: "CLICK", color: "#e8c25e", life: 1.2, impact: .8});
     noise(s, statue.x, statue.y, 14);
     notify(s, Data.campaignText.statueTaken, true);
     return true;
@@ -1404,6 +1410,39 @@ const Sim = (() => {
     notify(s, Data.campaignText.cinemaBuff);
   }
 
+  // pineridge.two-nights: two full nights (20:00-06:30) at Pine Ridge with no barricades. Getting cold means pneumonia: the night repeats.
+  const builtDefences = s => s.world.objects.reduce((n,o) => n + (o.action === "door" ? o.boards ?? 0 : 0) + (isBarrier(o) && o.active ? 1 : 0), 0);
+  function updatePineRidge(s) {
+    const c = s.campaign, r = c.ridge, rule = Data.pineRidge, text = Data.campaignText;
+    if (c.completed.includes("pineridge.two-nights")) return;
+    const night = isNight(s), here = s.world.region === "ridge";
+    if (!r.night) {
+      if (night && here && Campaign.isOpen("pineridge", runDay(s.minutes))) {
+        r.night = {start:s.minutes, fail:"", built:builtDefences(s)};
+        notify(s, text.ridgeNight);
+      }
+      return;
+    }
+    if (!here) { r.night = null; notify(s, text.ridgeLeft, true); return; }
+    if (!r.night.fail && builtDefences(s) > r.night.built) { r.night.fail = "barricade"; notify(s, text.ridgeBuilt, true); }
+    if (!r.night.fail && s.rules.exposure !== "off" && s.player.temperature < rule.coldLimit) {
+      r.night.fail = "cold";
+      s.player.sick = Math.max(s.player.sick ?? 0, rule.sickness);
+      notify(s, text.ridgeCold, true);
+    }
+    if (night) return;
+    const full = s.minutes - r.night.start >= rule.fullNight, ok = full && !r.night.fail;
+    r.night = null;
+    if (!full) { notify(s, text.ridgeLate); return; }
+    if (!ok) return;
+    r.nights++;
+    if (r.nights < rule.nights) { notify(s, text.ridgeSurvived + r.nights + " of " + rule.nights + "."); return; }
+    c.completed.push("pineridge.two-nights");
+    c.clues = Math.min(5, c.clues + 1);
+    CampaignHints.track(c.hints, "ironworks.barricade", s.minutes);
+    notify(s, text.ridgeDone);
+  }
+
   function updateCinemaBuff(s) {
     if (!s.campaign.buffUntil || s.minutes < s.campaign.buffUntil) return;
     s.campaign.buffUntil = 0;
@@ -1419,7 +1458,7 @@ const Sim = (() => {
     if (read < Data.campaignText.pages.length) { notify(s, "Torn pages found: " + read + " of " + Data.campaignText.pages.length + "."); return true; }
     if (!s.campaign.completed.includes("coldvale.houses")) {
       s.campaign.completed.push("coldvale.houses");
-      s.campaign.clues = Math.max(s.campaign.clues, Campaign.areas.coldvale.clue);
+      s.campaign.clues = Math.min(5, s.campaign.clues + 1);
       CampaignHints.track(s.campaign.hints, "cinema.statue", s.minutes);
       notify(s, Data.campaignText.housesDone);
     }
@@ -1954,6 +1993,7 @@ const Sim = (() => {
     if (tool) tool.condition = Math.max(0, tool.condition - (method === "pry" ? 2.5 : 1.5));
     if (method === "smash" && o.reinforced > 1) {
       o.reinforced--;
+      s.effects.push({x: o.x, y: o.y, text: "CRACK", color: "#c9d6ae", life: .7, impact: .3});
       noise(s, o.x, o.y, 13);
       hear(s,"glassSmash",o);
       notify(s, Data.campaignText.frameHolds);
@@ -1963,7 +2003,7 @@ const Sim = (() => {
     o.open = true;
     o.locked = false;
     o.latched = false;
-    if (method === "smash") { o.broken = true; o.hp = 0; }
+    if (method === "smash") { o.broken = true; o.hp = 0; s.effects.push({x: o.x, y: o.y, text: "SMASH", color: "#e3a289", life: .8, impact: .45}); }
     World.sync(s.world);
     noise(s, o.x, o.y, method === "pry" ? 6.5 : 13);
     hear(s,method === "pry" ? "pry" : "glassSmash",o);
@@ -3149,12 +3189,15 @@ const Sim = (() => {
   }
 
   function updateNeeds(s, dt) {
-    const p = s.player, rate = s.rules.needs / 100 * pressure(s), gradual = s.rules.care === "gradual";
+    // Needs follow game time on clocks slower than the default 2 (1.6 campaign, 0.4 Realistic), so a day costs the same food,
+    // water and sleep at any of those paces. Clocks 2-4 are unchanged.
+    const pace = Math.min(1, s.rules.clock / 2);
+    const p = s.player, rate = s.rules.needs / 100 * pressure(s) * pace, gradual = s.rules.care === "gradual";
     const inDanger = threats(s).length > 0;
     const floor = Data.modes[s.difficulty]?.noStarve ? 8 : 0;
     p.hunger = Math.max(floor, p.hunger - dt * .07 * rate * (p.sleeping ? .5 : 1));
     p.hydration = Math.max(floor, p.hydration - dt * (s.running ? .15 : .1) * rate * (p.sleeping ? .5 : 1));
-    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 : p.resting ? -1.6 : (s.running ? .075 : .04) * rate), 0, 100);
+    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 * pace : p.resting ? -1.6 * pace : (s.running ? .075 : .04) * rate), 0, 100);
     if (p.resting) {
       if (inDanger) { p.resting = false; notify(s, "Danger interrupted your rest.", true); }
       else if (p.hunger > 25 && p.hydration > 25 && (!gradual || !p.wounds.some(w => !w.bandaged))) {
@@ -3209,7 +3252,7 @@ const Sim = (() => {
     const raining = s.weather === "Rain";
     updateOutdoor(s, minutes, raining);
     if (s.longHaul && s.player.hp > 0) updateLongHaul(s);
-    if (s.campaign) { updateCinemaTrap(s); updateCinemaBuff(s); }
+    if (s.campaign) { updateCinemaTrap(s); updateCinemaBuff(s); updatePineRidge(s); }
     if (s.campaign?.hints.objective) {
       const hint = CampaignHints.next(s.campaign.hints, s.minutes);
       if (hint) notify(s, "Hint: " + hint);
@@ -3417,7 +3460,8 @@ const Sim = (() => {
       guideStep:s.guideStep, firstSleep:s.firstSleep, pinStory:s.pinStory, playtest:s.playtest,
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
-      campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}, buffUntil:s.campaign.buffUntil} : undefined,
+      campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}, buffUntil:s.campaign.buffUntil,
+        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,

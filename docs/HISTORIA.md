@@ -151,7 +151,8 @@ Notas: as áreas opcionais não têm pistas nem bosses. Ficam abertas nos dias m
 - **Falha:** sem consequências graves; o jogador pode voltar.
 
 ### Cinema (dia 2)
-- **Objetivo:** retirar a estátua dourada do altar.
+- **Objetivo:** retirar a estátua dourada (um ídolo) do altar.
+- **Aspeto (decidido pelo utilizador):** semelhante ao ídolo dourado clássico das aventuras: pequeno, atarracado, sentado, de cabeça grande, num altar de pedra. No jogo chama-se "Golden idol". Não é uma cópia do adereço do filme.
 - **Gatilho:** ao retirar a estátua, o cinema fecha-se e os zombies aparecem em massa, uma horda de 50. Inspira-se na armadilha da estátua de *Indiana Jones*: a mecânica, não o aspeto nem o texto.
 - **Saída:** o jogador tem de fugir pelas janelas, partindo-as. Quem tiver uma ferramenta pesada (ex.: pé-de-cabra) sai mais depressa.
 - **Recompensa:** moral e stats durante vários dias; protege de noite enquanto dorme.
@@ -208,7 +209,7 @@ Notas: as áreas opcionais não têm pistas nem bosses. Ficam abertas nos dias m
 ## 13. Referências pop culture
 - O jogo usa referências a zombies e pistas (filmes, jogos, livros de zombies).
 - Pode haver nomes e homenagens, mas **sem copiar** personagens, textos, músicas ou arte protegidas.
-- A armadilha da estátua é inspirada numa mecânica de *Indiana Jones*, sem copiar o aspeto, o nome nem o texto.
+- A armadilha da estátua é inspirada na cena de *Indiana Jones*. O ídolo tem o aspeto genérico de ídolo dourado de aventura (secção 10), sem copiar o adereço, o nome nem o texto do filme.
 - O tom do chat com a IA é uma homenagem ao HAL 9000 de *2001: Odisseia no Espaço*, sem copiar falas.
 
 ## 14. Decisões tomadas pelo Claude (a rever)

@@ -29,7 +29,9 @@ Tone: dark, grim zombie survival. Player-facing text is English.
 5. Every feature needs a test: `tests/smoke-test.js` (simulation) or `tests/render-test.js` (drawing).
 6. Per-frame drawing must stay cheap: no gradients or hundreds of polygons per frame; static art goes in the cached ground
    (`tileArt`/`microDetail`) or in baked sprites.
-7. Releases: bump the version in `game/data.js` and the `?v=` in `game/index.html`, add 3-6 lines to `CHANGELOG.md`,
+7. Cache: every change to a `game/*.js` file must change that file's `?v=` in `game/index.html` in the same pull request,
+   or browsers keep the old file next to the new `index.html` and the game breaks.
+8. Releases: bump the version in `game/data.js` and the `?v=` in `game/index.html`, add 3-6 lines to `CHANGELOG.md`,
    and add a save fixture for the new version: `node scripts/save-fixture.js game v<version> survival campaign` (loaded by `npm test`).
 
 ## Where things are

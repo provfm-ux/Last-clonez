@@ -58,7 +58,7 @@ Os identificadores entre parênteses são os usados pelo save. Carpentry, Aiming
 | 32 Fishing | Pescar com equipamento e isco. Nível reduz espera. O local tem stock finito e recuperação. | Captura, XP, stock, isco, gravação e níveis comparados |
 | 33 Trapping | Faltam armadilhas com isco e fauna disponível. | Pendente |
 | 34 Foraging | Recolher recursos e cogumelos. Aumenta rendimento e permite identificar espécies. | XP de colheita e identificação testados |
-| 35 Tracking | Faltam rastos persistentes de fauna ou passagem. | Pendente |
+| 35 Tracking | Examinar pegadas reais de infetados no exterior. O nível aumenta o alcance e revela direção, idade e tipo. | Movimento, níveis, XP único, expiração e saves testados |
 
 ## Validação e amostragem
 

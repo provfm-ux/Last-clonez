@@ -361,6 +361,7 @@ const Data = (() => {
     carving:{name:"Carving",desc:"Carve spears at a workbench. Practice produces sturdier starting equipment."},
     nimble:{name:"Nimble",desc:"Move more quickly while sneaking near a visible infected. Practice by repositioning."},
     electrical:{name:"Electrical",desc:"Helps stretch generator fuel. Practice by fixing the shelter radio."},
+    tracking:{name:"Tracking",desc:"Examine infected tracks to recognise direction, age and type. Higher levels spot them farther away."},
     lightfooted:{name:"Lightfooted",desc:"Reduces footstep noise. Practice moving near infected."},
     axe:{name:"Axe",desc:"Reduces swing recovery with axes. Practice by landing hits."},
     long_blunt:{name:"Long Blunt",desc:"Reduces swing recovery with bats, pipes and other long blunt weapons."},
@@ -390,7 +391,7 @@ const Data = (() => {
     "Physical & movement":["fitness","strength","running","lightfooted","nimble","sneaking"],
     "Combat & equipment":["combat","marksmanship","axe","long_blunt","short_blunt","long_blade","short_blade","spear","maintenance"],
     "Craft & care":["crafting","medical","mechanics","tailoring","electrical","carving","knapping","masonry","cooking"],
-    "Food & fieldwork":["gardening","foraging","fishing"]
+    "Food & fieldwork":["gardening","foraging","fishing","tracking"]
   };
   // Seasons last `seasonDays` days each. `chill` lowers the outdoor body-temperature target; `grow` scales crop growth.
   const seasonDays = 7;

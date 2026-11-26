@@ -19,10 +19,13 @@
   const assistsKey = "clonez-new-run-assists";
   const atmosphereKey = "clonez-visual-atmosphere";
   const flickerKey = "clonez-reduce-flicker";
+  const volumeKey = "clonez-sound-volumes";
+  const volumeLabels = {music:"Music and tension", effects:"Effects", infected:"Infected"};
   const atmosphereLabels = {full:"Full", reduced:"Reduced", off:"Off"};
   let atmosphereChoice = read(atmosphereKey);
   const storedFlicker = read(flickerKey);
   let reduceFlicker = storedFlicker === null ? Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) : storedFlicker === "1";
+  let soundVolumes = (() => { try { return Soundscape.setVolumes(JSON.parse(read(volumeKey))); } catch { return Soundscape.setVolumes({}); } })();
   const skipKey = "clonez-tutorial-skip-time";
   const guideHints = [
     "Pick up the wooden bat nearby.",
@@ -1932,7 +1935,9 @@
       .map(([id,label]) => '<option value="' + id + '"' + (id === selected ? " selected" : "") + '>' + label + '</option>').join("");
     show("Atmosphere effects", '<form id="atmosphere-form"><div class="rules-grid"><label>Effects<select name="effects">' +
       options + '</select></label></div><label class="onboarding-option"><input type="checkbox" name="reduce-flicker"' +
-      (reduceFlicker ? " checked" : "") + '> Reduce flicker</label><div class="item-actions">' +
+      (reduceFlicker ? " checked" : "") + '> Reduce flicker</label><div class="section-label">SOUND</div><div class="rules-grid">' +
+      Object.entries(volumeLabels).map(([id,label]) => '<label>' + label + '<input type="range" name="vol-' + id + '" min="0" max="100" step="5" value="' +
+        Math.round(soundVolumes[id] * 100) + '"></label>').join("") + '</div><div class="item-actions">' +
       '<button type="submit" class="small-button primary">Apply</button></div></form>', "atmosphere-options");
   }
 
@@ -1944,6 +1949,8 @@
     reduceFlicker = form.has("reduce-flicker");
     write(atmosphereKey, atmosphereChoice);
     write(flickerKey, reduceFlicker ? "1" : "0");
+    soundVolumes = Soundscape.setVolumes(Object.fromEntries(Object.keys(volumeLabels).map(id => [id, Number(form.get("vol-" + id)) / 100])));
+    write(volumeKey, JSON.stringify(soundVolumes));
     close();
   }
 

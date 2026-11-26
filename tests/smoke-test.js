@@ -1694,6 +1694,20 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("cinema.buff expira ao fim de 3 noites", !Sim.cinemaBuff(c) && c.campaign.buffUntil === 0 && /ordinary lump/.test(c.messages.at(-1).text));
 }
 
+{ // sys.save-fixtures (skill save-systems): um save real por versão lançada carrega sempre, também no CI
+  const zlib = require("zlib"), folder = path.join(__dirname, "fixtures");
+  const fixtures = fs.readdirSync(folder).filter(f => f.endsWith(".json.gz")).sort();
+  for (const file of fixtures) {
+    let loaded = null, why = "";
+    try { loaded = Sim.restore(JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(folder, file))).toString("utf8"))); } catch (e) { why = e.message; }
+    check("sys.save-fixtures " + file + " carrega", loaded?.mode === "play" && (!/campaign/.test(file) || loaded.campaign?.completed.includes("radio.rumour")), why);
+  }
+  check("sys.save-fixtures há saves da 0.34 e da campanha", fixtures.some(f => f.startsWith("v0.34-")) && fixtures.some(f => /campaign/.test(f)), fixtures.join(","));
+  const newer = JSON.parse(JSON.stringify(Sim.snapshot(fresh("survival")))); newer.schema = Data.saveVersion + 1;
+  let refused = false; try { Sim.restore(newer); } catch { refused = true; }
+  check("sys.save-fixtures um save de uma versão mais nova é recusado", refused);
+}
+
 { // sys.needs-clock (skill survival-crafting): fome, sede e sono medidos contra o tamanho do dia em cada velocidade
   const measure = clock => {
     const s = Sim.createControl("campaign", "carer", "shelter", {clock, count: 0, hordes: "off"});

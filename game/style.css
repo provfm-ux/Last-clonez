@@ -779,3 +779,7 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 .trait-choices { display:grid; gap:4px; max-height:240px; overflow:auto; }
 .trait-choices label { display:flex; align-items:center; gap:8px; min-height:44px; font-size:13px; }
 .trait-choices small { display:block; color:#a4b29a; }
+
+.setup-group { margin:6px 0; }
+.setup-group > summary { font-weight:700; }
+#longhaul-btn { margin:6px 0 8px; }

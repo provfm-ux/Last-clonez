@@ -1839,6 +1839,52 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     C.beats.length === C.length && C.beats.every((b, i) => b.day === i + 1) && !problems.length, problems.join("; "));
 }
 
+{ // ironworks.barricade (HISTORIA.md secções 10 e 16): dia útil → arma forte garantida; fim de semana → fábrica fechada
+  const toIron = (day, items = {}) => {
+    const s = fresh("campaign"); Sim.testJump(s, day, items, {anyMode: true});
+    s.player.bag = s.player.bag.filter(i => !["hammer", "crowbar"].includes(i.id));
+    const ex = s.world.objects.find(o => o.id === "exit-ironworks"); Object.assign(s.player, {x: ex.x, y: ex.y + (ex.y > s.world.height / 2 ? -1 : 1)});
+    return Sim.travel(s, ex);
+  };
+  const beside = (x, o) => { // um lugar livre e ao alcance junto ao objeto
+    for (const r of [.8, 1, 1.3]) for (let a = 0; a < 16; a++) {
+      const p = {x: o.x + Math.cos(a * Math.PI / 8) * r, y: o.y + Math.sin(a * Math.PI / 8) * r};
+      if (World.clear(x.world, p.x, p.y, .18)) { Object.assign(x.player, p); if (Sim.reachableObject(x, o)) return true; }
+    }
+    return false;
+  };
+  const weekend = fresh("campaign"); Sim.testJump(weekend, 9, {}, {anyMode: true});
+  check("ironworks.barricade ao fim de semana o computador da linha fecha os portões", /line computer.*weekends/.test(Sim.campaignProblem(weekend, "ironworks")));
+  const w = toIron(6), get = id => w.world.objects.find(o => o.id === id), cage = get("iron-cage"), board = get("iron-toolboard");
+  const terminals = [0, 1, 2].map(i => get("iron-terminal-" + i));
+  check("ironworks.barricade no dia 6 (quarta) entra-se; jaula, quadro de ferramentas e 3 terminais em 3 edifícios",
+    w?.world.region === "ironworks" && cage?.stage === 0 && board?.loot.map(l => l.id + ":" + l.condition).join() === "hammer:65,crowbar:65" &&
+    terminals.every(Boolean) && new Set(terminals.map(t => t.building)).size === 3);
+  const read = t => { beside(w, t); w.world.enemies = []; return Sim.readTerminal(w, t) ? w.messages.at(-1).text : ""; };
+  const logs = terminals.map(read);
+  check("ironworks.barricade os terminais ensinam a ordem da jaula e deixam pistas para o futuro (tokens, fortaleza, stand down)",
+    /frame bolts \(hammer\).*plates \(crowbar\).*chain/.test(logs[0]) && /PROJECT FORTRESS/.test(logs[1]) && /token/.test(logs[1]) &&
+    /stand down/.test(logs[2]) && terminals.every(t => t.read) && !logs.join(" ").match(/virus|infect/i));
+  beside(w, cage);
+  check("ironworks.barricade sem ferramentas não se desmonta", !Sim.dismantleCage(w, cage) && cage.stage === 0 && /needs a hammer/.test(w.messages.at(-1).text));
+  w.player.bag.push(...board.loot.map(item => ({...item, born: 0}))); board.loot = []; board.searched = true;
+  const tool = id => w.player.bag.find(i => i.id === id);
+  Sim.dismantleCage(w, cage);
+  check("ironworks.barricade passo 1: martelo tira os parafusos e gasta-se", cage.stage === 1 && tool("hammer").condition === 35);
+  Sim.dismantleCage(w, cage);
+  check("ironworks.barricade passo 2: pé-de-cabra arranca as chapas", cage.stage === 2 && tool("crowbar").condition === 35);
+  const saved = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(w))));
+  check("ironworks.barricade a jaula meio desmontada e os terminais lidos ficam gravados",
+    saved.world.objects.find(o => o.id === "iron-cage").stage === 2 && saved.world.objects.filter(o => o.action === "ironworks-terminal" && o.read).length === 3);
+  check("ironworks.barricade passo 3 abre a jaula: arma forte garantida e desafio cumprido", Sim.dismantleCage(w, cage) && cage.stage === 3 &&
+    Sim.quantity(w.player.bag, "foundrymaul") === 1 && w.campaign.completed.includes("ironworks.barricade") && w.campaign.hints.objective === "fathill.bosses");
+  check("ironworks.barricade a jaula aberta não dá outra arma", !Sim.dismantleCage(w, cage) && Sim.quantity(w.player.bag, "foundrymaul") === 1);
+  check("ironworks.barricade a marreta é mais forte do que o pé-de-cabra", Data.items.foundrymaul.damage > Data.items.crowbar.damage && Data.weaponSkills.foundrymaul);
+  const worn = toIron(6), wc = worn.world.objects.find(o => o.id === "iron-cage"); worn.world.enemies = [];
+  worn.player.bag.push({id: "hammer", qty: 1, condition: 20, born: 0}); beside(worn, wc);
+  check("ironworks.barricade ferramentas gastas não chegam", !Sim.dismantleCage(worn, wc) && /too worn/.test(worn.messages.at(-1).text));
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

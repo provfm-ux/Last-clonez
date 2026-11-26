@@ -23,6 +23,8 @@ const Data = (() => {
     machete: {combat:"heavy", name:"Machete", group:"Weapons", weight:1.1, damage:37, range:1.5, delay:.6, effort:7, noise:4, wear:.3, icon:"bat"},
     shovel: {combat:"heavy", name:"Garden shovel", group:"Weapons", weight:2.4, damage:33, range:1.5, delay:.82, effort:10, noise:5, wear:.22, icon:"bat"},
     golfclub: {combat:"blunt", name:"Golf club", group:"Weapons", weight:.9, damage:21, range:1.6, delay:.5, effort:5, noise:3, wear:.4, icon:"bat"},
+    foundrymaul: {combat:"blunt", name:"Foundry maul", group:"Weapons", weight:3.2, damage:42, range:1.5, delay:.85, effort:9, noise:4, wear:.12, icon:"bat",
+      detail:"Kept in a cage the line computer guarded. Heavy enough for whatever is waiting at the end of this."},
     crowbar: {combat:"blunt", name:"Crowbar", group:"Weapons", weight:1.8, damage:27, range:1.4, delay:.6, effort:6, noise:3, wear:.25, icon:"bat"},
     hatchet: {combat:"heavy", name:"Hatchet", group:"Weapons", weight:1.1, damage:32, range:1.2, delay:.55, effort:6, noise:3.5, wear:.55, icon:"bat"},
     wrench: {combat:"blunt", name:"Adjustable wrench", group:"Weapons", weight:1.1, damage:24, range:1.15, delay:.52, effort:5, noise:4, wear:.3, icon:"bat"},
@@ -225,6 +227,14 @@ const Data = (() => {
     jammed:"Jammed shut. Find a window.",
     frameHolds:"The window frame holds. Keep hitting, or pry it.",
     cinemaEscape:"You are out with the idol. For the first time in days, you feel a little safer.",
+    ironTools:"Each step needs a tool in good condition: ",
+    ironWorn:"Your tools are too worn for this. Look for another in the Ironworks.",
+    ironDone:"Inside the cage: the Foundry maul. Strong enough for the first friend.",
+    ironTerminals:[
+      "LINE 3 · SHIFT LOG 06:00 · The assistant scheduled the weapon cage audit. Order of work: frame bolts (hammer), plates (crowbar), chain last. Operators reminded: the assistant cannot be argued with, only asked.",
+      "SUBSTATION · POWER LOG · The assistant requested priority power for PROJECT FORTRESS. Approved automatically. Weekly token budget: 82% used. Nobody on site remembers starting that project.",
+      "DISPATCH · MAINTENANCE NOTE · If the assistant locks a gate mid-task it stops when its tokens run out, then carries on. Supervisor's trick: ask it to stand down. It listens to a good joke better than to a password."
+    ],
     evaLeaves:"Eva: \"I'm going out for Sunny Puffs. The petrol station still has a box, I know it does. Back before dark.\"",
     evaGone:"Eva did not come back. Her things are still at the shelter.",
     evaDiary:"Eva's diary, under her pillow. The last pages copy the whole rumour: five coordinates, a fortress, food and water for years. She wanted to see it.",
@@ -238,6 +248,11 @@ const Data = (() => {
     cinemaBuff:"The idol will watch over your sleep for three nights.",
     cinemaBuffEnds:"The idol feels like an ordinary lump of metal again."
   };
+  // ironworks.barricade: three dismantling stages, each needing one of the listed tools and wearing it down.
+  const ironworks = {wear:30, toolCondition:65, stages:[
+    {tools:["hammer"], verb:"Unbolt the frame", done:"The frame bolts give way."},
+    {tools:["crowbar"], verb:"Pry off the plates", done:"The steel plates come off with a scream of metal."},
+    {tools:["hammer","crowbar"], verb:"Break the chain", done:"The chain snaps. The cage swings open."}]};
   const evaDeparture = {hour:9, gone:6.5};
   const pineRidge = {nights:2, coldLimit:35.2, fullNight:600, sickness:30};
   const cinemaTrap = {horde:50, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
@@ -305,7 +320,7 @@ const Data = (() => {
     fishing:{name:"Fishing", desc:"Fish bite sooner. Grows by catching fish."}
   };
   const weaponSkills = {axe:"axe",hatchet:"axe",bat:"long_blunt",pipe:"long_blunt",golfclub:"long_blunt",
-    crowbar:"long_blunt",shovel:"long_blunt",fryingpan:"short_blunt",wrench:"short_blunt",rollingpin:"short_blunt",
+    crowbar:"long_blunt",foundrymaul:"long_blunt",shovel:"long_blunt",fryingpan:"short_blunt",wrench:"short_blunt",rollingpin:"short_blunt",
     machete:"long_blade",knife:"short_blade",flintknife:"short_blade",spear:"spear",carvedspear:"spear",broom:"spear"};
   const skillGroups = {
     "Physical & movement":["fitness","strength","running","lightfooted","nimble","sneaking"],
@@ -439,6 +454,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,campaignText,cinemaTrap,pineRidge,evaDeparture,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,campaignText,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

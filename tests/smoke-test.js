@@ -1461,6 +1461,28 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     !restored.world.objects.some(o=>o.id.startsWith("coverage-route-")));
 }
 
+{ // sys.calendar (HISTORIA.md secções 9 e 16): cada área abre e fecha no dia certo
+  const C = context.Campaign, open = (id, d) => C.isOpen(id, d);
+  check("sys.calendar dia vem dos minutos (08:00 do dia 1, meia-noite = dia 2)", C.day(480) === 1 && C.day(1439) === 1 && C.day(1440) === 2);
+  check("sys.calendar nenhuma área abre antes do seu dia", Object.entries(C.areas).every(([id, a]) => a.from === 1 || !open(id, a.from - 1)),
+    Object.entries(C.areas).filter(([id, a]) => a.from > 1 && open(id, a.from - 1)).map(([id]) => id).join(","));
+  check("sys.calendar cada área abre no seu dia", Object.entries(C.areas).every(([id, a]) => open(id, a.from)),
+    Object.keys(C.areas).filter(id => !open(id, C.areas[id].from)).join(","));
+  check("sys.calendar dias úteis: Ironworks abre no dia 6, fecha no fim de semana (9-10), reabre no 11",
+    C.isWeekday(6) && open("ironworks", 6) && !open("ironworks", 9) && !open("ironworks", 10) && open("ironworks", 11) &&
+    /weekend/.test(C.closedReason("ironworks", 9)));
+  check("sys.calendar mercado opcional (dia 11) só abre em dias úteis", open("opt.market", 11) && !open("opt.market", 16) && open("opt.market", 18));
+  check("sys.calendar maré baixa a cada 2 dias: FatHill no dia 8, 10 e 12, fechada no 9 e 11",
+    open("fathill", 8) && !open("fathill", 9) && open("fathill", 10) && !open("fathill", 11) && /tide/i.test(C.closedReason("fathill", 9)));
+  check("sys.calendar janelas fechadas: Eva só no dia 5, amigo 1 nos dias 14-20, viragem nos dias 15-18",
+    !open("eva", 6) && open("amigo1", 20) && !open("amigo1", 21) && open("viragem", 18) && !open("viragem", 19));
+  check("sys.calendar áreas cumpridas continuam abertas nos seus dias", open("coldvale", 30) && open("cinema", 30) && open("fortress", 30) && open("opt.farm", 24));
+  check("sys.calendar áreas opcionais (dias 7, 9, 11, 13, 21-24) não dão pista",
+    Object.entries(C.areas).filter(([id]) => id.startsWith("opt.")).every(([, a]) => a.kind === "optional" && a.clue === undefined &&
+    [7, 9, 11, 13, 21, 22, 23, 24].includes(a.from)));
+  check("sys.calendar 5 coordenadas parciais, uma por área", Object.values(C.areas).map(a => a.clue).filter(Boolean).sort().join() === "1,2,3,4,5");
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

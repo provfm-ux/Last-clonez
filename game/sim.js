@@ -1387,6 +1387,7 @@ const Sim = (() => {
       Object.assign(z,{alert:1, chaseX:s.player.x, chaseY:s.player.y});
     }
     s.atmosphere.awake = true;
+    s.effects.push({x: statue.x, y: statue.y, text: "CLICK", color: "#e8c25e", life: 1.2, impact: .8});
     noise(s, statue.x, statue.y, 14);
     notify(s, Data.campaignText.statueTaken, true);
     return true;
@@ -1954,6 +1955,7 @@ const Sim = (() => {
     if (tool) tool.condition = Math.max(0, tool.condition - (method === "pry" ? 2.5 : 1.5));
     if (method === "smash" && o.reinforced > 1) {
       o.reinforced--;
+      s.effects.push({x: o.x, y: o.y, text: "CRACK", color: "#c9d6ae", life: .7, impact: .3});
       noise(s, o.x, o.y, 13);
       hear(s,"glassSmash",o);
       notify(s, Data.campaignText.frameHolds);
@@ -1963,7 +1965,7 @@ const Sim = (() => {
     o.open = true;
     o.locked = false;
     o.latched = false;
-    if (method === "smash") { o.broken = true; o.hp = 0; }
+    if (method === "smash") { o.broken = true; o.hp = 0; s.effects.push({x: o.x, y: o.y, text: "SMASH", color: "#e3a289", life: .8, impact: .45}); }
     World.sync(s.world);
     noise(s, o.x, o.y, method === "pry" ? 6.5 : 13);
     hear(s,method === "pry" ? "pry" : "glassSmash",o);

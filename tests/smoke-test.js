@@ -1650,6 +1650,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("cinema.statue retirar a estátua: horda de 50, portas encravadas, estátua no saco", take(c) && !statue.active &&
     c.world.enemies.filter(z => z.origin === "cinema-horde").length === 50 && doors(c).every(o => o.sealed && !o.open) &&
     win(c).reinforced === Data.cinemaTrap.windowHits && Sim.quantity(c.player.bag, "goldstatue") === 1);
+  check("cinema.statue retirar o ídolo é um impacto grande (game-feel)", c.effects.some(e => e.text === "CLICK" && e.impact >= .7));
   check("cinema.statue a horda do cinema não dá recursos aleatórios",
     c.world.enemies.filter(z => z.origin === "cinema-horde").every(z => Sim.carriedSupply(c, z) === null));
   Object.assign(c.player, {x: doors(c)[0].x, y: doors(c)[0].y - 1});
@@ -1662,7 +1663,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   hit(); hit();
   check("cinema.statue sem pé-de-cabra: 2 pancadas não chegam", !w.open && /frame holds/.test(c.messages.at(-1).text));
   hit();
-  check("cinema.statue à terceira pancada a janela parte", w.open && w.broken);
+  check("cinema.statue à terceira pancada a janela parte", w.open && w.broken && c.effects.some(e => e.text === "SMASH" && e.impact > 0));
   const fast = toCinema({crowbar: 1}); take(fast);
   const fw = win(fast); Object.assign(fast.player, {x: fw.x - 1, y: fw.y, stamina: 100});
   check("cinema.statue com pé-de-cabra abre à primeira", Sim.breach(fast, fw, "pry") && fw.open);

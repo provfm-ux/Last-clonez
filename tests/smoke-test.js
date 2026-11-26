@@ -1461,6 +1461,18 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     !restored.world.objects.some(o=>o.id.startsWith("coverage-route-")));
 }
 
+{ // sys.day-end (HISTORIA.md secção 6): cada dia termina com um resumo curto
+  const s = fresh("training");
+  s.daily.walker = 3; s.daily.loot = 5;
+  s.minutes = Math.ceil(s.minutes / 1440) * 1440 - .1;
+  run(s, 2);
+  const last = s.messages.at(-1)?.text ?? "";
+  check("sys.day-end resumo curto ao fechar o dia", /^Day 1 complete: 3 infected down, 5 items looted\./.test(last) && s.daily.day === 2, last);
+  s.minutes = Math.ceil(s.minutes / 1440) * 1440 - .1;
+  run(s, 2);
+  check("sys.day-end dia sem atividade", /Day 2 complete: a quiet day/.test(s.messages.at(-1)?.text ?? ""), s.messages.at(-1)?.text);
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

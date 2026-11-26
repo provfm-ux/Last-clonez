@@ -1488,6 +1488,16 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("sys.calendar fortaleza só com as 5 coordenadas", /4 of 5/.test(C.missing("fortress", {clues: 4})) && C.missing("fortress", {clues: 5}) === "" &&
     C.missing("coldvale") === "");
   check("sys.calendar 5 coordenadas parciais, uma por área", Object.values(C.areas).map(a => a.clue).filter(Boolean).sort().join() === "1,2,3,4,5");
+{ // sys.clock (HISTORIA.md secção 16): 1,6 = 15 min reais por dia (mobile), 0,4 = 60 min (Realista)
+  for (const [clock, realMinutes] of [[1.6, 15], [0.4, 60]]) {
+    const s = Sim.createControl("training", "carer", "shelter", {clock}), start = s.minutes;
+    for (let t = 0; t < realMinutes * 60 && s.mode === "play"; t += .5) Sim.tick(s, .5, idle);
+    check("sys.clock " + clock + ": " + realMinutes + " min reais = 1 dia de jogo", s.rules.clock === clock && Math.abs(s.minutes - start - 1440) < 1e-6,
+      "clock=" + s.rules.clock + " minutos=" + (s.minutes - start));
+    const loaded = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+    check("sys.clock " + clock + " persiste no save", loaded.rules.clock === clock);
+  }
+  check("sys.clock rejeita valores fora da lista", Data.worldRules("survival", {clock:1.5}).clock === Data.worldRules("survival").clock);
 }
 
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>

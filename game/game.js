@@ -413,7 +413,7 @@
     const rules = Data.worldRules(ruleBase, !reset && current === "custom" ? customRules : null);
     const inputs = Object.entries(Data.ruleFields).map(([id, field]) => {
       const inputId = "rule-" + id;
-      const input = field.choices ? '<select id="' + inputId + '">' + Object.entries(field.choices).map(([value, label]) =>
+      const input = field.choices ? '<select id="' + inputId + '">' + Object.entries(field.choices).sort(([a], [b]) => field.numeric ? a - b : 0).map(([value, label]) =>
         '<option value="' + value + '"' + (String(rules[id]) === value ? " selected" : "") + ">" + label + "</option>").join("") + "</select>" :
         '<input type="number" id="' + inputId + '" min="' + field.min + '" max="' + field.max + '" value="' + rules[id] + '" required inputmode="numeric">';
       return '<label for="' + inputId + '">' + field.label + input + "</label>";

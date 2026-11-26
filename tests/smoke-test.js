@@ -1461,6 +1461,18 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     !restored.world.objects.some(o=>o.id.startsWith("coverage-route-")));
 }
 
+{ // sys.day-end (HISTORIA.md secção 6): cada dia termina com um resumo curto
+  const s = fresh("training");
+  s.daily.walker = 3; s.daily.loot = 5;
+  s.minutes = Math.ceil(s.minutes / 1440) * 1440 - .1;
+  run(s, 2);
+  const last = s.messages.at(-1)?.text ?? "";
+  check("sys.day-end resumo curto ao fechar o dia", /^Day 1 complete: 3 infected down, 5 items looted\./.test(last) && s.daily.day === 2, last);
+  s.minutes = Math.ceil(s.minutes / 1440) * 1440 - .1;
+  run(s, 2);
+  check("sys.day-end dia sem atividade", /Day 2 complete: a quiet day/.test(s.messages.at(-1)?.text ?? ""), s.messages.at(-1)?.text);
+}
+
 { // sys.test-shortcuts (HISTORIA.md secção 16): saltar para o dia N, dar itens, avançar o relógio
   const s = fresh("training"), hour = s.minutes % 1440;
   check("sys.test-shortcuts salta para o dia 12 à mesma hora e dá itens",

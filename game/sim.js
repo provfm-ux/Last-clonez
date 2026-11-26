@@ -388,8 +388,11 @@ const Sim = (() => {
     if (day === s.daily.day) return;
     s.dailyHistory.push(s.daily);
     if (s.dailyHistory.length > reportLimit) s.dailyHistory.shift();
+    const done = s.daily, kills = done.walker + done.runner + done.brute;
+    const parts = [[kills,"infected down"],[done.loot,"items looted"],[done.gathered,"gathered"],[done.cooked + done.crafted,"made"]]
+      .filter(([n]) => n > 0).map(([n,label]) => n + " " + label);
     s.daily = newDaily(day);
-    notify(s,"Day "+(day-1)+" complete. Your daily summary is in the journal.");
+    notify(s,"Day "+(day-1)+" complete: "+(parts.length ? parts.join(", ") : "a quiet day")+". Full summary in the journal.");
   }
 
   // Test shortcuts (HISTORIA.md section 16). Training mode only, unless a headless test passes {anyMode:true}.

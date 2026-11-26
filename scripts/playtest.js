@@ -96,8 +96,10 @@ const scenarios = {
   },
   async "campaign-start"(page) {
     await startCampaign(page);
-    const r = await page.evaluate(() => ({clock: pt.s().rules.clock, day: Math.floor(pt.s().minutes / 1440) + 1, rumour: /preppers hid clues/.test(pt.text())}));
-    return {pass: r.clock === 1.6 && r.day === 1 && r.rumour, notes: "clock " + r.clock + ", day " + r.day + ", radio rumour on screen: " + r.rumour, shot: true};
+    const r = await page.evaluate(() => ({clock: pt.s().rules.clock, day: Math.floor(pt.s().minutes / 1440) + 1, rumour: /preppers hid clues/.test(pt.text()),
+      goals: /Find the three torn pages/.test(pt.text()) && /Take the golden idol/.test(pt.text()) && !/Find Eva/.test(pt.text())}));
+    return {pass: r.clock === 1.6 && r.day === 1 && r.rumour && r.goals,
+      notes: "clock " + r.clock + ", day " + r.day + ", radio rumour on screen: " + r.rumour + ", campaign goals on screen: " + r.goals, shot: true};
   },
   async "use-notes"(page) {
     await startCampaign(page);

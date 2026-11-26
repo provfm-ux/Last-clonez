@@ -514,6 +514,7 @@ const Sim = (() => {
     };
     if (difficulty === "campaign") {
       s.campaign = newCampaign();
+      s.waypoint = "";
       if (region === "ironworks") placeIronworks(world);
       if (town) {
         placeCampaignPages(world, seed);
@@ -649,7 +650,43 @@ const Sim = (() => {
     return s;
   }
 
+  // Campaign goals: the next challenges in order, with progress and where the direction arrow should point.
+  function campaignGoals(s) {
+    const c = s.campaign, day = runDay(s.minutes), pages = s.world.objects.filter(o => o.action === "campaign-page" && o.read).length;
+    return Data.campaignGoals.map(goal => {
+      const done = c.completed.includes(goal.id), area = Campaign.areas[goal.area];
+      let text = goal.id === "eva.death" && c.eva === "gone" ? goal.gone : goal.text, detail = goal.detail;
+      if (goal.id === "coldvale.houses" && !done && pages) detail += " Torn pages " + pages + " of 3.";
+      if (goal.id === "pineridge.two-nights" && !done && c.ridge.nights) detail += " Nights " + c.ridge.nights + " of 2.";
+      const opens = !done && day < area.from ? area.from : null;
+      return {id:goal.id, done, text, detail, opens};
+    });
+  }
+
+  function campaignGoal(s) {
+    const goals = campaignGoals(s);
+    return goals.find(g => !g.done && !g.opens) ?? goals.find(g => !g.done) ?? null;
+  }
+
+  function campaignTarget(s, goal) {
+    if (!goal || s.hideNavigation) return null;
+    const find = id => s.world.objects.find(o => o.id === id) ?? null, region = s.world.region;
+    if (goal.id === "cinema.statue") {
+      if (region !== "cinema") return region === Regions.home ? find("exit-cinema") : find("exit-" + Regions.home);
+      const idol = find("cinema-statue");
+      return idol?.active ? idol : s.world.objects.find(o => o.action === "door" && o.kind === "window") ?? null;
+    }
+    if (goal.id === "pineridge.two-nights") return region === "ridge" ? null : region === Regions.home ? find("exit-ridge") : find("exit-" + Regions.home);
+    if (goal.id === "ironworks.barricade") return region === "ironworks" ? find("iron-cage") : region === Regions.home ? find("exit-ironworks") : find("exit-" + Regions.home);
+    if (goal.id === "eva.death" && s.campaign.eva === "gone") return region === Regions.home ? find("eva-diary") : find("exit-" + Regions.home);
+    return null;
+  }
+
   function pinnedGoal(s) {
+    if (s.campaign) {
+      const goal = campaignGoal(s);
+      return goal ? goal.text + (goal.opens ? " · opens on day " + goal.opens : "") : "More of the campaign is on its way.";
+    }
     if ((!s.pinStory && s.guideStep === undefined) || s.flags.radio) return null;
     if (s.world.region !== Regions.home) return "Return to Cold Vale.";
     if (s.flags.rescued || s.world.npc.mode === "dead") {
@@ -1321,6 +1358,10 @@ const Sim = (() => {
       if (s.world.region === Regions.home && !run.returned) return s.world.objects.find(o => o.id === "exit-ridge");
       if (s.world.region === "ridge") return s.world.objects.find(o => o.id === (run.supplied ? "exit-" + Regions.home : longHaulCache));
       if (s.world.region === Regions.home) return {...s.world.start,name:"Shelter"};
+    }
+    if (s.campaign && !s.waypoint) {
+      const target = campaignTarget(s, campaignGoal(s));
+      return target ? {...target, name:target.name} : null;
     }
     const id = s.waypoint || (goal ? (s.flags.rescued || s.world.npc.mode === "dead" ? "base" : "clinic") : "");
     if (!id) return null;
@@ -4028,7 +4069,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, campaignGoals, campaignGoal, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

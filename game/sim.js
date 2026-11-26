@@ -1332,13 +1332,16 @@ const Sim = (() => {
   }
 
   // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
-  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty()});
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0});
+  // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
+  const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
   const challengeId = /^[a-z0-9]+(\.[a-z0-9-]+)?$/;
   function restoreCampaign(raw) {
     if (raw === undefined) return newCampaign();
     if (!raw || !Number.isInteger(raw.clues) || raw.clues < 0 || raw.clues > 5 || !Array.isArray(raw.completed) || raw.completed.length > 64 ||
         raw.completed.some((id,i) => typeof id !== "string" || !challengeId.test(id) || raw.completed.indexOf(id) !== i)) throw new Error("Invalid campaign progress.");
-    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints)};
+    if (raw.buffUntil !== undefined && (!Number.isFinite(raw.buffUntil) || raw.buffUntil < 0)) throw new Error("Invalid campaign progress.");
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0};
   }
   // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
   function placeCampaignPages(world, seed) {
@@ -1396,7 +1399,15 @@ const Sim = (() => {
     for (const o of s.world.objects) if (o.sealed) o.sealed = false;
     s.campaign.completed.push("cinema.statue");
     CampaignHints.track(s.campaign.hints, "pineridge.two-nights", s.minutes);
+    s.campaign.buffUntil = (runDay(s.minutes) + Data.cinemaTrap.buffNights - 1) * 1440 + 390;
     notify(s, Data.campaignText.cinemaEscape);
+    notify(s, Data.campaignText.cinemaBuff);
+  }
+
+  function updateCinemaBuff(s) {
+    if (!s.campaign.buffUntil || s.minutes < s.campaign.buffUntil) return;
+    s.campaign.buffUntil = 0;
+    notify(s, Data.campaignText.cinemaBuffEnds);
   }
 
   function readCampaignPage(s, note) {
@@ -2774,7 +2785,8 @@ const Sim = (() => {
       item.condition = Math.max(0,(item.condition ?? 100)-wear);
     }
     guard = Math.min(.7,guard);
-    const amount = z.stats.damage * infectedDamage(s) * (1 - guard);
+    const shielded = p.sleeping && isNight(s) && cinemaBuff(s);
+    const amount = z.stats.damage * infectedDamage(s) * (1 - guard) * (shielded ? Data.cinemaTrap.sleepDamage : 1);
     const absorbed = guard > 0 && s.world.rng() < guard * .9;
     p.hp = Math.max(0, p.hp - amount); p.flash = .75; p.resting = false;
     if (!p.hp) s.deathCause = "a " + z.stats.name.toLowerCase();
@@ -3149,7 +3161,7 @@ const Sim = (() => {
         p.hp = Math.min(100, p.hp + dt * (gradual ? .38 : .12) * (p.sleeping ? .5 : 1));
       }
     }
-    p.panic = clamp(p.panic + dt * (inDanger ? 6 : -9), 0, 100);
+    p.panic = clamp(p.panic + dt * (inDanger ? 6 * (cinemaBuff(s) ? Data.cinemaTrap.panicRate : 1) : -9), 0, 100);
     let pain = 0;
     for (const w of p.wounds) {
       w.age += dt;
@@ -3197,7 +3209,7 @@ const Sim = (() => {
     const raining = s.weather === "Rain";
     updateOutdoor(s, minutes, raining);
     if (s.longHaul && s.player.hp > 0) updateLongHaul(s);
-    if (s.campaign) updateCinemaTrap(s);
+    if (s.campaign) { updateCinemaTrap(s); updateCinemaBuff(s); }
     if (s.campaign?.hints.objective) {
       const hint = CampaignHints.next(s.campaign.hints, s.minutes);
       if (hint) notify(s, "Hint: " + hint);
@@ -3405,7 +3417,7 @@ const Sim = (() => {
       guideStep:s.guideStep, firstSleep:s.firstSleep, pinStory:s.pinStory, playtest:s.playtest,
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
-      campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}} : undefined,
+      campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}, buffUntil:s.campaign.buffUntil} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
@@ -3761,7 +3773,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, cinemaBuff, hurt, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

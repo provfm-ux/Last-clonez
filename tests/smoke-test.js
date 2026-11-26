@@ -1480,6 +1480,13 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("sys.calendar áreas opcionais (dias 7, 9, 11, 13, 21-24) não dão pista",
     Object.entries(C.areas).filter(([id]) => id.startsWith("opt.")).every(([, a]) => a.kind === "optional" && a.clue === undefined &&
     [7, 9, 11, 13, 21, 22, 23, 24].includes(a.from)));
+  check("sys.calendar Ironworks fora de horas: fechada às 22:00, aberta às 08:00",
+    !C.isOpen("ironworks", 6, 22) && /opens at 08:00/.test(C.closedReason("ironworks", 6, 22)) && C.isOpen("ironworks", 6, 8));
+  check("sys.calendar Cinder Grotto pede lanterna e pilhas",
+    /flashlight and battery/.test(C.missing("cindergrotto", {items: []})) && /battery/.test(C.missing("cindergrotto", {items: ["flashlight"]})) &&
+    C.missing("cindergrotto", {items: ["flashlight", "battery"]}) === "");
+  check("sys.calendar fortaleza só com as 5 coordenadas", /4 of 5/.test(C.missing("fortress", {clues: 4})) && C.missing("fortress", {clues: 5}) === "" &&
+    C.missing("coldvale") === "");
   check("sys.calendar 5 coordenadas parciais, uma por área", Object.values(C.areas).map(a => a.clue).filter(Boolean).sort().join() === "1,2,3,4,5");
 }
 

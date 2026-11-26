@@ -1461,6 +1461,29 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     !restored.world.objects.some(o=>o.id.startsWith("coverage-route-")));
 }
 
+{ // sys.zombie-carry (HISTORIA.md secções 5 e 16): ~1 em 8 zombies aleatórios leva um recurso da área
+  const s = fresh("survival"), rule = Data.zombieCarry, n = 8000;
+  const at = type => { const b = s.world.buildings.find(b => b.type === type); return {x: b.x + b.w / 2, y: b.y + b.h / 2}; };
+  const street = {x: s.player.x, y: s.player.y}, sample = (origin, point = street) =>
+    Array.from({length: n}, (_, i) => Sim.carriedSupply(s, {id: "a" + i, origin, ...point}));
+  const horde = sample("horde"), share = horde.filter(Boolean).length / n;
+  check("sys.zombie-carry cerca de 1 em 8 leva recurso", share > .1 && share < .15, (share * 100).toFixed(1) + "%");
+  check("sys.zombie-carry é determinístico por zombie", Sim.carriedSupply(s, {id: "a42", origin: "horde", ...street}) === horde[42]);
+  check("sys.zombie-carry bosses e zombies de desafio nunca dão recursos",
+    ["cinema-sleeper", "cinema-winner", "resident", "boss", "challenge"].every(o => sample(o).every(x => x === null)));
+  const every = Object.values(rule.pools).flat();
+  check("sys.zombie-carry nunca dá arma nem item de desafio", every.every(id => Data.items[id] && !Data.items[id].damage && id !== "raffletrophy"));
+  const pool = (type, origin) => new Set(sample(origin, at(type)).filter(Boolean));
+  check("sys.zombie-carry pool por área: clínica bandagens, posto combustível, loja pilhas, rua comida/água",
+    [...pool("clinic", "nest")].join() === "bandage" && [...pool("fuel", "")].join() === "fuel" && [...pool("market", "horde")].join() === "battery" &&
+    [...new Set(horde.filter(Boolean))].sort().join() === "food,water");
+  const id = "a" + horde.findIndex(x => x === "food"), z = {...s.world.enemies.find(e => !e.origin), id, origin: "horde", ...street, hp: 1, dormant: false};
+  s.world.enemies.push(z);
+  for (let i = 0; i < 20 && z.hp > 0; i++) { Sim.attack(s, z); s.player.cooldown = 0; s.player.attackCooldown = 0; }
+  const pile = s.world.objects.find(o => o.kind === "drop" && o.died !== undefined && Math.abs(o.x - z.x) < .01 && Math.abs(o.y - z.y) < .01);
+  check("sys.zombie-carry o recurso cai junto ao corpo", z.hp <= 0 && pile?.loot.some(l => l.id === "food") && !pile.searched, z.hp > 0 ? "zombie vivo" : pile ? "" : "sem pilha");
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

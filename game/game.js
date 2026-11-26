@@ -339,6 +339,7 @@
     $("start-point").value = "shelter";
     showStartDetail();
     start();
+    if (active()) { write(startChoiceKey, "story"); $("advanced-start").open = false; } // next visit: options stay folded
   }
 
   function startRecommended() {
@@ -531,7 +532,7 @@
     state.mode = "menu";
     $("hero").hidden = false;
     $("advanced-start").open = read(startChoiceKey) === "advanced";
-    requestAnimationFrame(() => { if (!$("hero").hidden && !dialog.open) $("story-btn").focus({preventScroll:true}); }); // game-ui-ux: focus the primary action
+    requestAnimationFrame(() => { if (!$("hero").hidden && !dialog.open) ($("continue-btn").hidden ? $("story-btn") : $("continue-btn")).focus({preventScroll:true}); }); // game-ui-ux: focus the primary action
     $("intro-btn").textContent = read(introKey) ? "Replay introduction" : "Beginner introduction";
     $("continue-btn").hidden = !savedText && !read(backupKey);
     if (state.controlStart) $("start-point").value = state.controlStart;
@@ -2471,7 +2472,7 @@
   document.querySelectorAll("[data-panel]").forEach(button => button.addEventListener("click", health));
   $("navigation-mode").value = navigation;
   $("advanced-start").open = read(startChoiceKey) === "advanced" || !read(startChoiceKey) && Boolean(read(setupKey));
-  requestAnimationFrame(() => { if (!$("hero").hidden && !dialog.open) $("story-btn").focus({preventScroll:true}); });
+  requestAnimationFrame(() => { if (!$("hero").hidden && !dialog.open) ($("continue-btn").hidden ? $("story-btn") : $("continue-btn")).focus({preventScroll:true}); });
   $("guide-enabled").checked = read(guideKey) !== "0";
   $("playtest-enabled").checked = read(playtestKey) === "1";
   $("guide-enabled").addEventListener("change", event => write(guideKey, event.target.checked ? "1" : "0"));

@@ -194,6 +194,32 @@ const scenarios = {
     return {pass: r.controls <= 9 && r.focused === "story-btn" && /^Story campaign/.test(r.first) && mode === "campaign",
       notes: r.controls + " controls visible on the title screen, focus on: " + r.focused + ", start buttons: " + r.first + ", Story campaign starts: " + mode};
   },
+  async "menu-continue"(page) { // with a saved game: Continue is primary and the new-game buttons sit apart (game-ui-ux)
+    await page.evaluate(helpers);
+    await page.evaluate(() => { window.confirm = () => true; });
+    await page.click("#story-btn");
+    await page.waitForFunction(() => window.__state?.mode === "play");
+    await page.waitForFunction(() => /SAVED/.test(document.body.innerText)).catch(() => {});
+    await page.reload(); await page.waitForFunction(() => typeof Sim !== "undefined" && !document.getElementById("continue-btn").hidden);
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(() => {
+      const box = id => document.getElementById(id).getBoundingClientRect(), style = id => getComputedStyle(document.getElementById(id)).backgroundColor;
+      const buttons = ["continue-btn", "story-btn", "recommended-btn"].map(box);
+      const gaps = buttons.slice(1).map((b, i) => Math.round(b.top - buttons[i].bottom));
+      return {gaps, heights: buttons.map(b => Math.round(b.height)), focus: document.activeElement?.id,
+        label: document.getElementById("new-game-label").checkVisibility(), differ: style("continue-btn") !== style("story-btn"),
+        folded: !document.getElementById("advanced-start").open};
+    });
+    await page.screenshot({path: require("path").join(out, "menu-continue.png")});
+    await page.setViewportSize({width: 390, height: 844}); await page.waitForTimeout(300); // phone portrait
+    const phone = await page.evaluate(() => { const b = id => document.getElementById(id).getBoundingClientRect();
+      return {gap: Math.round(b("story-btn").top - b("continue-btn").bottom), height: Math.round(b("story-btn").height), fits: b("recommended-btn").right <= innerWidth}; });
+    await page.screenshot({path: require("path").join(out, "menu-continue-phone.png")});
+    r.gaps.push(phone.gap); r.heights.push(phone.height); r.differ = r.differ && phone.fits;
+    return {pass: r.gaps.every(g => g >= 12) && r.heights.every(h => h >= 44) && r.focus === "continue-btn" && r.label && r.differ && r.folded,
+      notes: "gaps between buttons " + r.gaps.join("/") + " px, heights " + r.heights.join("/") + " px, focus: " + r.focus +
+        ", 'Start a new game' label: " + r.label + ", Continue stands out: " + r.differ + ", options folded: " + r.folded};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

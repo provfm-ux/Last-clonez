@@ -673,12 +673,14 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("El Gordo appears on a small fraction of seeds", rare >= 35 && rare <= 105, rare + "/1000");
   for (const [outcome,seed] of seeds) {
     const run = Sim.create(seed,"survival","carer",6,undefined,"cinema");
-    check("cinema outcome: " + outcome, run.world.cinema === outcome && run.world.enemies.length <= 3);
+    check("cinema outcome: " + outcome, run.world.cinema === outcome && run.world.enemies.length <= 4 && // up to 3 sleepers + the raffle winner
+      run.world.enemies.filter(z => z.id === "cinema-winner").length === 1);
     if (outcome === "projector" || outcome === "noise") {
       Object.assign(run.player,{x:12.5,y:17.5});
       Sim.tick(run,.03);
       check("cinema sleepers respect the event trigger: " + outcome,
-        run.world.enemies.length >= 2 && run.world.enemies.every(z => z.dormant === (outcome === "noise")));
+        run.world.enemies.filter(z => z.origin === "cinema-sleeper").length >= 2 &&
+        run.world.enemies.filter(z => z.origin === "cinema-sleeper").every(z => z.dormant === (outcome === "noise")));
       if (outcome === "noise") {
         const z = run.world.enemies[0];
         Object.assign(run.player,{x:z.x+1,y:z.y});
@@ -1613,8 +1615,10 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("sys.campaign o progresso grava e carrega", loaded.campaign.clues === 1 && loaded.campaign.completed.join() === "radio.rumour,coldvale.houses" &&
     loaded.campaign.hints.objective === "cinema.statue");
   const legacy = JSON.parse(JSON.stringify(Sim.snapshot(s))); delete legacy.campaign;
-  check("sys.campaign save de campanha sem progresso começa vazio; outros modos não têm campanha",
-    Sim.restore(legacy).campaign.clues === 0 && round(fresh("survival")).campaign === undefined);
+  const story = round(fresh("survival"));
+  check("sys.campaign save de campanha sem progresso começa vazio; os outros modos também guardam a história, sem calendário",
+    Sim.restore(legacy).campaign.clues === 0 && story.campaign?.clues === 0 && !Sim.isCampaign(story) &&
+    Sim.campaignProblem(story, "cinema") === "" && Sim.pinnedGoal(story) !== "Find the three torn pages");
   const bad = JSON.parse(JSON.stringify(Sim.snapshot(s))); bad.campaign.clues = 9;
   let refused = false; try { Sim.restore(bad); } catch (e) { refused = /campaign/i.test(e.message); }
   check("sys.campaign progresso inválido é recusado", refused);
@@ -1649,7 +1653,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   const again = fresh("campaign");
   check("coldvale.houses mesma semente, mesmas casas; outros modos não têm páginas",
     again.world.objects.filter(o => o.action === "campaign-page").map(o => o.building + "@" + o.x + "," + o.y).join() ===
-    pages.map(o => o.building + "@" + o.x + "," + o.y).join() && !fresh("survival").world.objects.some(o => o.action === "campaign-page"));
+    pages.map(o => o.building + "@" + o.x + "," + o.y).join() && fresh("survival").world.objects.filter(o => o.action === "campaign-page").length === 3);
   const others = Sim.create(4242, "campaign", "carer", context.Expedition.generator).world.objects.filter(o => o.action === "campaign-page");
   check("coldvale.houses outra semente também tem 3 páginas", others.length === 3);
   const reach = o => { const near = [[0,1],[1,0],[0,-1],[-1,0],[.6,.6],[-.6,-.6],[.6,-.6],[-.6,.6]].map(([dx,dy]) => ({x:o.x+dx*.7, y:o.y+dy*.7}))
@@ -1675,8 +1679,8 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     return Sim.travel(s, exit);
   };
   const c = toCinema({}), statue = c.world.objects.find(o => o.id === "cinema-statue");
-  check("cinema.statue a estátua está no palco só na campanha", statue?.active && c.world.tiles.find(t => t.x === 11 && t.y === 5)?.room === "Stage" &&
-    !Sim.create(17, "survival", "carer", context.Expedition.generator, undefined, ctxRegions.definitions.cinema ? "cinema" : undefined).world.objects.some(o => o.id === "cinema-statue"));
+  check("cinema.statue o ídolo está no palco em todos os modos (um só jogo)", statue?.active && c.world.tiles.find(t => t.x === 11 && t.y === 5)?.room === "Stage" &&
+    ["survival", "longhaul", "harsh"].every(mode => Sim.create(17, mode, "carer", context.Expedition.generator, undefined, "cinema").world.objects.some(o => o.id === "cinema-statue")));
   const take = s => { const st = s.world.objects.find(o => o.id === "cinema-statue"); Object.assign(s.player, {x: 11.5, y: 6.5}); return Sim.takeStatue(s, st); };
   const doors = s => s.world.objects.filter(o => o.action === "door" && o.kind !== "window" && o.building === s.world.buildings.find(b => b.type === "cinema").id);
   const win = s => s.world.objects.find(o => o.action === "door" && o.kind === "window");
@@ -2026,6 +2030,22 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("ui.campaign-goals com tudo feito por agora o objetivo avisa que há mais a caminho", /on its way/.test(Sim.pinnedGoal(c)) && Sim.destination(c) === null);
   const plain = fresh("survival"); plain.pinStory = true;
   check("ui.campaign-goals fora da campanha nada muda", Sim.pinnedGoal(plain) === "Find Eva" && Sim.campaignGoals === Sim.campaignGoals);
+}
+
+{ // story.all-modes (pedido do utilizador): os vilões e a história estão em todos os modos; só as regras são da campanha
+  for (const mode of ["survival", "longhaul"]) {
+    const s = fresh(mode), ex = s.world.objects.find(o => o.id === "exit-cinema"); Object.assign(s.player, {x: ex.x - 1, y: ex.y});
+    const c = Sim.travel(s, ex);
+    check("story.all-modes " + mode + ": o cinema abre no dia 1 (sem calendário) e tem o ídolo, a torneira e o vencedor", c?.world.region === "cinema" &&
+      c.world.objects.some(o => o.id === "cinema-statue" && o.active) && c.world.objects.some(o => o.id === "cinema-tap") &&
+      c.world.enemies.some(z => z.id === "cinema-winner"));
+    Object.assign(c.player, {x: 11.5, y: 6.5});
+    check("story.all-modes " + mode + ": a armadilha funciona (horda de 50, portas trancadas)", Sim.takeStatue(c, c.world.objects.find(o => o.id === "cinema-statue")) &&
+      c.world.enemies.filter(z => z.origin === "cinema-horde").length === 50 && c.world.objects.filter(o => o.sealed).length === 2);
+  }
+  const plain = fresh("survival"); Sim.testJump(plain, 6, {}, {anyMode: true}); plain.world.npc.mode = "refuge"; plain.world.npc.hp = 100; run(plain, 2);
+  check("story.all-modes fora da campanha a Eva não parte nem há dicas", plain.world.npc.mode === "refuge" && plain.campaign.eva === "" &&
+    plain.campaign.hints.objective === null);
 }
 
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>

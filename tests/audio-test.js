@@ -14,7 +14,7 @@ async function run() {
     async decodeAudioData(bytes) { decoded.push(bytes.byteLength); return {recorded:bytes.byteLength}; },
     createBuffer(channel,length) { const channelData = new Float32Array(length); return {getChannelData:() => channelData}; },
     createBufferSource() {
-      const source = {...node(),playbackRate:{value:1},start() { sources.push(this); },stop() { this.stopped = true; }};
+      const source = {...node(),playbackRate:{value:1},start(when) { this.when = when; sources.push(this); },stop() { this.stopped = true; }};
       return source;
     },
     createGain:node,createBiquadFilter:node,createStereoPanner:node
@@ -68,7 +68,7 @@ async function run() {
   assert.ok(await attackGain(1) > atFour*4);
   assert.ok(await attackGain(8) < atFour*.6);
   assert.ok(await attackGain(1,true) < await attackGain(1));
-  const generated = ["doorOpen","doorClose","windowSlide","glassSmash","pry","hammer","stepSoft","stepHard","strike","shot","crash"];
+  const generated = ["doorOpen","doorClose","windowSlide","glassSmash","pry","hammer","stepSoft","stepHard","strike","shot","crash","idolClick","doorSlam","tension"];
   for (const kind of generated) {
     const samples = play(kind).getChannelData(0);
     const peak = samples.reduce((max,value) => Math.max(max,Math.abs(value)),0);
@@ -76,6 +76,12 @@ async function run() {
     assert.equal(samples.at(-1) < .005 && samples.at(-1) > -.005,true,kind);
     sources.at(-1).onended();
   }
+  audio.play(ctx,{kind:"doorSlam",x:1,y:0,delay:.5},{x:0,y:0});
+  assert.equal(sources.at(-1).when,.5,"delayed cue starts later");
+  sources.at(-1).onended();
+  audio.play(ctx,{kind:"doorSlam",x:1,y:0},{x:0,y:0});
+  assert.equal(sources.at(-1).when,undefined,"cue without delay starts now");
+  sources.at(-1).onended();
   await zombie("idle");
   const first = sources.at(-1).buffer;
   await zombie("idle");

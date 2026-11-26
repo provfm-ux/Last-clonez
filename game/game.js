@@ -413,7 +413,7 @@
     const rules = Data.worldRules(ruleBase, !reset && current === "custom" ? customRules : null);
     const inputs = Object.entries(Data.ruleFields).map(([id, field]) => {
       const inputId = "rule-" + id;
-      const input = field.choices ? '<select id="' + inputId + '">' + Object.entries(field.choices).map(([value, label]) =>
+      const input = field.choices ? '<select id="' + inputId + '">' + Object.entries(field.choices).sort(([a], [b]) => field.numeric ? a - b : 0).map(([value, label]) =>
         '<option value="' + value + '"' + (String(rules[id]) === value ? " selected" : "") + ">" + label + "</option>").join("") + "</select>" :
         '<input type="number" id="' + inputId + '" min="' + field.min + '" max="' + field.max + '" value="' + rules[id] + '" required inputmode="numeric">';
       return '<label for="' + inputId + '">' + field.label + input + "</label>";
@@ -578,6 +578,7 @@
     const p = state.player, list = Sim.moodles(state);
     if (p.exposure) list.unshift({label:"Viral infection",level:4});
     if (p.resting) list.push({label:"Resting",level:1});
+    if (Sim.cinemaBuff(state)) list.push({label:"Idol's luck",level:1});
     if (state.blueprint) list.push({label:"Build mode",level:1});
     const {pending,time} = state.atmosphere;
     if (pending) list.unshift({label:"Horde · " + Math.max(1,Math.ceil(pending.due-time)) + "s",level:4});
@@ -585,7 +586,7 @@
   }
 
   const taskTarget = o => o && (o.action === "travel" || Sim.isSupplyCache(state, o) || Sim.unreadClueAt(state, o) || o.action === "radio" && state.supplyRun === "return" ||
-    Chronicle.isUnseen(state.ledger,o) && !Sim.sceneProblem(state,o) ||
+    Chronicle.isUnseen(state.ledger,o) && !Sim.sceneProblem(state,o) || Sim.unreadNote(o) ||
     o.action === "garden" || o.action === "campfire" && Sim.fireBatch(state, o));
   const nearbyExit = () => Sim.nearby(state).find(o => o.action === "travel");
 
@@ -618,7 +619,7 @@
     if (o.action === "bed") return state.player.fatigue >= 35 ? "Sleep" : "Rest";
     return ({bed:"Rest", barrel:"Collector", campfire:"Campfire", radio:"Radio", garden:"Garden", tap:"Tap", generator:"Generator",
       harvest:"Chop", dismantle:"Salvage", workbench:"Build", travel:"Cross", spring:"Fill", forage:"Forage", fish:"Fish",
-      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read",crib:"Look"}[o.action] || "Use");
+      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read","campaign-page":"Read","cinema-statue":"Take","eva-diary":"Read","cinema-note":"Read","ironworks-terminal":"Read","ironworks-cage":"Dismantle",crib:"Look"}[o.action] || "Use");
   }
 
   function canTalk() {
@@ -1700,6 +1701,30 @@
       if (Sim.readFieldNote(state,o)) save();
       return;
     }
+    if (o.action === "ironworks-cage") {
+      if (Sim.dismantleCage(state,o)) save();
+      return;
+    }
+    if (o.action === "ironworks-terminal") {
+      if (Sim.readTerminal(state,o)) save();
+      return;
+    }
+    if (o.action === "cinema-note") {
+      if (Sim.readCinemaNote(state,o)) save();
+      return;
+    }
+    if (o.action === "eva-diary") {
+      if (Sim.readEvaDiary(state,o)) save();
+      return;
+    }
+    if (o.action === "cinema-statue") {
+      if (Sim.takeStatue(state,o)) save();
+      return;
+    }
+    if (o.action === "campaign-page") {
+      if (Sim.readCampaignPage(state,o)) save();
+      return;
+    }
     if (o.action === "mushroom") {
       const name = Sim.itemName(state,o.species);
       const conditions = {
@@ -2572,7 +2597,7 @@
   startPoint.value = "shelter";
   startPoint.addEventListener("change", showStartDetail);
   const presets = $("difficulty");
-  const headline = ["longhaul","relaxed","survival","harsh"];
+  const headline = ["campaign","longhaul","relaxed","survival","harsh"];
   const presetOption = id => '<option value="' + id + '">' + Data.modes[id].name + '</option>';
   presets.innerHTML = headline.map(presetOption).join("") + '<optgroup label="More modes">' +
     Object.keys(Data.modes).filter(id => !headline.includes(id)).map(presetOption).join("") +

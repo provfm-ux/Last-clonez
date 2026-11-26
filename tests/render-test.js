@@ -12,6 +12,7 @@ let heldWeapon = null;
 const infectedFrames = [], survivorFrames = [];
 const bagPigments = new Set(["#3b2822","#c4875e","#985b40","#714534","#513629","#e0b784"]);
 const bagPixels = [];
+let lastTranslate = null;
 const smokeFrames = [], canopyPositions = [], rippleFrames = [], propSprites = [];
 let beamOpacity = 1;
 const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
@@ -22,6 +23,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
       counts[k] = (counts[k] || 0) + 1;
       if (k === "fillRect" && (t.fillStyle === "#afc1c66b" || t.fillStyle === "#879fa840")) rippleFrames.push(args);
       if (k === "fillRect" && bagPigments.has(t.fillStyle)) bagPixels.push(t.fillStyle);
+      if (k === "translate" && !lastTranslate) lastTranslate = args;
       if (k === "save") t.savedAlpha.push(t.globalAlpha);
       if (k === "restore") t.globalAlpha = t.savedAlpha.pop() ?? 1;
       if (k === "drawImage" && args.length === 5) {
@@ -429,6 +431,63 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   portrait.width = portrait.height = 48;
   const equipped = per(() => View.equipmentPortrait(portrait,run));
   check("equipamento: retrato apresenta jogador e arma equipada", equipped.drawImage >= 2);
+}
+{ // cinema.statue: a estátua desenha-se no palco, barata e sem gradientes, e desaparece depois de apanhada
+  const run = Sim.createControl("campaign","carer","shelter"); Sim.testJump(run, 2, {}, {anyMode: true});
+  const exit = run.world.objects.find(o => o.id === "exit-cinema"); Object.assign(run.player, {x: exit.x - 1, y: exit.y});
+  const c = Sim.travel(run, exit); View.prepare(c.world); Object.assign(c.player, {x: 11.5, y: 7.5}); for (let i = 0; i < 5; i++) Sim.tick(c, .05);
+  const statue = c.world.objects.find(o => o.id === "cinema-statue");
+  const total = r => Object.entries(r).filter(([k]) => !/Gradient/.test(k)).reduce((n, [, v]) => n + v, 0);
+  View.render(c, 0, 1/60);
+  const shown = per(() => View.render(c, 0, 1/60)); statue.active = false;
+  const gone = per(() => View.render(c, 0, 1/60)); statue.active = true;
+  check("cinema.statue estátua desenhada no palco, barata e sem gradientes", total(shown) > total(gone) && total(shown) - total(gone) < 200 &&
+    (shown.createRadialGradient ?? 0) === (gone.createRadialGradient ?? 0) && (shown.createLinearGradient ?? 0) === (gone.createLinearGradient ?? 0),
+    total(shown) + " vs " + total(gone));
+}
+{ // game-feel: impactos abanam só o desenho, decaem em tempo real e respeitam "Reduce flicker"
+  const run = Sim.createControl("training","carer","shelter"); View.prepare(run.world); run.visualAtmosphere = "full"; run.reduceFlicker = false;
+  const frame = dt => { lastTranslate = null; View.render(run, 0, dt); return lastTranslate.slice(); };
+  for (let i = 0; i < 30; i++) frame(1/60);
+  const rest = frame(1/60);
+  run.effects.push({x: run.player.x, y: run.player.y, text: "CLICK", color: "#fff", life: 1, impact: .8});
+  frame(.03);
+  run.effects.push({x: run.player.x, y: run.player.y, text: "SMASH", color: "#fff", life: 1, impact: .45});
+  const hit = frame(1/60);
+  check("game-feel dois impactos somam trauma e abanam o ecrã", View.trauma() > .9 && (Math.abs(hit[0] - rest[0]) > .5 || Math.abs(hit[1] - rest[1]) > .5),
+    "trauma " + View.trauma().toFixed(2));
+  for (let t = 0; t < 1 / 1.2; t += 1/60) frame(1/60);
+  const after = frame(1/60);
+  check("game-feel o abanão volta a zero em menos de 1/decaimento segundos", View.trauma() === 0 && after[0] === rest[0] && after[1] === rest[1]);
+  run.reduceFlicker = true;
+  run.effects.push({x: run.player.x, y: run.player.y, text: "CLICK", color: "#fff", life: 1, impact: .8});
+  const calm = frame(1/60);
+  check("game-feel com Reduce flicker o ecrã não abana", calm[0] === rest[0] && calm[1] === rest[1]);
+}
+{ // ironworks: o terminal do computador da linha desenha-se, barato e sem gradientes
+  const run = Sim.createControl("campaign","carer","shelter"); Sim.testJump(run, 6, {}, {anyMode: true});
+  const ex = run.world.objects.find(o => o.id === "exit-ironworks"); Object.assign(run.player, {x: ex.x, y: ex.y + (ex.y > run.world.height / 2 ? -1 : 1)});
+  const w = Sim.travel(run, ex), t = w.world.objects.find(o => o.id === "iron-terminal-0"); View.prepare(w.world); w.world.enemies = [];
+  Object.assign(w.player, {x: t.x, y: t.y + 1.2}); for (let i = 0; i < 5; i++) Sim.tick(w, .05);
+  const total = r => Object.entries(r).filter(([k]) => !/Gradient/.test(k)).reduce((n, [, v]) => n + v, 0);
+  View.render(w, 0, 1/60);
+  const shown = per(() => View.render(w, 0, 1/60)); t.active = false;
+  const gone = per(() => View.render(w, 0, 1/60)); t.active = true;
+  check("ironworks terminal desenhado, barato e sem gradientes", total(shown) > total(gone) && total(shown) - total(gone) < 80 &&
+    (shown.createRadialGradient ?? 0) === (gone.createRadialGradient ?? 0) && (shown.createLinearGradient ?? 0) === (gone.createLinearGradient ?? 0),
+    total(shown) + " vs " + total(gone));
+}
+{ // cinema: a torneira de cerveja do convívio desenha-se, barata e sem gradientes
+  const run = Sim.createControl("campaign","carer","shelter"); Sim.testJump(run, 2, {}, {anyMode: true});
+  const ex = run.world.objects.find(o => o.id === "exit-cinema"); Object.assign(run.player, {x: ex.x - 1, y: ex.y});
+  const c = Sim.travel(run, ex), tap = c.world.objects.find(o => o.id === "cinema-tap"); View.prepare(c.world); c.world.enemies = [];
+  Object.assign(c.player, {x: tap.x + 1.5, y: tap.y - 1}); for (let i = 0; i < 5; i++) Sim.tick(c, .05);
+  const total = r => Object.entries(r).filter(([k]) => !/Gradient/.test(k)).reduce((n, [, v]) => n + v, 0);
+  View.render(c, 0, 1/60);
+  const shown = per(() => View.render(c, 0, 1/60)); tap.active = false;
+  const gone = per(() => View.render(c, 0, 1/60)); tap.active = true;
+  check("cinema torneira de cerveja desenhada, barata e sem gradientes", total(shown) > total(gone) && total(shown) - total(gone) < 120 &&
+    (shown.createRadialGradient ?? 0) === (gone.createRadialGradient ?? 0), total(shown) + " vs " + total(gone));
 }
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

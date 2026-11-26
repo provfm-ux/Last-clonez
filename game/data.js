@@ -6,6 +6,10 @@ const Data = (() => {
     pantrycap:{name:"Pantrycap",group:"Food",weight:.08,use:"food",nutrition:16,perish:1.5,icon:"food"},
     mushroommeal:{name:"Roasted Pantrycaps",group:"Food",weight:.13,use:"food",nutrition:38,perish:.8,icon:"food"},
     bitterfold:{name:"Bitterfold",group:"Food",weight:.08,use:"food",toxic:true,perish:1.5,icon:"food"},
+    evadiary:{name:"Eva's diary",group:"Equipment",weight:.2,icon:"book",
+      detail:"Her handwriting gets smaller near the end. Every page is about the fortress."},
+    goldstatue:{name:"Golden idol",group:"Equipment",weight:1.2,icon:"badge",
+      detail:"Left on the cinema altar by two regulars. The rumour ties it to the fortress."},
     raffletrophy:{name:"Golden Raffle Trophy",group:"Equipment",weight:.35,icon:"badge",
       detail:"Congratulations. You survived the raffle. The winner didn't."},
     bat: {combat:"blunt", name:"Wooden bat", group:"Weapons", weight:1.4, damage:25, range:1.4, delay:.55, effort:6, noise:3, wear:.6, icon:"bat"},
@@ -19,6 +23,8 @@ const Data = (() => {
     machete: {combat:"heavy", name:"Machete", group:"Weapons", weight:1.1, damage:37, range:1.5, delay:.6, effort:7, noise:4, wear:.3, icon:"bat"},
     shovel: {combat:"heavy", name:"Garden shovel", group:"Weapons", weight:2.4, damage:33, range:1.5, delay:.82, effort:10, noise:5, wear:.22, icon:"bat"},
     golfclub: {combat:"blunt", name:"Golf club", group:"Weapons", weight:.9, damage:21, range:1.6, delay:.5, effort:5, noise:3, wear:.4, icon:"bat"},
+    foundrymaul: {combat:"blunt", name:"Foundry maul", group:"Weapons", weight:3.2, damage:42, range:1.5, delay:.85, effort:9, noise:4, wear:.12, icon:"bat",
+      detail:"Kept in a cage the line computer guarded. Heavy enough for whatever is waiting at the end of this."},
     crowbar: {combat:"blunt", name:"Crowbar", group:"Weapons", weight:1.8, damage:27, range:1.4, delay:.6, effort:6, noise:3, wear:.25, icon:"bat"},
     hatchet: {combat:"heavy", name:"Hatchet", group:"Weapons", weight:1.1, damage:32, range:1.2, delay:.55, effort:6, noise:3.5, wear:.55, icon:"bat"},
     wrench: {combat:"blunt", name:"Adjustable wrench", group:"Weapons", weight:1.1, damage:24, range:1.15, delay:.52, effort:5, noise:4, wear:.3, icon:"bat"},
@@ -144,6 +150,7 @@ const Data = (() => {
   const baseline = {count:65, mix:"mixed", hordes:"normal", damage:100, loot:100, needs:100, clock:2, startHour:8,
     weather:"cycle", infection:"bites", care:"gradual", exposure:"on", powerDays:3, waterDays:2, afterlifeChance:60};
   const modes = {
+    campaign:{...baseline, name:"Campaign · 30 Days", desc:"Follow the radio rumour across the region, one area and one clue at a time. Areas open on set days.", clock:1.6},
     survival:{...baseline, name:"Survival", desc:"The standard Cold Vale outbreak."},
     longhaul:{name:"Easy · 30 Days", desc:"Hold the Cold Vale shelter for 30 days with guided objectives and slower needs.",
       count:18, mix:"walkers", damage:45, loot:150, needs:25, clock:4, weather:"showers",
@@ -164,7 +171,7 @@ const Data = (() => {
     damage:{label:"Infected damage (%)", min:40, max:175, step:5},
     loot:{label:"Loot quantity (%)", min:40, max:180, step:5},
     needs:{label:"Hunger, thirst and fatigue rate (%)", min:25, max:175, step:5},
-    clock:{label:"Game minutes per real second", choices:{1:"1 · 24 minutes per day", 2:"2 · 12 minutes per day", 3:"3 · 8 minutes per day", 4:"4 · 6 minutes per day"}, numeric:true},
+    clock:{label:"Game minutes per real second", choices:{0.4:"0.4 · 60 minutes per day (Realistic)", 1:"1 · 24 minutes per day", 1.6:"1.6 · 15 minutes per day (Mobile)", 2:"2 · 12 minutes per day", 3:"3 · 8 minutes per day", 4:"4 · 6 minutes per day"}, numeric:true},
     startHour:{label:"Starting hour (0–23)", min:0, max:23, step:1},
     weather:{label:"Weather", choices:{cycle:"Passing rain", showers:"Frequent showers", rain:"Steady rain", dry:"Dry"}},
     infection:{label:"Viral transmission", choices:{bites:"Bites only", wounds:"Bites, cuts and scratches", off:"Off"}},
@@ -175,6 +182,7 @@ const Data = (() => {
     waterDays:{label:"Days before water cuts", min:-1, max:14, step:1}
   };
   const modeAdvice = {
+    campaign:"About 15 real minutes per day. Some areas only open on weekdays or at low tide.",
     longhaul:"Follow one suggestion at a time. The shelter has a starter kit.",
     relaxed:"For learning controls and exploring.",
     survival:"For a first full survival run.",
@@ -204,6 +212,53 @@ const Data = (() => {
     }
     return rules;
   }
+  // HISTORIA.md section 5: about 1 in 8 random infected carry a supply, picked by the building where they fall.
+  // Only these origins count (street population, wandering hordes, nests): bosses and challenge infected never carry one.
+  // Campaign texts (HISTORIA.md sections 1 and 10). Player-facing, English.
+  const campaignText = {
+    rumour:"87.6 FM · A rumour keeps repeating: preppers hid clues to a fortress with food, water and weapons. Eva has not stopped talking about it.",
+    pages:[
+      "A torn page taped under a drawer: \"Five numbers, five places. Never all in one.\" Someone drew a small fort in the margin.",
+      "A prepper checklist: water, seed, fuel, coordinates. Beside the last word: \"Start where the radio can hear you.\"",
+      "A page behind a wall calendar: \"If you found three of these, you have the first number.\" The handwriting matches the others."
+    ],
+    housesDone:"The three pages fit together. You have the first coordinate. The rumour is real, or someone wants it to be.",
+    statueTaken:"The stand clicks. Both doors slam and lock. In the dark corner by the beer tap, the members' social turns towards you.",
+    cinemaNote:"OXFORD NIGHT REEL · MEMBERS' SOCIAL. Friday, after the raffle: free pints at the tap in the back corner. Please do not touch the golden idol on its stand. Since the last break-in it is wired to the doors. — Management",
+    jammed:"Jammed shut. Find a window.",
+    frameHolds:"The window frame holds. Keep hitting, or pry it.",
+    cinemaEscape:"You are out with the idol. For the first time in days, you feel a little safer.",
+    ironTools:"Each step needs a tool in good condition: ",
+    ironWorn:"Your tools are too worn for this. Look for another in the Ironworks.",
+    ironDone:"Inside the cage: the Foundry maul. Strong enough for the first friend.",
+    ironTerminals:[
+      "LINE 3 · SHIFT LOG 06:00 · The assistant scheduled the weapon cage audit. Order of work: frame bolts (hammer), plates (crowbar), chain last. Operators reminded: the assistant cannot be argued with, only asked.",
+      "SUBSTATION · POWER LOG · The assistant requested priority power for PROJECT FORTRESS. Approved automatically. Weekly token budget: 82% used. Nobody on site remembers starting that project.",
+      "DISPATCH · MAINTENANCE NOTE · If the assistant locks a gate mid-task it stops when its tokens run out, then carries on. Supervisor's trick: ask it to stand down. It listens to a good joke better than to a password."
+    ],
+    evaLeaves:"Eva: \"I'm going out for Sunny Puffs. The petrol station still has a box, I know it does. Back before dark.\"",
+    evaGone:"Eva did not come back. Her things are still at the shelter.",
+    evaDiary:"Eva's diary, under her pillow. The last pages copy the whole rumour: five coordinates, a fortress, food and water for years. She wanted to see it.",
+    ridgeNight:"Night at Pine Ridge. No barricades: only what you brought.",
+    ridgeBuilt:"You built a barricade. Pine Ridge only counts nights without one.",
+    ridgeCold:"The cold settles in your chest. Pneumonia. This night will not count; try again tomorrow night.",
+    ridgeLeft:"You left Pine Ridge. The night does not count.",
+    ridgeLate:"You arrived after dark. Only a full night at Pine Ridge counts.",
+    ridgeSurvived:"Night survived at Pine Ridge: ",
+    ridgeDone:"Two nights in the pines. Carved into the firewatch rail: the second coordinate.",
+    cinemaBuff:"The idol will watch over your sleep for three nights.",
+    cinemaBuffEnds:"The idol feels like an ordinary lump of metal again."
+  };
+  // ironworks.barricade: three dismantling stages, each needing one of the listed tools and wearing it down.
+  const ironworks = {wear:30, toolCondition:65, stages:[
+    {tools:["hammer"], verb:"Unbolt the frame", done:"The frame bolts give way."},
+    {tools:["crowbar"], verb:"Pry off the plates", done:"The steel plates come off with a scream of metal."},
+    {tools:["hammer","crowbar"], verb:"Break the chain", done:"The chain snaps. The cage swings open."}]};
+  const evaDeparture = {hour:9, gone:6.5};
+  const pineRidge = {nights:2, coldLimit:35.2, fullNight:600, sickness:30};
+  const cinemaTrap = {horde:50, tensionEvery:6, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
+  const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],
+    pools:{clinic:["bandage"], fuel:["fuel"], market:["battery"], workshop:["battery"], town:["food", "water"]}};
   const legacyRules = {care:"quick", exposure:"off", powerDays:-1, waterDays:-1};
   const utilities = {tapReserve:5, generatorCapacity:960, minutesPerFuel:240, generatorRange:10, noiseInterval:8};
   const flashlight = {capacity:180, starter:42, range:10, angle:.59};
@@ -266,7 +321,7 @@ const Data = (() => {
     fishing:{name:"Fishing", desc:"Fish bite sooner. Grows by catching fish."}
   };
   const weaponSkills = {axe:"axe",hatchet:"axe",bat:"long_blunt",pipe:"long_blunt",golfclub:"long_blunt",
-    crowbar:"long_blunt",shovel:"long_blunt",fryingpan:"short_blunt",wrench:"short_blunt",rollingpin:"short_blunt",
+    crowbar:"long_blunt",foundrymaul:"long_blunt",shovel:"long_blunt",fryingpan:"short_blunt",wrench:"short_blunt",rollingpin:"short_blunt",
     machete:"long_blade",knife:"short_blade",flintknife:"short_blade",spear:"spear",carvedspear:"spear",broom:"spear"};
   const skillGroups = {
     "Physical & movement":["fitness","strength","running","lightfooted","nimble","sneaking"],
@@ -400,6 +455,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,worldRules,legacyRules,zombieCarry,campaignText,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

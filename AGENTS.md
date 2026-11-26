@@ -8,6 +8,7 @@ Tone: dark, grim zombie survival. Player-facing text is English.
 - `npm run index` - regenerate `docs/CODE_INDEX.md` after adding/removing/moving functions (CI checks it).
 - `npm run build` - writes `dist/` (static site + `single.html`).
 - `npm run test:compat` - needs the previous release unpacked in `../old-version`; proves old saves still load.
+- `node scripts/playtest.js` - plays scripted scenarios in the real game in a browser (needs Playwright; skill `/playtest`).
 
 ## Save tokens (read first)
 - Never open whole files. `game/sim.js` ~2400 lines, `game/game.js` ~1900, `game/view.js` ~1300.
@@ -28,7 +29,8 @@ Tone: dark, grim zombie survival. Player-facing text is English.
 5. Every feature needs a test: `tests/smoke-test.js` (simulation) or `tests/render-test.js` (drawing).
 6. Per-frame drawing must stay cheap: no gradients or hundreds of polygons per frame; static art goes in the cached ground
    (`tileArt`/`microDetail`) or in baked sprites.
-7. Releases: bump the version in `game/data.js` and the `?v=` in `game/index.html`, add 3-6 lines to `CHANGELOG.md`.
+7. Releases: bump the version in `game/data.js` and the `?v=` in `game/index.html`, add 3-6 lines to `CHANGELOG.md`,
+   and add a save fixture for the new version: `node scripts/save-fixture.js game v<version> survival campaign` (loaded by `npm test`).
 
 ## Where things are
 See `docs/ARCHITECTURE.md` (module roles, invariants) and `docs/CONTENT_GUIDE.md` (how to add content).

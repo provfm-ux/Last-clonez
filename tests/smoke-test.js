@@ -1461,6 +1461,468 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     !restored.world.objects.some(o=>o.id.startsWith("coverage-route-")));
 }
 
+{ // sys.day-end (HISTORIA.md secção 6): cada dia termina com um resumo curto
+  const s = fresh("training");
+  s.daily.walker = 3; s.daily.loot = 5;
+  s.minutes = Math.ceil(s.minutes / 1440) * 1440 - .1;
+  run(s, 2);
+  const last = s.messages.at(-1)?.text ?? "";
+  check("sys.day-end resumo curto ao fechar o dia", /^Day 1 complete: 3 infected down, 5 items looted\./.test(last) && s.daily.day === 2, last);
+  s.minutes = Math.ceil(s.minutes / 1440) * 1440 - .1;
+  run(s, 2);
+  check("sys.day-end dia sem atividade", /Day 2 complete: a quiet day/.test(s.messages.at(-1)?.text ?? ""), s.messages.at(-1)?.text);
+}
+
+{ // sys.test-shortcuts (HISTORIA.md secção 16): saltar para o dia N, dar itens, avançar o relógio
+  const s = fresh("training"), hour = s.minutes % 1440;
+  check("sys.test-shortcuts salta para o dia 12 à mesma hora e dá itens",
+    Sim.testJump(s, 12, {battery: 2, crowbar: 1}) && Math.floor(s.minutes / 1440) + 1 === 12 && s.minutes % 1440 === hour &&
+    Sim.quantity(s.player.bag, "battery") >= 2 && Sim.quantity(s.player.bag, "crowbar") >= 1 && s.daily.day === 12);
+  check("sys.test-shortcuts não volta atrás no tempo", !Sim.testJump(s, 3));
+  const loaded = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  check("sys.test-shortcuts o save depois do salto carrega", loaded.daily.day === 12);
+  const before = s.minutes;
+  Sim.fastForward(s, 300);
+  check("sys.test-shortcuts avança 5 h de jogo sem tempo real", Math.abs(s.minutes - before - 300) < 1e-6 && s.mode === "play");
+  check("sys.test-shortcuts só no modo training (ou forçado em testes)", !Sim.testJump(fresh("survival"), 5) && Sim.testJump(fresh("survival"), 5, {}, {anyMode: true}));
+}
+
+{ // sys.hints (HISTORIA.md secções 14 e 16): 2 dias parado → dica; no máximo uma por dia; três níveis
+  const H = context.CampaignHints, D = 1440, start = 480, s = H.track(H.empty(), "fortress.last-boss", start);
+  check("sys.hints sem dica antes de 2 dias parado", H.next(s, start + 2 * D - 1) === null);
+  const first = H.next(s, start + 2 * D);
+  check("sys.hints 2 dias parado → dica discreta", first === H.hints["fortress.last-boss"][0], String(first));
+  check("sys.hints no máximo uma dica por dia", H.next(s, start + 2 * D + 600) === null);
+  const second = H.next(s, start + 3 * D), third = H.next(s, start + 4 * D);
+  check("sys.hints níveis seguintes, do discreto ao explícito", second === H.hints["fortress.last-boss"][1] && third === "It's mutated. It burns.");
+  check("sys.hints depois do nível 3 não repete", H.next(s, start + 5 * D) === null);
+  H.progress(s, start + 5 * D);
+  check("sys.hints progresso recomeça a contagem", H.next(s, start + 6 * D) === null && H.next(s, start + 7 * D) === H.hints["fortress.last-boss"][0]);
+  H.track(s, "amigo1.lockdown-chat", start + 7 * D + 60);
+  check("sys.hints novo objetivo recomeça do nível 1", s.level === 0 && H.next(s, start + 8 * D) === null);
+  check("sys.hints objetivo sem dicas não dá nada", H.next(H.track(H.empty(), "opt.fuel", 0), 10 * D) === null);
+  const saved = H.restore(JSON.parse(JSON.stringify(s)));
+  check("sys.hints estado persiste; saves antigos e inválidos começam vazios",
+    JSON.stringify(saved) === JSON.stringify(s) && H.restore(undefined).objective === null && H.restore({objective:3, since:-1}).level === 0);
+}
+
+{ // sys.zombie-carry (HISTORIA.md secções 5 e 16): ~1 em 8 zombies aleatórios leva um recurso da área
+  const s = fresh("survival"), rule = Data.zombieCarry, n = 8000;
+  const at = type => { const b = s.world.buildings.find(b => b.type === type); return {x: b.x + b.w / 2, y: b.y + b.h / 2}; };
+  const street = {x: s.player.x, y: s.player.y}, sample = (origin, point = street) =>
+    Array.from({length: n}, (_, i) => Sim.carriedSupply(s, {id: "a" + i, origin, ...point}));
+  const horde = sample("horde"), share = horde.filter(Boolean).length / n;
+  check("sys.zombie-carry cerca de 1 em 8 leva recurso", share > .1 && share < .15, (share * 100).toFixed(1) + "%");
+  check("sys.zombie-carry é determinístico por zombie", Sim.carriedSupply(s, {id: "a42", origin: "horde", ...street}) === horde[42]);
+  check("sys.zombie-carry bosses e zombies de desafio nunca dão recursos",
+    ["cinema-sleeper", "cinema-winner", "resident", "boss", "challenge"].every(o => sample(o).every(x => x === null)));
+  const every = Object.values(rule.pools).flat();
+  check("sys.zombie-carry nunca dá arma nem item de desafio", every.every(id => Data.items[id] && !Data.items[id].damage && id !== "raffletrophy"));
+  const pool = (type, origin) => new Set(sample(origin, at(type)).filter(Boolean));
+  check("sys.zombie-carry pool por área: clínica bandagens, posto combustível, loja pilhas, rua comida/água",
+    [...pool("clinic", "nest")].join() === "bandage" && [...pool("fuel", "")].join() === "fuel" && [...pool("market", "horde")].join() === "battery" &&
+    [...new Set(horde.filter(Boolean))].sort().join() === "food,water");
+  const id = "a" + horde.findIndex(x => x === "food"), z = {...s.world.enemies.find(e => !e.origin), id, origin: "horde", ...street, hp: 1, dormant: false};
+  s.world.enemies.push(z);
+  for (let i = 0; i < 20 && z.hp > 0; i++) { Sim.attack(s, z); s.player.cooldown = 0; s.player.attackCooldown = 0; }
+  const pile = s.world.objects.find(o => o.kind === "drop" && o.died !== undefined && Math.abs(o.x - z.x) < .01 && Math.abs(o.y - z.y) < .01);
+  check("sys.zombie-carry o recurso cai junto ao corpo", z.hp <= 0 && pile?.loot.some(l => l.id === "food") && !pile.searched, z.hp > 0 ? "zombie vivo" : pile ? "" : "sem pilha");
+}
+
+{ // sys.calendar (HISTORIA.md secções 9 e 16): cada área abre e fecha no dia certo
+  const C = context.Campaign, open = (id, d) => C.isOpen(id, d);
+  check("sys.calendar dia vem dos minutos (08:00 do dia 1, meia-noite = dia 2)", C.day(480) === 1 && C.day(1439) === 1 && C.day(1440) === 2);
+  check("sys.calendar nenhuma área abre antes do seu dia", Object.entries(C.areas).every(([id, a]) => a.from === 1 || !open(id, a.from - 1)),
+    Object.entries(C.areas).filter(([id, a]) => a.from > 1 && open(id, a.from - 1)).map(([id]) => id).join(","));
+  check("sys.calendar cada área abre no seu dia", Object.entries(C.areas).every(([id, a]) => open(id, a.from)),
+    Object.keys(C.areas).filter(id => !open(id, C.areas[id].from)).join(","));
+  check("sys.calendar dias úteis: Ironworks abre no dia 6, fecha no fim de semana (9-10), reabre no 11",
+    C.isWeekday(6) && open("ironworks", 6) && !open("ironworks", 9) && !open("ironworks", 10) && open("ironworks", 11) &&
+    /weekend/.test(C.closedReason("ironworks", 9)));
+  check("sys.calendar mercado opcional (dia 11) só abre em dias úteis", open("opt.market", 11) && !open("opt.market", 16) && open("opt.market", 18));
+  check("sys.calendar maré baixa a cada 2 dias: FatHill no dia 8, 10 e 12, fechada no 9 e 11",
+    open("fathill", 8) && !open("fathill", 9) && open("fathill", 10) && !open("fathill", 11) && /tide/i.test(C.closedReason("fathill", 9)));
+  check("sys.calendar janelas fechadas: Eva só no dia 5, amigo 1 nos dias 14-20, viragem nos dias 15-18",
+    !open("eva", 6) && open("amigo1", 20) && !open("amigo1", 21) && open("viragem", 18) && !open("viragem", 19));
+  check("sys.calendar áreas cumpridas continuam abertas nos seus dias", open("coldvale", 30) && open("cinema", 30) && open("fortress", 30) && open("opt.farm", 24));
+  check("sys.calendar áreas opcionais (dias 7, 9, 11, 13, 21-24) não dão pista",
+    Object.entries(C.areas).filter(([id]) => id.startsWith("opt.")).every(([, a]) => a.kind === "optional" && a.clue === undefined &&
+    [7, 9, 11, 13, 21, 22, 23, 24].includes(a.from)));
+  check("sys.calendar Ironworks fora de horas: fechada às 22:00, aberta às 08:00",
+    !C.isOpen("ironworks", 6, 22) && /opens at 08:00/.test(C.closedReason("ironworks", 6, 22)) && C.isOpen("ironworks", 6, 8));
+  check("sys.calendar Cinder Grotto pede lanterna e pilhas",
+    /flashlight with batteries/.test(C.missing("cindergrotto", {items: []})) && /batteries/.test(C.missing("cindergrotto", {items: ["flashlight"]})) &&
+    C.missing("cindergrotto", {items: ["flashlight", "battery"]}) === "");
+  check("sys.calendar fortaleza só com as 5 coordenadas", /4 of 5/.test(C.missing("fortress", {clues: 4})) && C.missing("fortress", {clues: 5}) === "" &&
+    C.missing("coldvale") === "");
+  check("sys.calendar 5 coordenadas parciais, uma por área", Object.values(C.areas).map(a => a.clue).filter(Boolean).sort().join() === "1,2,3,4,5");
+}
+
+{ // sys.clock (HISTORIA.md secção 16): 1,6 = 15 min reais por dia (mobile), 0,4 = 60 min (Realista)
+  for (const [clock, realMinutes] of [[1.6, 15], [0.4, 60]]) {
+    const s = Sim.createControl("training", "carer", "shelter", {clock}), start = s.minutes;
+    for (let t = 0; t < realMinutes * 60 && s.mode === "play"; t += .5) Sim.tick(s, .5, idle);
+    check("sys.clock " + clock + ": " + realMinutes + " min reais = 1 dia de jogo", s.rules.clock === clock && Math.abs(s.minutes - start - 1440) < 1e-6,
+      "clock=" + s.rules.clock + " minutos=" + (s.minutes - start));
+    const loaded = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+    check("sys.clock " + clock + " persiste no save", loaded.rules.clock === clock);
+  }
+  check("sys.clock rejeita valores fora da lista", Data.worldRules("survival", {clock:1.5}).clock === Data.worldRules("survival").clock);
+}
+
+{ // sys.campaign (HISTORIA.md secção 16, brief tarefa 8): modo campanha com calendário, dicas e progresso no save
+  const s = fresh("campaign"), round = x => Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(x))));
+  check("sys.campaign modo novo a 15 min reais por dia com progresso vazio",
+    s.rules.clock === 1.6 && s.campaign?.clues === 0 && s.campaign.completed.join() === "radio.rumour" && s.campaign.hints.objective === "coldvale.houses");
+  s.campaign.clues = 1; s.campaign.completed.push("coldvale.houses");
+  context.CampaignHints.track(s.campaign.hints, "cinema.statue", s.minutes);
+  const loaded = round(s);
+  check("sys.campaign o progresso grava e carrega", loaded.campaign.clues === 1 && loaded.campaign.completed.join() === "radio.rumour,coldvale.houses" &&
+    loaded.campaign.hints.objective === "cinema.statue");
+  const legacy = JSON.parse(JSON.stringify(Sim.snapshot(s))); delete legacy.campaign;
+  check("sys.campaign save de campanha sem progresso começa vazio; outros modos não têm campanha",
+    Sim.restore(legacy).campaign.clues === 0 && round(fresh("survival")).campaign === undefined);
+  const bad = JSON.parse(JSON.stringify(Sim.snapshot(s))); bad.campaign.clues = 9;
+  let refused = false; try { Sim.restore(bad); } catch (e) { refused = /campaign/i.test(e.message); }
+  check("sys.campaign progresso inválido é recusado", refused);
+  const exit = s.world.objects.find(o => o.id === "exit-cinema");
+  Object.assign(s.player, {x: exit.x - 1, y: exit.y});
+  check("sys.campaign o cinema está fechado no dia 1", Sim.travel(s, exit) === null && /opens on day 2/.test(s.messages.at(-1).text), s.messages.at(-1).text);
+  Sim.testJump(s, 2, {}, {anyMode: true});
+  check("sys.campaign no dia 2 entra-se no cinema", Sim.travel(s, exit)?.world.region === "cinema");
+  const weekend = fresh("campaign"); Sim.testJump(weekend, 9, {}, {anyMode: true});
+  check("sys.campaign Ironworks recusada ao fim de semana (dia 9)", /weekend/.test(Sim.campaignProblem(weekend, "ironworks")) &&
+    Sim.campaignProblem(weekend, "quarry") === "");
+  const grotto = fresh("campaign"); Sim.testJump(grotto, 12, {}, {anyMode: true});
+  const lamp = grotto.player.bag.find(i => i.id === "flashlight");
+  if (lamp) lamp.charge = 0;
+  grotto.player.bag = grotto.player.bag.filter(i => i.id !== "battery");
+  const without = Sim.campaignProblem(grotto, "cavern");
+  grotto.player.bag.push({id: "flashlight", qty: 1, condition: 100, born: 0, charge: 60, uid: "test-lamp"});
+  check("sys.campaign Cinder Grotto pede lanterna com pilhas", /flashlight with batteries/.test(without) && Sim.campaignProblem(grotto, "cavern") === "", without);
+  const stuck = fresh("campaign");
+  context.CampaignHints.track(stuck.campaign.hints, "fortress.last-boss", stuck.minutes);
+  Sim.testJump(stuck, 3, {}, {anyMode: true}); run(stuck, 1);
+  check("sys.campaign a dica aparece no jogo depois de 2 dias parado", stuck.messages.some(m => m.text === "Hint: The coat is scorched but whole."));
+}
+
+{ // coldvale.houses (HISTORIA.md secções 10 e 16): 3 casas com pistas → pista 1 e rumor do rádio
+  const s = fresh("campaign"), pages = s.world.objects.filter(o => o.action === "campaign-page");
+  const homes = new Set(pages.map(o => o.building));
+  check("coldvale.houses 3 páginas em 3 casas diferentes", pages.length === 3 && homes.size === 3 &&
+    pages.every(o => s.world.buildings.find(b => b.id === o.building)?.type === "home"), pages.length + " páginas, " + homes.size + " casas");
+  check("coldvale.houses o rumor do rádio fica registado no início", s.campaign.completed.includes("radio.rumour") &&
+    s.messages.some(m => m.text === Data.campaignText.rumour));
+  const again = fresh("campaign");
+  check("coldvale.houses mesma semente, mesmas casas; outros modos não têm páginas",
+    again.world.objects.filter(o => o.action === "campaign-page").map(o => o.building + "@" + o.x + "," + o.y).join() ===
+    pages.map(o => o.building + "@" + o.x + "," + o.y).join() && !fresh("survival").world.objects.some(o => o.action === "campaign-page"));
+  const others = Sim.create(4242, "campaign", "carer", context.Expedition.generator).world.objects.filter(o => o.action === "campaign-page");
+  check("coldvale.houses outra semente também tem 3 páginas", others.length === 3);
+  const reach = o => { const near = [[0,1],[1,0],[0,-1],[-1,0],[.6,.6],[-.6,-.6],[.6,-.6],[-.6,.6]].map(([dx,dy]) => ({x:o.x+dx*.7, y:o.y+dy*.7}))
+    .find(p => World.clear(s.world,p.x,p.y,.18)) ?? {x:o.x, y:o.y}; Object.assign(s.player, near); };
+  const far = pages.filter(o => Math.hypot(s.player.x - o.x, s.player.y - o.y) > 3);
+  check("coldvale.houses ler de longe não conta", far.length > 0 && far.every(o => !Sim.readCampaignPage(s, o) && !o.read));
+  for (const [i, page] of pages.slice(0, 2).entries()) { reach(page); Sim.readCampaignPage(s, page); }
+  check("coldvale.houses 2 de 3 páginas ainda não dão pista", s.campaign.clues === 0 && /2 of 3/.test(s.messages.at(-1).text), s.messages.at(-1).text);
+  const mid = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  check("coldvale.houses páginas lidas ficam gravadas", mid.world.objects.filter(o => o.action === "campaign-page" && o.read).length === 2);
+  reach(pages[2]);
+  check("coldvale.houses 3 páginas → coordenada 1", Sim.readCampaignPage(s, pages[2]) && s.campaign.clues === 1 &&
+    s.campaign.completed.includes("coldvale.houses") && s.messages.at(-1).text === Data.campaignText.housesDone);
+  check("coldvale.houses a dica seguinte passa para o cinema", s.campaign.hints.objective === "cinema.statue");
+  reach(pages[0]); Sim.readCampaignPage(s, pages[0]);
+  check("coldvale.houses reler não repete a recompensa", s.campaign.completed.filter(id => id === "coldvale.houses").length === 1 && s.campaign.clues === 1);
+}
+
+{ // cinema.statue (HISTORIA.md secções 10 e 16): estátua → horda de 50 → fuga pela janela; com pé-de-cabra é mais rápido
+  const toCinema = items => {
+    const s = fresh("campaign"); Sim.testJump(s, 2, items, {anyMode: true});
+    const exit = s.world.objects.find(o => o.id === "exit-cinema"); Object.assign(s.player, {x: exit.x - 1, y: exit.y});
+    return Sim.travel(s, exit);
+  };
+  const c = toCinema({}), statue = c.world.objects.find(o => o.id === "cinema-statue");
+  check("cinema.statue a estátua está no palco só na campanha", statue?.active && c.world.tiles.find(t => t.x === 11 && t.y === 5)?.room === "Stage" &&
+    !Sim.create(17, "survival", "carer", context.Expedition.generator, undefined, ctxRegions.definitions.cinema ? "cinema" : undefined).world.objects.some(o => o.id === "cinema-statue"));
+  const take = s => { const st = s.world.objects.find(o => o.id === "cinema-statue"); Object.assign(s.player, {x: 11.5, y: 6.5}); return Sim.takeStatue(s, st); };
+  const doors = s => s.world.objects.filter(o => o.action === "door" && o.kind !== "window" && o.building === s.world.buildings.find(b => b.type === "cinema").id);
+  const win = s => s.world.objects.find(o => o.action === "door" && o.kind === "window");
+  check("cinema.statue retirar a estátua: horda de 50, portas encravadas, estátua no saco", take(c) && !statue.active &&
+    c.world.enemies.filter(z => z.origin === "cinema-horde").length === 50 && doors(c).every(o => o.sealed && !o.open) &&
+    win(c).reinforced === Data.cinemaTrap.windowHits && Sim.quantity(c.player.bag, "goldstatue") === 1);
+  check("cinema.statue retirar o ídolo é um impacto grande (game-feel)", c.effects.some(e => e.text === "CLICK" && e.impact >= .7));
+  check("cinema.statue a horda do cinema não dá recursos aleatórios",
+    c.world.enemies.filter(z => z.origin === "cinema-horde").every(z => Sim.carriedSupply(c, z) === null));
+  Object.assign(c.player, {x: doors(c)[0].x, y: doors(c)[0].y - 1});
+  check("cinema.statue as portas não abrem", !Sim.door(c, doors(c)[0]) && /Jammed/.test(c.messages.at(-1).text));
+  const saved = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(c))));
+  check("cinema.statue o estado da armadilha fica gravado", doors(saved).every(o => o.sealed) && win(saved).reinforced === 3 &&
+    saved.world.enemies.filter(z => z.origin === "cinema-horde").length === 50);
+  const w = win(c); Object.assign(c.player, {x: w.x - 1, y: w.y, hp: 100});
+  const hit = () => { c.player.stamina = 100; return Sim.breach(c, w, "smash"); };
+  hit(); hit();
+  check("cinema.statue sem pé-de-cabra: 2 pancadas não chegam", !w.open && /frame holds/.test(c.messages.at(-1).text));
+  hit();
+  check("cinema.statue à terceira pancada a janela parte", w.open && w.broken && c.effects.some(e => e.text === "SMASH" && e.impact > 0));
+  const fast = toCinema({crowbar: 1}); take(fast);
+  const fw = win(fast); Object.assign(fast.player, {x: fw.x - 1, y: fw.y, stamina: 100});
+  check("cinema.statue com pé-de-cabra abre à primeira", Sim.breach(fast, fw, "pry") && fw.open);
+  Object.assign(c.player, {x: w.x + 1, y: w.y, hp: 100}); c.world.enemies = c.world.enemies.filter(z => z.origin !== "cinema-horde");
+  run(c, 1);
+  check("cinema.statue sair pela janela cumpre o desafio e destrava as portas", c.campaign.completed.includes("cinema.statue") &&
+    doors(c).every(o => !o.sealed) && c.campaign.hints.objective === "pineridge.two-nights" && c.messages.some(m => /feel a little safer/.test(m.text)));
+}
+
+{ // cinema.buff (HISTORIA.md secções 10 e 16): protege enquanto dorme à noite; expira ao fim de 3 noites
+  const s = fresh("campaign"); Sim.testJump(s, 2, {}, {anyMode: true});
+  const exit = s.world.objects.find(o => o.id === "exit-cinema"); Object.assign(s.player, {x: exit.x - 1, y: exit.y});
+  const c = Sim.travel(s, exit); Object.assign(c.player, {x: 11.5, y: 6.5});
+  Sim.takeStatue(c, c.world.objects.find(o => o.id === "cinema-statue"));
+  c.world.enemies = c.world.enemies.filter(z => z.origin !== "cinema-horde");
+  const w = c.world.objects.find(o => o.action === "door" && o.kind === "window"); w.open = true; w.broken = true; w.hp = 0; w.reinforced = 0;
+  Object.assign(c.player, {x: w.x + 1, y: w.y}); run(c, 1);
+  check("cinema.buff ativo depois da fuga, até à manhã do dia 5", Sim.cinemaBuff(c) && c.campaign.buffUntil === 4 * 1440 + 390 &&
+    c.messages.some(m => /three nights/.test(m.text)));
+  c.minutes = 1440 + 23 * 60;
+  const copy = (buff, sleeping) => { const x = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(c)))); if (!buff) x.campaign.buffUntil = 0;
+    Object.assign(x.player, {sleeping, resting: sleeping, flash: 0, hp: 100, grabCool: 5}); Sim.hurt(x, {kind: "walker", stats: Data.infected.walker}); return 100 - x.player.hp; };
+  const shielded = copy(true, true), plain = copy(false, true), awake = copy(true, false);
+  check("cinema.buff a dormir à noite sofre metade do dano", plain > 0 && Math.abs(shielded - plain * Data.cinemaTrap.sleepDamage) < 1e-9, shielded + " vs " + plain);
+  check("cinema.buff acordado não há proteção", Math.abs(awake - plain) < 1e-9);
+  check("cinema.buff fica gravado", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(c)))).campaign.buffUntil === c.campaign.buffUntil);
+  c.minutes = c.campaign.buffUntil + 1; run(c, 1);
+  check("cinema.buff expira ao fim de 3 noites", !Sim.cinemaBuff(c) && c.campaign.buffUntil === 0 && /ordinary lump/.test(c.messages.at(-1).text));
+}
+
+{ // sys.save-fixtures (skill save-systems): um save real por versão lançada carrega sempre, também no CI
+  const zlib = require("zlib"), folder = path.join(__dirname, "fixtures");
+  const fixtures = fs.readdirSync(folder).filter(f => f.endsWith(".json.gz")).sort();
+  for (const file of fixtures) {
+    let loaded = null, why = "";
+    try { loaded = Sim.restore(JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(folder, file))).toString("utf8"))); } catch (e) { why = e.message; }
+    check("sys.save-fixtures " + file + " carrega", loaded?.mode === "play" && (!/campaign/.test(file) || loaded.campaign?.completed.includes("radio.rumour")), why);
+  }
+  check("sys.save-fixtures há saves da 0.34 e da campanha", fixtures.some(f => f.startsWith("v0.34-")) && fixtures.some(f => /campaign/.test(f)), fixtures.join(","));
+  const newer = JSON.parse(JSON.stringify(Sim.snapshot(fresh("survival")))); newer.schema = Data.saveVersion + 1;
+  let refused = false; try { Sim.restore(newer); } catch { refused = true; }
+  check("sys.save-fixtures um save de uma versão mais nova é recusado", refused);
+}
+
+{ // sys.needs-clock (skill survival-crafting): fome, sede e sono medidos contra o tamanho do dia em cada velocidade
+  const measure = clock => {
+    const s = Sim.createControl("campaign", "carer", "shelter", {clock, count: 0, hordes: "off"});
+    Object.assign(s.player, {hunger: 92, hydration: 92, fatigue: 8}); s.world.enemies = [];
+    const at = {}, start = s.minutes, mark = (key, done) => { if (at[key] === undefined && done) at[key] = (s.minutes - start) / 1440; };
+    for (let i = 0; i < 60000 && Object.keys(at).length < 3; i++) {
+      Sim.tick(s, .25); Object.assign(s.player, {hp: 100});
+      mark("fome", s.player.hunger < 30); mark("sede", s.player.hydration < 30); mark("sono", s.player.fatigue >= 60);
+    }
+    return at;
+  };
+  const days = Object.fromEntries([0.4, 1.6, 2].map(c => [c, measure(c)]));
+  const show = Object.entries(days).map(([c, d]) => c + ": fome " + d.fome.toFixed(2) + "d, sede " + d.sede.toFixed(2) + "d, sono " + d.sono.toFixed(2) + "d").join(" | ");
+  check("sys.needs-clock 1,6 e 0,4 gastam por dia o mesmo que o ritmo 2", ["fome", "sede", "sono"].every(k =>
+    Math.abs(days[0.4][k] - days[2][k]) / days[2][k] < .05 && Math.abs(days[1.6][k] - days[2][k]) / days[2][k] < .05), show);
+  check("sys.needs-clock uma barra de fome dura cerca de 1 a 2 dias; a sede chega primeiro", days[0.4].fome >= 1 && days[0.4].fome <= 2 &&
+    days[0.4].sede < days[0.4].fome, show);
+}
+
+{ // pineridge.two-nights (HISTORIA.md secções 10 e 16): 2 noites sem barricadas → pista 2; com exposição a noite repete-se
+  const start = fresh("campaign"); Sim.testJump(start, 3, {}, {anyMode: true});
+  const exit = start.world.objects.find(o => o.id === "exit-ridge"); Object.assign(start.player, {x: exit.x, y: exit.y + (exit.y > start.world.height / 2 ? -1 : 1)});
+  let s = Sim.travel(start, exit);
+  const calm = x => { x.world.enemies = []; x.rules.hordes = "off"; x.atmosphere.pending = null; x.rules.clock = 4; // relógio rápido só no teste
+    Object.assign(x.player, {hp: 100, hunger: 90, hydration: 90, fatigue: 10, temperature: 37, wetness: 0}); };
+  const seen = []; // o jogo só guarda as últimas 7 mensagens: registar todas durante as noites
+  const night = (x, day, during) => { // das 19:50 do dia até às 06:40 do dia seguinte
+    x.minutes = (day - 1) * 1440 + 1190; calm(x);
+    for (let t = 0; t < 22; t++) { if (t === 8 && during) during(x); Sim.fastForward(x, 30); seen.push(...x.messages.map(m => m.text));
+      if (t !== 8 || !during) calm(x); else x.player.hp = 100; }
+  };
+  const said = pattern => seen.some(text => pattern.test(text));
+  const ridge = () => s.campaign.ridge;
+  check("pineridge.two-nights começa no campo de Pine Ridge", s?.world.region === "ridge" && ridge().nights === 0);
+  night(s, 3);
+  check("pineridge.two-nights noite inteira sem barricadas conta", ridge().nights === 1 && said(/Night survived at Pine Ridge: 1 of 2/) &&
+    ridge().night === null);
+  check("pineridge.two-nights o progresso fica gravado", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s)))).campaign.ridge.nights === 1);
+  const opening = s.world.objects.find(o => o.action === "door");
+  night(s, 4, x => { x.world.objects.find(o => o.id === opening.id).boards = 1; });
+  check("pineridge.two-nights com barricada a noite não conta", ridge().nights === 1 && said(/only counts nights without one/), "noites " + ridge().nights);
+  s.world.objects.find(o => o.id === opening.id).boards = 0;
+  night(s, 5, x => { x.player.temperature = 35; });
+  check("pineridge.two-nights com frio: pneumonia e a noite repete-se", ridge().nights === 1 && s.player.sick > 0 &&
+    said(/Pneumonia/), "noites " + ridge().nights + ", doença " + s.player.sick);
+  const before = s.campaign.clues;
+  s.player.sick = 0; night(s, 6);
+  check("pineridge.two-nights segunda noite válida → coordenada 2", ridge().nights === 2 && s.campaign.completed.includes("pineridge.two-nights") &&
+    s.campaign.clues === before + 1 && said(/second coordinate/) && s.campaign.hints.objective === "ironworks.barricade");
+  const away = fresh("campaign"); Sim.testJump(away, 3, {}, {anyMode: true});
+  const ex = away.world.objects.find(o => o.id === "exit-ridge"); Object.assign(away.player, {x: ex.x, y: ex.y + (ex.y > away.world.height / 2 ? -1 : 1)});
+  let a = Sim.travel(away, ex); a.minutes = 2 * 1440 + 1210; calm(a); Sim.fastForward(a, 5);
+  const back = a.world.objects.find(o => o.id === "exit-coldvale"); Object.assign(a.player, {x: back.x, y: back.y + (back.y > a.world.height / 2 ? -1 : 1)});
+  const home = Sim.travel(a, back); Sim.fastForward(home, 2);
+  check("pineridge.two-nights sair a meio da noite não conta", a.campaign.ridge.night !== null && home.campaign.ridge.night === null &&
+    home.messages.some(m => /left Pine Ridge/.test(m.text)));
+}
+
+{ // eva.death (HISTORIA.md secções 2 e 16): a Eva sai no dia 5, não volta no dia 6, o diário é dado ao jogador
+  const s = fresh("campaign"), npc = () => s.world.npc, seen = [];
+  const watch = () => seen.push(...s.messages.map(m => m.text));
+  const diary = s.world.objects.find(o => o.id === "eva-diary");
+  check("eva.death o diário está escondido no abrigo desde o início", diary && !diary.active &&
+    s.world.buildings.find(b => b.id === diary.building) === s.world.base);
+  Object.assign(npc(), {mode: "follow", hp: 100, x: s.player.x + 1, y: s.player.y});
+  Sim.testJump(s, 5, {}, {anyMode: true}); run(s, 2); watch();
+  check("eva.death no dia 5 às 08:00 a Eva ainda está", npc().mode !== "away" && npc().hp > 0 && s.campaign.eva === "", npc().mode);
+  Sim.fastForward(s, 70); watch();
+  check("eva.death às 09:00 do dia 5 a Eva sai para ir buscar Sunny Puffs", npc().mode === "away" && npc().hp === 0 && s.campaign.eva === "left" &&
+    seen.some(t => /Sunny Puffs/.test(t)));
+  const saved = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
+  check("eva.death a saída fica gravada", saved.campaign.eva === "left" && saved.world.npc.mode === "away");
+  Sim.testJump(s, 6, {}, {anyMode: true}); run(s, 2); watch();
+  check("eva.death no dia 6 não volta e o diário aparece no abrigo", npc().mode === "away" && s.campaign.eva === "gone" && diary.active &&
+    seen.some(t => /did not come back/.test(t)));
+  Object.assign(s.player, {x: diary.x, y: diary.y + .6});
+  check("eva.death ler o diário dá-o ao jogador e cumpre o desafio", Sim.readEvaDiary(s, diary) && Sim.quantity(s.player.bag, "evadiary") === 1 &&
+    s.campaign.completed.includes("eva.death") && /whole rumour/.test(s.messages.at(-1).text));
+  Sim.readEvaDiary(s, diary);
+  check("eva.death reler não duplica o diário", Sim.quantity(s.player.bag, "evadiary") === 1);
+  const old = Sim.restore(JSON.parse(require("zlib").gunzipSync(fs.readFileSync(path.join(__dirname, "fixtures", "main-2026-11-campaign.json.gz"))).toString("utf8")));
+  check("eva.death um save de campanha anterior recebe o diário escondido", old.world.objects.some(o => o.id === "eva-diary" && !o.active) && old.campaign.eva === "");
+  const away = fresh("campaign"); Object.assign(away.world.npc, {mode: "refuge", hp: 100}); Sim.testJump(away, 5, {}, {anyMode: true});
+  const ex = away.world.objects.find(o => o.id === "exit-ridge"); Object.assign(away.player, {x: ex.x, y: ex.y + (ex.y > away.world.height / 2 ? -1 : 1)});
+  const ridge = Sim.travel(away, ex); ridge.world.enemies = []; Sim.fastForward(ridge, 70);
+  check("eva.death a Eva sai mesmo com o jogador noutra região", ridge.campaign.eva === "left" &&
+    ridge.regionStates.coldvale.npc.mode === "away" && ridge.world.npc.mode === "away");
+}
+
+{ // sys.campaign-graph (skill level-design): sem bloqueios (soft-locks), prazos possíveis e ritmo com descansos
+  const C = context.Campaign, ids = Object.keys(C.challenges);
+  // Jogador que faz um desafio por dia a partir do dia `first`, sempre o primeiro que o calendário e o inventário deixam.
+  const play = first => {
+    const have = new Set(C.start), done = {}; let clues = 0, busy = 0;
+    for (let d = first; d <= C.length; d++) {
+      if (busy > 0) { busy--; continue; }
+      const next = ids.find(id => done[id] === undefined && C.isOpen(C.challenges[id].area, d) &&
+        (C.challenges[id].needs ?? []).every(n => have.has(n)) && clues >= (C.challenges[id].clues ?? 0));
+      if (!next) continue;
+      const ch = C.challenges[next]; done[next] = d + (ch.days ?? 1) - 1; busy = (ch.days ?? 1) - 1;
+      for (const g of ch.grants ?? []) g === "clue" ? clues++ : have.add(g);
+    }
+    return done;
+  };
+  const done = play(1), late = play(15);
+  const missing = ids.filter(id => done[id] === undefined);
+  check("sys.campaign-graph todos os desafios obrigatórios são possíveis em 30 dias", !missing.length, missing.join(",") || JSON.stringify(done));
+  const plan = {"coldvale.houses":1, "cinema.statue":2, "pineridge.two-nights":4, "eva.death":5, "ironworks.barricade":6, "fathill.bosses":8,
+    "westfields.stealth":10, "cindergrotto.battery":12, "amigo1.lockdown-chat":14, "viragem.zero":15, "fortress.last-boss":25};
+  check("sys.campaign-graph o caminho de ouro segue os dias do documento (secção 9)", ids.every(id => done[id] === plan[id]),
+    ids.filter(id => done[id] !== plan[id]).map(id => id + "@" + done[id]).join(","));
+  check("sys.campaign-graph o que um desafio com prazo precisa obtém-se antes de o prazo fechar", ids.every(id => {
+    const ch = C.challenges[id], end = C.areas[ch.area].to; if (end === undefined) return true;
+    return (ch.needs ?? []).every(n => C.start.includes(n) || ids.some(o => (C.challenges[o].grants ?? []).includes(n) && done[o] < end));
+  }));
+  check("sys.campaign-graph quem começa só no dia 15 ainda chega ao boss final (perde só desafios com prazo)",
+    late["fortress.last-boss"] <= C.length && ids.filter(id => late[id] === undefined).every(id => C.areas[C.challenges[id].area].to !== undefined),
+    JSON.stringify(late));
+  check("sys.campaign-graph as 5 coordenadas existem e a fortaleza pede as 5", ids.filter(id => (C.challenges[id].grants ?? []).includes("clue")).length === 5 &&
+    C.challenges["fortress.last-boss"].clues === 5 && C.areas.fortress.requires.clues === 5);
+  const problems = [], high = .7; let run = 0;
+  for (const [i, b] of C.beats.entries()) {
+    run = b.intensity >= high ? run + 1 : 0;
+    if (run > 2) problems.push("dia " + b.day + ": " + run + " dias intensos seguidos");
+    if (b.type === "boss" && C.beats[i - 1]?.type !== "rest") problems.push("dia " + b.day + ": boss sem descanso antes");
+  }
+  if (C.beats[0].type !== "teach") problems.push("o dia 1 não ensina");
+  check("sys.campaign-graph ritmo: 30 dias, ensina primeiro, descanso antes de cada boss, sem 3 picos seguidos",
+    C.beats.length === C.length && C.beats.every((b, i) => b.day === i + 1) && !problems.length, problems.join("; "));
+}
+
+{ // ui.use-notes: o botão Use abre primeiro as notas soltas por ler (antes ficavam atrás de portas e contentores)
+  const s = fresh("campaign"), page = s.world.objects.find(o => o.action === "campaign-page"), diary = s.world.objects.find(o => o.id === "eva-diary");
+  const field = [s.world, ...Object.values(s.regionStates)].flatMap(z => z.objects).find(o => o.action === "field-note");
+  const door = s.world.objects.find(o => o.action === "door"), crate = s.world.objects.find(o => o.action === "loot");
+  check("ui.use-notes notas por ler contam como tarefa (página, nota de campo)", Sim.unreadNote(page) && (!field || Sim.unreadNote(field)));
+  check("ui.use-notes notas lidas ou escondidas não", !Sim.unreadNote({...page, read: true}) && !Sim.unreadNote(diary));
+  check("ui.use-notes portas e contentores não são notas", !Sim.unreadNote(door) && !Sim.unreadNote(crate));
+}
+
+{ // ironworks.barricade (HISTORIA.md secções 10 e 16): dia útil → arma forte garantida; fim de semana → fábrica fechada
+  const toIron = (day, items = {}) => {
+    const s = fresh("campaign"); Sim.testJump(s, day, items, {anyMode: true});
+    s.player.bag = s.player.bag.filter(i => !["hammer", "crowbar"].includes(i.id));
+    const ex = s.world.objects.find(o => o.id === "exit-ironworks"); Object.assign(s.player, {x: ex.x, y: ex.y + (ex.y > s.world.height / 2 ? -1 : 1)});
+    return Sim.travel(s, ex);
+  };
+  const beside = (x, o) => { // um lugar livre e ao alcance junto ao objeto
+    for (const r of [.8, 1, 1.3]) for (let a = 0; a < 16; a++) {
+      const p = {x: o.x + Math.cos(a * Math.PI / 8) * r, y: o.y + Math.sin(a * Math.PI / 8) * r};
+      if (World.clear(x.world, p.x, p.y, .18)) { Object.assign(x.player, p); if (Sim.reachableObject(x, o)) return true; }
+    }
+    return false;
+  };
+  const weekend = fresh("campaign"); Sim.testJump(weekend, 9, {}, {anyMode: true});
+  check("ironworks.barricade ao fim de semana o computador da linha fecha os portões", /line computer.*weekends/.test(Sim.campaignProblem(weekend, "ironworks")));
+  const w = toIron(6), get = id => w.world.objects.find(o => o.id === id), cage = get("iron-cage"), board = get("iron-toolboard");
+  const terminals = [0, 1, 2].map(i => get("iron-terminal-" + i));
+  check("ironworks.barricade no dia 6 (quarta) entra-se; jaula, quadro de ferramentas e 3 terminais em 3 edifícios",
+    w?.world.region === "ironworks" && cage?.stage === 0 && board?.loot.map(l => l.id + ":" + l.condition).join() === "hammer:65,crowbar:65" &&
+    terminals.every(Boolean) && new Set(terminals.map(t => t.building)).size === 3);
+  const read = t => { beside(w, t); w.world.enemies = []; return Sim.readTerminal(w, t) ? w.messages.at(-1).text : ""; };
+  const logs = terminals.map(read);
+  check("ironworks.barricade os terminais ensinam a ordem da jaula e deixam pistas para o futuro (tokens, fortaleza, stand down)",
+    /frame bolts \(hammer\).*plates \(crowbar\).*chain/.test(logs[0]) && /PROJECT FORTRESS/.test(logs[1]) && /token/.test(logs[1]) &&
+    /stand down/.test(logs[2]) && terminals.every(t => t.read) && !logs.join(" ").match(/virus|infect/i));
+  beside(w, cage);
+  check("ironworks.barricade sem ferramentas não se desmonta", !Sim.dismantleCage(w, cage) && cage.stage === 0 && /needs a hammer/.test(w.messages.at(-1).text));
+  w.player.bag.push(...board.loot.map(item => ({...item, born: 0}))); board.loot = []; board.searched = true;
+  const tool = id => w.player.bag.find(i => i.id === id);
+  Sim.dismantleCage(w, cage);
+  check("ironworks.barricade passo 1: martelo tira os parafusos e gasta-se", cage.stage === 1 && tool("hammer").condition === 35);
+  Sim.dismantleCage(w, cage);
+  check("ironworks.barricade passo 2: pé-de-cabra arranca as chapas", cage.stage === 2 && tool("crowbar").condition === 35);
+  const saved = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(w))));
+  check("ironworks.barricade a jaula meio desmontada e os terminais lidos ficam gravados",
+    saved.world.objects.find(o => o.id === "iron-cage").stage === 2 && saved.world.objects.filter(o => o.action === "ironworks-terminal" && o.read).length === 3);
+  check("ironworks.barricade passo 3 abre a jaula: arma forte garantida e desafio cumprido", Sim.dismantleCage(w, cage) && cage.stage === 3 &&
+    Sim.quantity(w.player.bag, "foundrymaul") === 1 && w.campaign.completed.includes("ironworks.barricade") && w.campaign.hints.objective === "fathill.bosses");
+  check("ironworks.barricade a jaula aberta não dá outra arma", !Sim.dismantleCage(w, cage) && Sim.quantity(w.player.bag, "foundrymaul") === 1);
+  check("ironworks.barricade a marreta é mais forte do que o pé-de-cabra", Data.items.foundrymaul.damage > Data.items.crowbar.damage && Data.weaponSkills.foundrymaul);
+  const worn = toIron(6), wc = worn.world.objects.find(o => o.id === "iron-cage"); worn.world.enemies = [];
+  worn.player.bag.push({id: "hammer", qty: 1, condition: 20, born: 0}); beside(worn, wc);
+  check("ironworks.barricade ferramentas gastas não chegam", !Sim.dismantleCage(worn, wc) && /too worn/.test(worn.messages.at(-1).text));
+}
+
+{ // cinema.scene (pedido do utilizador + skill team-audio): vencedor da rifa a andar, torneira do convívio, nota e sons da armadilha
+  const enter = seed => { const s = Sim.createControl("campaign", "carer", "shelter", undefined, {seed}); Sim.testJump(s, 2, {}, {anyMode: true});
+    const ex = s.world.objects.find(o => o.id === "exit-cinema"); Object.assign(s.player, {x: ex.x - 1, y: ex.y}); return Sim.travel(s, ex); };
+  const winners = [17, 4242, 90009].map(seed => enter(seed).world.enemies.filter(z => z.id === "cinema-winner" && z.hp > 0 && !z.dormant).length);
+  check("cinema.scene o vencedor da rifa anda sempre pelo cinema na campanha", winners.every(n => n === 1), winners.join(","));
+  const c = enter(17), tap = c.world.objects.find(o => o.id === "cinema-tap"), note = c.world.objects.find(o => o.id === "cinema-note");
+  check("cinema.scene há uma torneira de cerveja no canto e a nota do convívio", tap && note && World.tileAt(c.world, tap.x, tap.y).building === c.world.buildings[0].id);
+  Object.assign(c.player, {x: note.x + .8, y: note.y}); c.world.enemies = c.world.enemies.filter(z => z.id !== "cinema-winner");
+  check("cinema.scene a nota lê-se com Use e avisa que o ídolo está ligado às portas", Sim.unreadNote(note) && Sim.readCinemaNote(c, note) && note.read &&
+    /social/i.test(c.messages.at(-1).text) && /wired to the doors/.test(c.messages.at(-1).text));
+  c.sounds = []; Object.assign(c.player, {x: 11.5, y: 6.5}); Sim.takeStatue(c, c.world.objects.find(o => o.id === "cinema-statue"));
+  const cue = kind => c.sounds.filter(x => x.kind === kind);
+  const slams = cue("doorSlam");
+  check("cinema.scene sequência: clique, duas portas a bater uma depois da outra, a horda no canto da torneira e a tensão",
+    cue("idolClick").length === 1 && slams.length === 2 && slams[0].delay < slams[1].delay && cue("horde")[0]?.delay > slams[1].delay &&
+    Math.hypot(cue("horde")[0].x - tap.x, cue("horde")[0].y - tap.y) < .01 && cue("tension").length === 1, c.sounds.map(x => x.kind + "+" + (x.delay ?? 0)).join(" "));
+  check("cinema.scene cada porta mostra SLAM (pista visual dos sons)", c.effects.filter(e => e.text === "SLAM").length === 2);
+  const horde = c.world.enemies.filter(z => z.origin === "cinema-horde"), statue = {x: 11.5, y: 5.5};
+  const mean = point => horde.reduce((n, z) => n + Math.hypot(z.x - point.x, z.y - point.y), 0) / horde.length;
+  check("cinema.scene a horda sai do canto da torneira", horde.length === 50 && mean(tap) < mean(statue), mean(tap).toFixed(1) + " vs " + mean(statue).toFixed(1));
+  c.world.enemies = c.world.enemies.filter(z => z.origin !== "cinema-horde"); c.sounds = []; Object.assign(c.player, {hp: 100});
+  for (let i = 0; i < 30; i++) Sim.tick(c, .25);
+  check("cinema.scene a tensão repete enquanto o jogador está preso", c.sounds.some(x => x.kind === "tension"));
+  const w = c.world.objects.find(o => o.action === "door" && o.kind === "window"); Object.assign(w, {open: true, broken: true, hp: 0, reinforced: 0});
+  Object.assign(c.player, {x: w.x + 1, y: w.y}); run(c, 1); c.sounds = [];
+  for (let i = 0; i < 30; i++) Sim.tick(c, .25);
+  check("cinema.scene depois da fuga a tensão para", c.campaign.completed.includes("cinema.statue") && !c.sounds.some(x => x.kind === "tension"));
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

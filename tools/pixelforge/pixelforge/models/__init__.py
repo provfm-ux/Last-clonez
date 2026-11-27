@@ -1,3 +1,3 @@
-from . import police
+from . import police, knight
 
-MODELS = {"police": police.BOXES}
+MODELS = {"police": police.BOXES, "knight": knight.BOXES}

@@ -33,7 +33,13 @@ def _project(p):                      # 2:1 isometric
     return ((p[0] - p[1]), (p[0] + p[1]) * 0.5 - p[2] * 1.0)
 
 
-def render_dir(boxes, yaw_deg, ppu=8, canvas=(420, 520)):
+def _canvas(boxes, pp):
+    r = max(max(abs(b[0]), abs(b[3]), abs(b[1]), abs(b[4])) for b in boxes) * 1.42
+    zmax = max(b[5] for b in boxes)
+    return (int((2 * r + 4) * pp), int((zmax + r * 1.1 + 6) * pp)), int((zmax + r * 0.75 + 2) * pp)
+
+
+def render_dir(boxes, yaw_deg, ppu=8, canvas=None):
     """Render one direction at ppu px per unit, flat shaded, painter's algorithm."""
     a = math.radians(yaw_deg)
     quads = []
@@ -49,13 +55,14 @@ def render_dir(boxes, yaw_deg, ppu=8, canvas=(420, 520)):
                 p = (x0 + (x1 - x0) * fx, y0 + (y1 - y0) * fy, z0 + (z1 - z0) * fz)
                 pts.append(_rot(p, a))
             depth = sum(q[0] + q[1] for q in pts) / 4 + sum(q[2] for q in pts) / 4 * 0.01
-            shade = 0.5 + 0.5 * max(0.0, float(np.dot(nw, LIGHT)))
+            shade = 0.42 + 0.7 * max(0.0, float(np.dot(nw, LIGHT)))
             rgb = tuple(min(255, int(c * shade)) for c in col)
             quads.append((depth, pts, rgb))
     quads.sort(key=lambda q: q[0])
+    canvas, oy = _canvas(boxes, ppu) if canvas is None else (canvas, canvas[1] - 70)
     img = Image.new("RGBA", canvas, (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    ox, oy = canvas[0] / 2, canvas[1] - 70
+    ox = canvas[0] / 2
     for _, pts, rgb in quads:
         poly = [(ox + _project(p)[0] * ppu, oy + _project(p)[1] * ppu) for p in pts]
         d.polygon(poly, fill=rgb + (255,), outline=rgb + (255,))

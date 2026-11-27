@@ -46,7 +46,7 @@ def main(argv=None):
     d = sub.add_parser("model", help="render a built-in 3D box model in 8 true directions")
     d.add_argument("name", help="model name (see pixelforge/models)")
     d.add_argument("-o", "--out", default="out/model")
-    d.add_argument("--ppu", type=int, default=2, help="pixels per model unit (size)")
+    d.add_argument("--ppu", type=float, default=2, help="pixels per model unit (size)")
     d.add_argument("--colors", type=int, default=20)
     a = p.parse_args(argv)
 

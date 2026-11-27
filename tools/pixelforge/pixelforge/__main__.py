@@ -48,6 +48,10 @@ def main(argv=None):
     d.add_argument("-o", "--out", default="out/model")
     d.add_argument("--ppu", type=float, help="pixels per model unit (size); default 3.5 organic, 2 blocky")
     d.add_argument("--colors", type=int, default=20, help="blocky models only")
+    c = sub.add_parser("sheets", help="8-direction magenta sheets -> transparent foot-aligned atlases")
+    c.add_argument("package", help="folder with manifesto_8_direcoes.json and the PNG sheets")
+    c.add_argument("-o", "--out", default="out/chars")
+    c.add_argument("--only", nargs="*", help="character ids")
     a = p.parse_args(argv)
 
     if a.cmd == "styles":
@@ -57,6 +61,10 @@ def main(argv=None):
     if a.cmd == "fetch":
         for u in a.urls:
             print(fetch(u))
+        return
+    if a.cmd == "sheets":
+        from .sheets import build
+        build(a.package, a.out, a.only)
         return
     if a.cmd == "model":
         from .models import MODELS, ORGANIC

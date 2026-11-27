@@ -20,6 +20,10 @@ Two renderers:
 - BOXES (legacy, blocky): `police`, `knight`.
 Size: `--ppu` pixels per model unit (organic default 3.5 -> ~236 px tall; raise for finer pixels). Author a model once, reuse forever.
 
+Character sheets (4x2 grid, magenta bg, order N NE E SE / S SW W NW): `python3 -m pixelforge sheets <package_dir> -o out/chars`
+writes per character 3 size tiers (hd 160 / game 80 / mini 40 px tall) as 8-cell row atlases + JSON (cell size, feet anchor, scale) + `index.json`.
+Originals are never modified. Brute x1.28, runner x0.94 (same factors as game/view.js); crawler anchors on the body.
+
 Limits: one photo gives one view. `--dirs` makes S,SE,E,SW,W by squashing; N-facing needs a back view.
 Web images may be copyrighted: keep refs/*.json (source URL), do not commit refs/ or out/.
 Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py && python3 tests/test_voxel.py && python3 tests/test_organic.py` (healthy = `Tudo OK` x4).

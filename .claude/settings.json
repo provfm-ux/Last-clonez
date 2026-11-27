@@ -1,10 +1,10 @@
 {
   "extraKnownMarketplaces": {
-    "ecc": {
-      "source": { "source": "github", "repo": "affaan-m/ECC" }
-    }
+    "ecc": { "source": { "source": "github", "repo": "affaan-m/ECC" } },
+    "caveman": { "source": { "source": "github", "repo": "JuliusBrussee/caveman" } }
   },
   "enabledPlugins": {
-    "ecc@ecc": true
+    "ecc@ecc": true,
+    "caveman@caveman": true
   }
 }

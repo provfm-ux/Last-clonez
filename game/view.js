@@ -1773,6 +1773,7 @@ const View = (() => {
   const charTiers = {mini: 1, game: .5, hd: .25};      // world-size multiplier: the mini tier is the 40 px reference
   const charVectors = [[0, -1], [.7, -.7], [1, 0], [.7, .7], [0, 1], [-.7, .7], [-1, 0], [-.7, -.7]];
   const charImages = new Map(), charEntries = new Map();
+  let charHand = null;                               // screen position of the weapon hand of the sprite drawn last (player only)
   let charTier = "mini", charState = 0;              // 0 not started, 1 loading, 2 ready, -1 unavailable
   try {
     const wanted = /[?&]chars=(off|mini|game|hd)\b/.exec(location.search)?.[1];
@@ -1845,6 +1846,7 @@ const View = (() => {
   }
 
   function drawCharacter(a, isPlayer, x, y, scale, direction, stride, clock) {
+    charHand = null;
     if (charState < 0 || charTier === "off" || typeof Image !== "function" || typeof fetch !== "function") return false;
     if (charState === 0) {
       charState = 1;
@@ -1886,9 +1888,11 @@ const View = (() => {
     }
     const lunge = a.swing > 0 ? 2.5 : a.windup > 0 ? -1.2 : a.flash > 0 ? -1.5 : 0;   // strike, wind-up, recoil
     dx += vec[0] * lunge * scale; dy += vec[1] * lunge * scale * .5;
+    const left = Math.round(x - src.anchor[0] * z + dx), top = Math.round(y - src.anchor[1] * z + dy);
     ctx.drawImage(sheet, index * src.cell[0], frame * src.cell[1], src.cell[0], src.cell[1],
-      Math.round(x - src.anchor[0] * z + dx), Math.round(y - src.anchor[1] * z + dy),
-      Math.round(src.cell[0] * z), Math.round(src.cell[1] * z));
+      left, top, Math.round(src.cell[0] * z), Math.round(src.cell[1] * z));
+    const hand = baked ? walk.hands?.[frame]?.[index] : t.hands?.[index];   // where the weapon hand is on this pose
+    if (hand) charHand = [left + hand[0] * z, top + hand[1] * z];
     return true;
   }
 
@@ -1933,10 +1937,11 @@ const View = (() => {
       const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - spriteGround * scale);
       if (!chars) ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
         Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
-      if (isPlayer && frame.grip) {            // the held weapon keeps the grip point of the procedural pose
+      const grip = chars && charHand ? charHand : frame.grip && [left + Math.round(frame.grip[0] * scale), top + Math.round(frame.grip[1] * scale)];
+      if (isPlayer && grip) {                  // the weapon goes in the sprite's hand, or on the procedural pose's grip point
         const phase = swing ? (heldId === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
           a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : pose === "ready" ? (heldId === "pistol" ? 4 : 0) : 6;
-        drawHeldWeapon(heldId, left + Math.round(frame.grip[0] * scale), top + Math.round(frame.grip[1] * scale), dx < dy ? -1 : 1, phase);
+        drawHeldWeapon(heldId, Math.round(grip[0]), Math.round(grip[1]), dx < dy ? -1 : 1, phase);
       }
     }
     if (alive && (a.windup > 0 || a.stats && a.alert > 0)) {

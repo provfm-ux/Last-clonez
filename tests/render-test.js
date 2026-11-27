@@ -8,7 +8,7 @@ const html = fs.readFileSync(path.join(dir, "index.html"), "utf8");
 const files = [...html.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "game");
 const pascal = f => f.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join("");
 const counts = {};
-let heldWeapon = null;
+let heldWeapon = null, heldWeaponAt = null;
 const infectedFrames = [], survivorFrames = [], charDraws = [], charRequests = [];
 const bagPigments = new Set(["#3b2822","#c4875e","#985b40","#714534","#513629","#e0b784"]);
 const bagPixels = [];
@@ -44,7 +44,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
         counts.furnitureBlit = (counts.furnitureBlit || 0) + 1;
         propSprites.push(args[0]);
       }
-      if (k === "drawImage" && args.length === 3 && args[0]?.width === 36 && args[0]?.height === 36) heldWeapon = args[0];
+      if (k === "drawImage" && args.length === 3 && args[0]?.width === 36 && args[0]?.height === 36) { heldWeapon = args[0]; heldWeaponAt = [args[1], args[2]]; }
       if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 40) {
         infectedFrames.push(args.slice(1, 7));
       }
@@ -547,6 +547,18 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
     check("personagens 8 direções: o jogador pede as máscaras de recolor (pele, cabelo, casaco)",
       charRequests.some(r => r.endsWith("protagonist_mini_mask.png")) && charRequests.some(r => r.endsWith("protagonist_walk_mini_mask.png")),
       charRequests.filter(r => r.includes("mask")).length + " máscaras");
+    {                                                                       // a arma vai para a mão do sprite (index.json: hands)
+      cs.player.bag.push({id: "bat", qty: 1, uid: "render-hand-bat", condition: 100});
+      Sim.use(cs, cs.player.bag.length - 1);
+      cs.player.moving = false; cs.player.swing = 0; cs.player.headingX = 1; cs.player.headingY = 0;   // facing SE
+      charDraws.length = 0; heldWeapon = null; heldWeaponAt = null;
+      View.render(cs, .9, 1 / 60);
+      const body = charDraws.filter(a => a[0]._s.endsWith("protagonist_mini.png")).at(-1);
+      const hand = charIndex.characters.find(c => c.id === "protagonist").tiers.mini.hands?.[3];
+      const ok = Boolean(body && hand && heldWeaponAt) && Math.abs(heldWeaponAt[0] + 18 - (body[5] + hand[0])) <= 1 && Math.abs(heldWeaponAt[1] + 18 - (body[6] + hand[1])) <= 1;
+      check("personagens 8 direções: a arma empunhada fica na mão do sprite do jogador", ok,
+        body && hand && heldWeaponAt ? "arma " + (heldWeaponAt[0] + 18) + "," + (heldWeaponAt[1] + 18) + " mão " + (body[5] + hand[0]) + "," + (body[6] + hand[1]) : "sem dados");
+    }
     cs.player.appearance = "female"; charDraws.length = 0;
     for (let i = 0; i < 3; i++) View.render(cs, .5 + i / 60, 1 / 60);
     check("personagens 8 direções: aparência feminina usa o sprite da sobrevivente", cellOf("survivor_female_mini") >= 0);

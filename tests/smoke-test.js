@@ -2069,8 +2069,8 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
       }
       if (!["skin", "hair", "jacket"].every(r => v.refs?.[r]?.length === 3)) bad.push(c.id + "/refs-" + t);
     }
-    check("assets.characters 20 personagens x 3 tamanhos, 8 células iguais por PNG, âncora dentro da célula",
-      idx.characters.length === 20 && idx.order.join() === "N,NE,E,SE,S,SW,W,NW" && idx.default_tier in idx.tiers && !bad.length, bad.join(","));
+    check("assets.characters 22 personagens x 3 tamanhos, 8 células iguais por PNG, âncora dentro da célula",
+      idx.characters.length === 22 && idx.order.join() === "N,NE,E,SE,S,SW,W,NW" && idx.default_tier in idx.tiers && !bad.length, bad.join(","));
   }
 }
 

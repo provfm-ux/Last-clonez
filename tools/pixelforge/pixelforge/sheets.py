@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image
 
 from . import recolor as recolormod
+from . import zombify as zombmod
 from . import walk as walkmod
 from .core import apply_palette, kmeans_palette
 
@@ -20,7 +21,7 @@ KEY = np.array([251, 4, 250])
 TIERS = {"hd": (160, 0), "game": (80, 48), "mini": (40, 32)}
 WALK_TIERS = ("mini", "game")                          # hd keeps the static pose + procedural motion
 WALK_FRAMES = 8
-SCALE_CLASS = {"brute": 1.28, "runner": 0.94}          # same factors the game already uses in view.js
+SCALE_CLASS = {"brute": 1.28, "runner": 0.94, "obese_male": 1.15, "obese_female": 1.15}          # same factors the game already uses in view.js
 ANCHOR_CENTROID = {"crawler"}                          # lies on the ground: anchor on the body, not feet
 
 
@@ -62,6 +63,17 @@ def prepare(sheet_path, cid):
     sheet = Image.open(sheet_path)
     W, H = sheet.size
     cells = [key_out(sheet.crop(cell_box(i, W, H))) for i in range(8)]
+    return align(cells, cid)
+
+
+def load_direction_files(folder):
+    """8 transparent PNGs (one per direction, Pixel Lab export names) -> cells in N NE E SE S SW W NW order."""
+    names = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
+    return [Image.open(os.path.join(folder, n + ".png")).convert("RGBA") for n in names]
+
+
+def align(cells, cid):
+    """Crop each pose and put all 8 on one shared cell, feet on the anchor. -> (cells, cell size, anchor)."""
     info = []
     for im in cells:
         ax, by = _anchor(im, cid in ANCHOR_CENTROID)
@@ -123,12 +135,22 @@ def walk_tier(frames, cell_full, anchor_full, s, pal):
 def build(package_dir, out_dir, only=None, rig_path=None):
     man = json.load(open(os.path.join(package_dir, "manifesto_8_direcoes.json")))
     rig = walkmod.load_rig(rig_path)
+    zcfg = zombmod.load_cfg()
     os.makedirs(out_dir, exist_ok=True)
     result = []
-    for ch in man["characters"]:
+    extras_file = os.path.join(os.path.dirname(__file__), "..", "sources", "characters.json")
+    extras = json.load(open(extras_file))["characters"] if os.path.exists(extras_file) else []
+    for ch in [*man["characters"], *extras]:
         if only and ch["id"] not in only:
             continue
-        cells, size, anchor = prepare(os.path.join(package_dir, ch["image"]), ch["id"])
+        if "dir" in ch:                                                      # extra: transparent PNG per direction
+            folder = os.path.join(os.path.dirname(extras_file), ch["dir"])
+            cells, size, anchor = align(load_direction_files(folder), ch["id"])
+            ch = {**ch, "image": "sources/" + ch["dir"]}
+        else:
+            cells, size, anchor = prepare(os.path.join(package_dir, ch["image"]), ch["id"])
+        if ch["id"] in zcfg.get("ids", []):                                  # every zombie: green skin, blood on the mouth
+            cells = zombmod.zombify(cells, DIRS, ch["id"], zcfg)
         src_std = 385 if ch["id"] in ANCHOR_CENTROID else max(
             c.getchannel("A").getbbox()[3] - c.getchannel("A").getbbox()[1] for c in cells)   # crawler: same px/px as the others
         entry = {"id": ch["id"], "name": ch["name"], "category": ch.get("category"), "order": DIRS,
@@ -161,7 +183,7 @@ def build(package_dir, out_dir, only=None, rig_path=None):
     if only and os.path.exists(idx):                                          # --only: merge into the existing index
         byid = {c["id"]: c for c in json.load(open(idx))["characters"]}
         byid.update({c["id"]: c for c in result})
-        result = [byid[c["id"]] for c in man["characters"] if c["id"] in byid]
+        result = [byid[c["id"]] for c in [*man["characters"], *extras] if c["id"] in byid]
     json.dump({"order": DIRS, "default_tier": "mini", "tiers": {k: {"height": v[0]} for k, v in TIERS.items()},
                "layout": "one row of 8 cells (order above), every cell the same size, anchor = feet (crawler: body)",
                "characters": result}, open(os.path.join(out_dir, "index.json"), "w"), indent=1)

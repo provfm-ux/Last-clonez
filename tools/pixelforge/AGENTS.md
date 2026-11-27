@@ -31,6 +31,15 @@ Customisable characters (`recolor.IDS`: protagonist, survivor_male, survivor_fem
 (85 skin, 170 hair, 255 jacket) and `recolor` refs in `index.json`; the game recolours them from the player's style at load time.
 Tweak the HSV rules in `pixelforge/recolor.py` (`classify_cell`) if a region leaks, then re-run `--only <id>`.
 
+Extra characters (not in the package): `sources/characters.json` + one transparent PNG per direction in `sources/<id>/` (Pixel Lab `create-character-v3`
+export: `POST /v2/create-character-v3` ~3 generations at 128x128, poll `/v2/background-jobs/<id>`, `GET /v2/characters/<id>/zip`). `sheets` builds them like the rest
+(obese_male, obese_female = the big infected; the muscular `brute` is kept for mutated infected).
+
+Zombie look: every infected id in `zombify.json` gets blood on the mouth in the views where the face shows, and flesh/pink skin recoloured to green
+(`skin: auto`: skin that is already green, grey or olive is NOT changed; `green` forces it, `keep` forbids it). Face, neck, hands keep their shading. In the
+views where the face shows. Per-character knobs: `skin` (green|keep), `hue`, `head_frac`, `bright_factor`, `big_skin`, `mouth_k`, `mouth_y` (mouth height as a
+fraction of the figure height, for dark faces). Edit, then re-run `sheets --only <id>`. Check with a face contact sheet before committing.
+
 Limits: one photo gives one view. `--dirs` makes S,SE,E,SW,W by squashing; N-facing needs a back view.
 Web images may be copyrighted: keep refs/*.json (source URL), do not commit refs/ or out/.
 Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py && python3 tests/test_voxel.py && python3 tests/test_organic.py` (healthy = `Tudo OK` x4).

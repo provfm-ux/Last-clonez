@@ -535,9 +535,9 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
     cs.player.headingX = 1; cs.player.headingY = 0; charDraws.length = 0; View.render(cs, .1, 1 / 60);
     const se = cellOf("protagonist_mini");
     cs.player.headingX = -1; cs.player.headingY = 0; charDraws.length = 0; View.render(cs, .2, 1 / 60);
-    const nw = cellOf("protagonist_mini"), brute = cellOf("brute_mini");
+    const nw = cellOf("protagonist_mini"), brute = cellOf("obese_");
     check("personagens 8 direções: o jogador usa a Protagonista e a direção escolhe a célula (SE=3, NW=7)", se === 3 && nw === 7, "SE " + se + ", NW " + nw);
-    check("personagens 8 direções: o infetado 'brute' usa o atlas Brute", brute >= 0, "célula " + brute);
+    check("personagens 8 direções: o infetado grande ('brute') é um obeso (homem ou mulher), não o musculado", brute >= 0 && cellOf("brute_mini") < 0, "célula " + brute);
     charDraws.length = 0;                                                   // a andar: o ciclo de caminhada é desenhado e muda de linha com o passo
     cs.player.moving = true;
     for (let i = 0; i < 12; i++) { cs.player.x += .12; View.render(cs, .3 + i / 60, 1 / 60); }

@@ -1,0 +1,11 @@
+{
+  "_help": "Extra characters that do not come from the magenta package: one transparent PNG per direction (Pixel Lab create-character-v3 export), named north, north-east, east, south-east, south, south-west, west, north-west.",
+  "characters": [
+    {"id": "obese_male", "name": "Infetado obeso (homem)", "category": "infected", "dir": "obese_male",
+     "prompt": "obese infected zombie man, huge round belly, torn dirty stained shirt, grey-green rotting skin, sunken eyes, grim muted dark colours, apocalypse survival game",
+     "generator": "pixellab create-character-v3, 128x128, low top-down, seed 7"},
+    {"id": "obese_female", "name": "Infetada obesa (mulher)", "category": "infected", "dir": "obese_female",
+     "prompt": "obese infected zombie woman, huge round belly, torn dirty stained dress and cardigan, grey-green rotting skin, messy long hair, sunken eyes, grim muted dark colours, apocalypse survival game",
+     "generator": "pixellab create-character-v3, 128x128, low top-down, seed 11"}
+  ]
+}

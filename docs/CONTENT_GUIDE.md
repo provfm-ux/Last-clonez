@@ -50,7 +50,7 @@ Bake sprites once to an offscreen canvas and `drawImage` them; no per-frame grad
 desaturated greens/browns, blood `#4a0c0f #6a1216 #8c1a1c`, cold tint, dark tone, less cartoon.
 
 ## Graphics - 8-direction character atlases (assets only, not wired in yet)
-`game/assets/characters/` has 20 characters x 3 sizes (`<id>_mini|game|hd.png` = 40/80/160 px tall, default `mini`) and `index.json`
+`game/assets/characters/` has 22 characters x 3 sizes (`<id>_mini|game|hd.png` = 40/80/160 px tall, default `mini`) and `index.json`
 (cell size, feet anchor, scale). Each PNG is one row of 8 equal cells, order N NE E SE S SW W NW (screen directions). Regenerate with
 `python3 -m pixelforge sheets <package> -o out/chars` in `tools/pixelforge` (see its AGENTS.md).
 

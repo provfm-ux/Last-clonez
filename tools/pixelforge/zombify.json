@@ -1,0 +1,100 @@
+{
+  "_help": "Zombie look applied while building atlases (pixelforge/zombify.py). skin: 'auto' (default) recolours flesh/pink skin (hue below 25) to green and leaves skin that is already green, grey or olive alone; 'green' always recolours; 'keep' never does. blood: paints blood on the mouth in the views where the face shows (S SE SW E W). skin_color is the mid-tone of the recolour.",
+  "default": {
+    "skin": "auto",
+    "blood": true,
+    "skin_color": "#7a9a68",
+    "mouth_k": 0.8
+  },
+  "characters": {
+    "limping": {
+      "skin": "keep",
+      "hue": [
+        120,
+        215
+      ],
+      "mouth_y": 0.17
+    },
+    "missing_right_forearm": {
+      "hue": [
+        20,
+        120
+      ],
+      "mouth_y": 0.2,
+      "skin": "keep"
+    },
+    "elderly_female": {
+      "skin": "keep",
+      "hue": [
+        55,
+        130
+      ],
+      "mouth_y": 0.235
+    },
+    "obese_male": {
+      "skin": "keep",
+      "hue": [
+        60,
+        160
+      ],
+      "head_frac": 0.3,
+      "mouth_y": 0.21
+    },
+    "obese_female": {
+      "skin": "keep",
+      "hue": [
+        60,
+        160
+      ],
+      "head_frac": 0.3,
+      "mouth_y": 0.21
+    },
+    "crawler": {
+      "hue": [
+        8,
+        34
+      ],
+      "head_frac": 0.55,
+      "skin": "keep"
+    },
+    "runner": {
+      "hue": [
+        22,
+        60
+      ],
+      "head_frac": 0.35,
+      "skin": "keep"
+    },
+    "construction": {
+      "hue": [
+        0,
+        36
+      ]
+    },
+    "brute": {
+      "head_frac": 0.2,
+      "big_skin": true,
+      "bright_factor": 0.55
+    },
+    "missing_left_arm": {
+      "skin": "keep"
+    }
+  },
+  "ids": [
+    "walker",
+    "runner",
+    "brute",
+    "construction",
+    "paramedic",
+    "hiker",
+    "police",
+    "missing_left_arm",
+    "missing_right_forearm",
+    "limping",
+    "crawler",
+    "elderly_female",
+    "obese_male",
+    "obese_female"
+  ],
+  "_mouth_y": "mouth_y = mouth height as a fraction of the figure height, used instead of face detection for dark/odd faces"
+}

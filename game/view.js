@@ -1832,6 +1832,7 @@ const View = (() => {
     if (a.kind === "pierwoman") return "woman";      // the story bosses of FatHill
     if (a.kind === "david") return "david";
     if (a.kind === "vic") return "friend";
+    if (a.kind === "pip") return "pip";
     if (a.stats) {                                    // infected: kind, then outfit, then a stable pick from the spawn phase
       if (a.kind === "runner") return "runner";
       if (a.kind === "mutant") return "brute";

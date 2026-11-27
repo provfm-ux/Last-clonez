@@ -525,6 +525,7 @@ const Sim = (() => {
       if (region === "fields") placeFieldsLedger(world);
       if (region === "coast") placeFatHill(world, seed, rules);
       if (region === "reservoir") placeAmigo1(world, rules);
+      if (region === "fortress") placeFortress(world, rules);
       if (town) {
         placeEvaDiary(world);
         CampaignHints.track(s.campaign.hints, "coldvale.houses", s.minutes);
@@ -676,6 +677,10 @@ const Sim = (() => {
         else if (c.chat.until > Date.now()) { text = goal.wait; detail = goal.waitDetail; }
         else if (c.chat.used) detail += " Prompts used " + c.chat.used + " of " + Data.aiChat.prompts + ".";
       }
+      if (goal.id === "fortress.last-boss") {
+        if (done) { text = goal.done; detail = goal.doneDetail; }
+        else if (s.world.enemies.some(z => z.kind === "pip" && z.hp > 0 && !z.guard)) { text = goal.coat; detail = goal.coatDetail; }
+      }
       if (goal.id === "westfields.stealth" && !done && c.fields.alerts) detail += " The noise you made drew " + (c.fields.alerts === 1 ? "one group" : c.fields.alerts + " groups") + ".";
       const opens = !done && day < area.from ? area.from : null;
       return {id:goal.id, done, text, detail, opens};
@@ -707,6 +712,10 @@ const Sim = (() => {
       if (region === "reservoir") return s.campaign.chat.done ? null : find("ai-terminal");
       return region === "fields" ? find("exit-reservoir") : region === Regions.home ? find("exit-fields") : find("exit-" + Regions.home);
     }
+    if (goal.id === "fortress.last-boss") {
+      if (region === "fortress") return null;
+      return region === "ridge" ? find("exit-fortress") : region === Regions.home ? find("exit-ridge") : find("exit-" + Regions.home);
+    }
     if (goal.id === "westfields.stealth") return region === "fields" ? find("westfields-ledger") : region === Regions.home ? find("exit-fields") : find("exit-" + Regions.home);
     if (goal.id === "cindergrotto.battery") {
       if (region === Regions.cavern) return find(s.campaign.grotto === "reached" ? "exit-ridge" : "grotto-plate");
@@ -723,7 +732,7 @@ const Sim = (() => {
     if (!goal) return T.idle;
     if (goal.opens) return T.waiting.replace("{day}", goal.opens);
     const area = Data.campaignGoals.find(g => g.id === goal.id).area, closed = Campaign.closedReason(area, day, hour);
-    const at = {coldvale:Regions.home, cinema:"cinema", pineridge:"ridge", ironworks:"ironworks", fathill:"coast", westfields:"fields", cindergrotto:Regions.cavern, viragem:"reservoir", amigo1:"reservoir"}[area];
+    const at = {coldvale:Regions.home, cinema:"cinema", pineridge:"ridge", ironworks:"ironworks", fathill:"coast", westfields:"fields", cindergrotto:Regions.cavern, viragem:"reservoir", amigo1:"reservoir", fortress:"fortress"}[area];
     const text = T.goals[goal.id], f = c.fathill, pages = s.world.objects.filter(o => o.action === "campaign-page" && o.read).length;
     switch (goal.id) {
       case "coldvale.houses": return region !== Regions.home ? T.back : text.replace("{n}", pages);
@@ -743,6 +752,11 @@ const Sim = (() => {
       case "amigo1.lockdown-chat":
         if (region !== "reservoir") return closed || text.go;
         return c.chat.done ? text.fight : c.chat.until > Date.now() ? text.wait : text.chat;
+      case "fortress.last-boss": {
+        if (region !== "fortress") return closed || text.go;
+        const pip = s.world.enemies.find(z => z.kind === "pip" && z.hp > 0);
+        return !pip ? text.done : pip.guard ? text.coat : text.fire;
+      }
       case "westfields.stealth": return region !== "fields" ? closed || text.go : c.fields.alerts ? text.noisy : text.sneak;
       case "cindergrotto.battery":
         if (region === Regions.cavern) return c.grotto === "reached" ? text.out : text.plate;
@@ -1732,6 +1746,15 @@ const Sim = (() => {
   // Damage that reaches a boss's hit points: nothing while guarded (it builds towards breaking the guard), double while lured.
   function bossDamage(s, z, amount) {
     if (!z.stats.boss) return amount;
+    if (z.kind === "pip") {
+      if (z.guard) {
+        z.guardDmg = (z.guardDmg ?? 0) + amount;
+        if (z.guardDmg >= Data.pipFight.guardDamage) { z.guard = false; z.guardBroken = false; notify(s, Data.campaignText.pipCoat, true); }
+        else notify(s, Data.campaignText.pipBraced);
+        return 0;
+      }
+      return nearFire(s, z) ? amount * Data.pipFight.fireMult : amount;
+    }
     if (z.kind === "vic" && z.guard) { notify(s, Data.campaignText.vicBraced, true); return 0; }
     if (z.guard) {
       z.guardDmg = (z.guardDmg ?? 0) + amount;
@@ -1812,6 +1835,49 @@ const Sim = (() => {
       const t = spotIn(world, cottage).reverse()[0];
       if (t) world.objects.push({id:"vic-diary", x:t.x+.5, y:t.y+.5, building:cottage.id, zone:t.zone, tint:.54, kind:"record", action:"vic-diary", name:"Vic's diary", read:false, active:true, solid:false});
     }
+  }
+
+  // fortress.last-boss: Pip, the mutated first infected, inside the compound with an escort. Fire (stone rings, built campfires) hurts the mutation.
+  function placeFortress(world, rules) {
+    const rng = Level.seeded(0x5a1f), keep = world.buildings.find(b => b.name === "Fortress keep"), used = [];
+    const spot = (tx, ty) => {
+      let best = null;
+      for (let y = 12; y < 52; y++) for (let x = 16; x < 57; x++) {
+        const t = World.tileAt(world,x,y);
+        if (!t || t.building || !World.clear(world,x+.5,y+.5,.4) || used.some(u => Math.hypot(u.x - x, u.y - y) < 2.5) || world.objects.some(o => Math.floor(o.x) === x && Math.floor(o.y) === y)) continue;
+        const d = Math.hypot(x - tx, y - ty);
+        if ((!best || d < best.d) && World.route(world,world.start.x,world.start.y,x+.5,y+.5,0,true).length) best = {x, y, d};
+      }
+      if (best) used.push(best);
+      return best;
+    };
+    const at = spot(42, 34);
+    if (at) {
+      const z = World.infected(world, "fortress-pip", at.x+.5, at.y+.5, rules.mix, rng, "boss");
+      Object.assign(z, {kind:"pip", stats:Data.infected.pip, hp:Data.infected.pip.hp, outfit:"plain", guard:true, guardDmg:0, guardBroken:false, docile:false, lured:0, dormant:false});
+      world.enemies.push(z);
+    }
+    for (let i = 0; i < Data.pipFight.escort; i++) {
+      const a = spot(34 + (i % 4) * 6, 30 + Math.floor(i / 4) * 12);
+      if (a) world.enemies.push(World.infected(world, "fortress-escort-" + i, a.x+.5, a.y+.5, rules.mix, rng, "resident"));
+    }
+    void keep;
+  }
+
+  const nearFire = (s, z) => s.world.objects.some(o => o.kind === "campfire" && o.active !== false && distance(o, z) <= Data.pipFight.fireRange);
+  function pipBurn(s, z, dt) {
+    if (z.guard || z.hp <= 0 || !nearFire(s, z)) { z.burning = false; return; }
+    if (!z.burning) { z.burning = true; notify(s, Data.campaignText.pipBurning, true); }
+    z.hp = Math.max(1, z.hp - Data.pipFight.burnPerSecond * dt);
+    z.flash = .15;
+  }
+
+  function pipFinale(s) {
+    const c = s.campaign;
+    if (!c || c.completed.includes("fortress.last-boss")) return;
+    c.completed.push("fortress.last-boss");
+    CampaignHints.progress(c.hints, s.minutes);
+    notify(s, Data.campaignText.pipDown, true);
   }
 
   const chatLog = (chat, who, text) => { chat.log.push({who, text}); while (chat.log.length > Data.aiChat.maxLog) chat.log.shift(); };
@@ -3229,6 +3295,7 @@ const Sim = (() => {
     fathillFear(s, enemy);
     if (enemy.kind === "david") fathillFinale(s, enemy);
     if (enemy.kind === "vic") vicFinale(s);
+    if (enemy.kind === "pip") pipFinale(s);
     hearZombie(s,"death",enemy);
     const winner = enemy.origin === "cinema-winner";
     const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item, supply = winner ? null : carriedSupply(s, enemy);
@@ -3628,6 +3695,7 @@ const Sim = (() => {
         continue;
       }
       if (z.docile) { z.moving = false; z.alert = 0; continue; }
+      if (z.kind === "pip") pipBurn(s, z, dt);
       if (z.lured > 0) {                                 // the violin: he walks up to the player and stands there, not attacking
         z.lured = Math.max(0, z.lured - dt);
         z.alert = Math.max(z.alert, 8); z.chaseX = p.x; z.chaseY = p.y; z.cooldown = Math.max(z.cooldown, .6);

@@ -26,6 +26,9 @@ const Regions = (() => {
     lighthouse: {name:"Gull Point", direction:"Beyond the coast", tag:"LIGHT", type:"Headland", color:"#6a7480", width:64, height:64, deep:true, host:"coast",
       arrival:[32,58], exitBack:[32,61], hostExit:[100,100], hostArrival:[97,100], vehicles:false, cold:.35,
       detail:"A windy headland with a locked lighthouse, a keeper's cottage and a boat shed."},
+    fortress: {name:"The Fortress", direction:"Beyond Pine Ridge", tag:"FORT", type:"Fortress", color:"#5c6168", width:64, height:64, deep:true, host:"ridge",
+      arrival:[5,32], exitBack:[2,32], hostExit:[100,8], hostArrival:[97,8], vehicles:false, cold:.1,
+      detail:"A walled compound with a keep, gardens and two gates. Whatever started this is inside."},
     cinema:{name:"Oxford Night Reel", direction:"Oxford", tag:"CINEMA", color:"#514c46", width:29, height:31,
       deep:true, host:"coldvale", generator:6, arrival:[14,27], exitBack:[14,29], hostExit:[72,64], hostArrival:[71,64], vehicles:false,
       detail:"A shuttered Oxford cult cinema. The evening raffle never finished."},
@@ -235,6 +238,14 @@ const Regions = (() => {
       reservoir(x,y) {
         if (y < 26 && x > 3 && x < 60) return "water";
         return y < 8 ? "rock" : "grass";
+      },
+      fortress(x,y) {
+        const wall = x === 14 || x === 58 || y === 10 || y === 54;
+        if (x >= 14 && x <= 58 && y >= 10 && y <= 54) {
+          if (wall) return (x === 14 || x === 58) && y >= 30 && y <= 34 ? "concrete" : "rock";
+          return x >= 18 && x <= 24 && y >= 42 && y <= 46 || x >= 50 && x <= 55 && y >= 42 && y <= 46 ? "grass" : "concrete";
+        }
+        return "grass";
       },
       lighthouse(x,y) {
         const spine = 32 + 3 * Math.sin(y / 9), half = 14 - Math.abs(y - 30) / 4, d = Math.abs(x - spine);
@@ -517,6 +528,17 @@ const Regions = (() => {
       collector(40,36); campfire(24,46);
       for (const [x,y] of [[10,40],[30,50],[50,50],[56,38]]) resource(x,y,"forage","Wild blackberries",{resource:"berries"});
       vehicle(52,45,"reservoir-van",{wood:2,fuel:1},16);
+    } else if (region === "fortress") {
+      zone("yard","Fortress yard","#6b6f72"); zone("approach","Fortress approach","#6f6a54");
+      road([[2,32],[14,32]],1.6,"trail","approach"); road([[58,32],[62,32]],1.6,"trail","approach");
+      const keep = building(26,16,14,11,"Fortress keep","industrial","iron");
+      keep.stash(2,2,"locker","Armoury",{pistol:1,ammo:12,bandage:3,splint:1});
+      keep.stash(10,2,"fridge","Sealed larder",{food:6,water:6,fresh:1},{storage:true});
+      keep.stash(2,7,"crate","Seed store",{radishseed:4,part:2,nails:10});
+      keep.bed(10,7,"Keep bunk"); keep.bed(11,7,"Keep bunk"); keep.bench(6,7);
+      for (const [x,y] of [[34,34],[46,38],[40,46],[48,28],[22,40]]) campfire(x,y);
+      collector(20,20); collector(52,20);
+      for (const [x,y] of [[20,44],[21,44],[22,44],[52,44]]) garden(x,y,"potato");
     } else if (region === "lighthouse") {
       zone("point","Gull Point","#6c7380");
       road([[32,61],[31,50],[29,40],[30,28],[33,19]],1.4,"trail","point");
@@ -540,7 +562,7 @@ const Regions = (() => {
     }
 
     const occupied = new Set(objects.map(o => Math.floor(o.y)*width + Math.floor(o.x)));
-    const density = {ridge:.085, ironworks:.04, coast:.035, fields:.045, quarry:.012, reservoir:.05, lighthouse:.03}[region] ?? .023;
+    const density = {ridge:.085, ironworks:.04, coast:.035, fields:.045, quarry:.012, reservoir:.05, lighthouse:.03, fortress:.004}[region] ?? .023;
     for (const t of tiles) {
       t.baseKind = t.kind; t.baseSolid = t.solid;
       if (t.surface !== "grass" || t.solid || occupied.has(t.y*width+t.x) || Math.hypot(t.x+.5-start.x,t.y+.5-start.y) < 6) continue;

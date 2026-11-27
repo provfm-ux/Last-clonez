@@ -64,7 +64,7 @@ const Campaign = (() => {
   ].map(([day,type,intensity]) => ({day,type,intensity}));
 
   // Game regions that belong to a campaign area (travel there follows the calendar). Other regions stay free.
-  const regions = {coldvale:"coldvale", cinema:"cinema", ridge:"pineridge", ironworks:"ironworks", coast:"fathill", fields:"westfields", cavern:"cindergrotto", reservoir:"amigo1"};
+  const regions = {coldvale:"coldvale", cinema:"cinema", ridge:"pineridge", ironworks:"ironworks", coast:"fathill", fields:"westfields", cavern:"cindergrotto", reservoir:"amigo1", fortress:"fortress"};
 
   const day = minutes => Math.floor(minutes / 1440) + 1;
   const weekday = d => weekdays[(d - 1 + firstWeekday) % 7];

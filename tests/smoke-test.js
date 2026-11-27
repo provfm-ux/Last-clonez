@@ -711,7 +711,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
 {
   const {Expedition,Chronicle,Regions} = context;
   const districts = Object.entries(Expedition.districts);
-  const oldTiles = Object.entries(Regions.definitions).filter(([id]) => !Expedition.districts[id])
+  const oldTiles = Object.entries(Regions.definitions).filter(([id]) => !Expedition.districts[id] && id !== "fortress")
     .reduce((sum,[,area]) => sum+area.width*area.height,0);
   const newTiles = districts.reduce((sum,[,area]) => sum+area.width*area.height,0);
   check("outer districts at least double the mapped area",newTiles >= oldTiles);
@@ -2013,7 +2013,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
 { // ui.campaign-goals (revisão, sugestão 1): objetivos da campanha no topo, no diário e na seta de direção
   const s = fresh("campaign");
   check("ui.campaign-goals começa com as 3 páginas, sem seta (encontrar as casas faz parte do desafio)",
-    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 10);
+    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 11);
   s.campaign.completed.push("coldvale.houses");
   check("ui.campaign-goals o cinema ainda fechado mostra quando abre e aponta para a saída",
     Sim.pinnedGoal(s) === "Take the golden idol · opens on day 2" && Sim.destination(s)?.id === "exit-cinema", Sim.pinnedGoal(s));
@@ -2034,7 +2034,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("ui.campaign-goals depois mostra a Cinder Grotto (dia 12)", Sim.pinnedGoal(c) === "Read the surveyor's plate in Cinder Grotto · opens on day 12", Sim.pinnedGoal(c));
   c.campaign.completed.push("cindergrotto.battery");
   check("ui.campaign-goals depois mostra o primeiro amigo (dia 14)", /opens on day 14/.test(Sim.pinnedGoal(c)) && /Stop the assistant/.test(Sim.pinnedGoal(c)), Sim.pinnedGoal(c));
-  c.campaign.completed.push("amigo1.lockdown-chat", "viragem.zero");
+  c.campaign.completed.push("amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss");
   check("ui.campaign-goals com tudo feito por agora o objetivo avisa que há mais a caminho", /on its way/.test(Sim.pinnedGoal(c)) && Sim.destination(c) === null);
   const plain = fresh("survival"); plain.pinStory = true;
   check("ui.campaign-goals fora da campanha nada muda", Sim.pinnedGoal(plain) === "Find Eva" && Sim.campaignGoals === Sim.campaignGoals);
@@ -2224,8 +2224,45 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("amigo1: saves antigos sem 'chat' carregam e valores inválidos são recusados", Sim.restore(old).campaign.chat.used === 0 && bad);
 }
 
+{ // fortress.last-boss: o Pip mutado; casaco cai com dano, fogo causa dano extra; a fortaleza fica como refúgio
+  const r = Sim.create(11, "campaign", "carer", context.Expedition.generator, undefined, "ridge");
+  const exit = r.world.objects.find(o => o.id === "exit-fortress");
+  check("fortress: Pine Ridge tem a saída para a fortaleza num sítio livre", Boolean(exit) && context.World.clear(r.world, exit.x, exit.y, .3), exit ? exit.x + "," + exit.y : "sem saída");
+  Sim.testJump(r, 25, {}, {anyMode: true});
+  if (exit) Object.assign(r.player, {x: exit.x, y: exit.y + .5});
+  const blocked = exit && Sim.travel(r, exit);
+  check("fortress: sem as 5 coordenadas não se entra", !blocked || blocked.world.region !== "fortress");
+  r.campaign.clues = 5;
+  const inside = exit && Sim.travel(r, exit);
+  check("fortress: com as 5 coordenadas, no dia 25, entra-se", inside?.world.region === "fortress", inside?.world.region);
+  const f = Sim.create(11, "campaign", "carer", 2, undefined, "fortress");
+  Sim.testJump(f, 25, {}, {anyMode: true});
+  const pip = f.world.enemies.find(z => z.kind === "pip");
+  check("fortress: o Pip existe com casaco, e há escolta e fogueiras", Boolean(pip) && pip.guard && pip.hp === 320 && f.world.enemies.length > 4 && f.world.objects.filter(o => o.kind === "campfire").length >= 5);
+  check("fortress: a fortaleza tem horta, despensa e coletores para o final",
+    f.world.objects.filter(o => o.kind === "garden").length >= 4 && f.world.objects.some(o => o.kind === "barrel") && f.world.buildings.some(b => b.name === "Fortress keep"));
+  // damage path used by Sim.attack: bossDamage via fists/weapon. Drive it through attack with a strong weapon.
+  const fire = f.world.objects.find(o => o.kind === "campfire");
+  Object.assign(pip, {x: fire.x + 8, y: fire.y});
+  f.player.weapon = "foundrymaul"; f.player.bag.push({id:"foundrymaul", qty:1, condition:100, born:0, uid:"fm2"}); f.player.weaponUid = "fm2";
+  const swing = () => { f.player.cooldown = 0; f.player.stamina = 100; Object.assign(f.player, {x: pip.x - 1, y: pip.y}); Sim.attack(f, pip); };
+  const before = pip.hp; swing();
+  check("fortress: com o casaco os golpes não ferem o Pip", pip.hp === before && pip.guard);
+  for (let i = 0; i < 12 && pip.guard; i++) swing();
+  check("fortress: o casaco cai com dano acumulado", !pip.guard && pip.hp === 320);
+  swing(); const plain = 320 - pip.hp;
+  Object.assign(pip, {x: fire.x + 1, y: fire.y}); pip.hp = 320; swing();
+  const burnt = 320 - pip.hp;
+  check("fortress: perto do fogo o mesmo golpe faz mais dano", plain > 0 && burnt >= plain * 2, plain + " vs " + burnt);
+  const hp0 = pip.hp; Object.assign(pip, {x: fire.x + 1, y: fire.y}); Sim.tick(f, .033, idle);
+  check("fortress: o fogo queima o Pip com o tempo", pip.hp < hp0 || pip.burning);
+  pip.hp = 1; Object.assign(pip, {x: fire.x + 8, y: fire.y}); swing(); swing(); swing();
+  check("fortress: o Pip a cair conclui o desafio final", pip.hp <= 0 && f.campaign.completed.includes("fortress.last-boss"), pip.hp + "");
+  check("fortress: depois da vitória fica uma dica de refúgio", /fortress is yours/.test(Sim.campaignTip(f)) || Sim.campaignTip(f).length > 20);
+}
+
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
-  const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero"];
+  const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"];
   let empty = 0, total = 0, sample = "";
   for (let day = 1; day <= 30; day++) for (let done = 0; done <= goalsOrder.length; done++) {
     const s = fresh("campaign"); Sim.testJump(s, day, {}, {anyMode: true});
@@ -2233,7 +2270,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     const tip = Sim.campaignTip(s); total++;
     if (typeof tip !== "string" || tip.length < 20) { empty++; sample = day + "/" + done; }
   }
-  check("ui.campaign-tip em 30 dias x 11 estados de progresso há sempre uma dica", empty === 0, empty + " vazias de " + total + " " + sample);
+  check("ui.campaign-tip em 30 dias x 12 estados de progresso há sempre uma dica", empty === 0, empty + " vazias de " + total + " " + sample);
   const t0 = fresh("campaign");
   check("ui.campaign-tip no início explica as páginas", /torn page/.test(Sim.campaignTip(t0)) && /0 of 3/.test(Sim.campaignTip(t0)), Sim.campaignTip(t0));
   const pre = fresh("campaign"); pre.campaign.completed.push("coldvale.houses");

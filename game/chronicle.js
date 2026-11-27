@@ -14,6 +14,7 @@ const Chronicle = (() => {
     reservoir:"Follow the spillway to the valve tower. Someone scratched a warning inside.",
     lighthouse:"The boat shed at Gull Point kept a second copy of the keeper’s watch.",
     cinema:"The ticket booth and projection booth kept separate records of the last screening.",
+    fortress:"The keep's ledger lists everyone the fortress was built for.",
     cavern:"Follow the winch and survey rooms to the final shutdown console."
   };
   const entries = {

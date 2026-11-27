@@ -255,6 +255,11 @@ const Data = (() => {
     vicHelmet:"The assistant stands down and Vic's helmet drops from his hands. He is just a very strong man with nothing left to lose. End it.",
     diaryEarly:"The pages are stuck together with something dark. You cannot make sense of them yet. Come back from day 15.",
     diaryRead:"VIC'S DIARY · He was the first one. ‘Patchwork called me Playtester 04. I was the swab. I am the test.’ The last page: ‘The rumour was us. We built the fortress for the end of the world, then started it.’",
+    pipCoat:"The scorched firefighter's coat tears off Pip's back in strips. Underneath, the skin is raw and it steams. Get him near a fire.",
+    pipBraced:"The coat soaks it up. Keep hitting: it will not hold forever.",
+    pipBurning:"Pip screams as the flames take hold of the mutation.",
+    pipDown:"Pip falls, and the whole fortress goes quiet. The doors can be locked from the inside now. Stay as long as you like: the gardens, the larder and the water are yours.",
+    fortressLocked:"The coordinates are incomplete. Five are needed, and the road only appears with all of them.",
     aiNone:"The terminal is dark. It only answers at the valve tower.",
     violinNone:"Nothing near enough to hear it.",
     violinGuarded:"He hears it. The vest keeps him braced against the sound.",
@@ -309,7 +314,10 @@ const Data = (() => {
     {id:"amigo1.lockdown-chat", area:"amigo1", text:"Stop the assistant and bring Vic down", detail:"Days 14 to 20. Greywater Reservoir, past Westfields. Carry the Foundry maul. The valve tower terminal still listens; Vic's helmet will not come off by force.",
       fight:"Bring Vic down with the Foundry maul", fightDetail:"The assistant is off and the helmet is loose. Vic is still very strong.",
       wait:"Survive until the assistant has tokens again", waitDetail:"The assistant is out of tokens and will resume in a few minutes. Survive the infected it called."},
-    {id:"viragem.zero", area:"viragem", text:"Find out what happened to the first friend", detail:"Days 15 to 18. Greywater Reservoir, past Westfields. Vic kept a diary in the locked keeper's cottage; the key is in the pump house."}
+    {id:"viragem.zero", area:"viragem", text:"Find out what happened to the first friend", detail:"Days 15 to 18. Greywater Reservoir, past Westfields. Vic kept a diary in the locked keeper's cottage; the key is in the pump house."},
+    {id:"fortress.last-boss", area:"fortress", text:"Reach the fortress and end it with Pip", detail:"From day 25, with all five coordinates. Beyond Pine Ridge. Pip wears a scorched firefighter's coat; the mutation burns, so fight him near a campfire.",
+      coat:"Lead Pip to a fire", coatDetail:"His coat is off. Fight him beside a stone fire ring or a campfire you built: fire hurts him more and keeps burning.",
+      done:"The fortress is yours", doneDetail:"Stay as long as you like. Garden, cook, collect water and hold the gates."}
   ];
   // Campaign tips (Sim.campaignTip): always one concrete next step, shown under the pinned goal.
   const campaignTips = {
@@ -322,6 +330,7 @@ const Data = (() => {
       "pineridge.two-nights":{go:"Follow the arrow to Pine Ridge. Bring a bedroll, wood and water: no barricades there.", stay:"Survive the night: keep a campfire lit and stay dry and warm. Nights done: {n} of 2."},
       "eva.death":{follow:"Stay close to Eva and look after her until day 5.", wait:"Eva has gone out. Wait at the shelter: her diary turns up in the morning.", diary:"Read Eva's diary under the pillow at the shelter."},
       "ironworks.barricade":{go:"Follow the arrow to the Ironworks. It is open on weekdays, 08:00 to 18:00.", cage:"Take the weapon cage apart in the machine shop with the toolboard hammer and crowbar. They wear out: do not waste them."},
+      "fortress.last-boss":{go:"You have all five coordinates. Follow the arrow through Pine Ridge to the fortress road. Bring fire: a campfire, and a good weapon.", coat:"Beat Pip down until his coat comes apart. Hit hard and keep your distance from the escort.", fire:"His coat is off. Lead him to a stone fire ring or a campfire you built: fire hurts him and keeps burning.", done:"The fortress is yours. Garden, cook, collect water and kill at your pace."},
       "viragem.zero":{go:"Follow the arrow to Greywater Reservoir, past Westfields. The diary is in the locked keeper's cottage: look for the key in the pump house.", read:"Read Vic's diary in the keeper's cottage. Days 15 to 18 only."},
       "amigo1.lockdown-chat":{go:"Follow the arrow to Greywater Reservoir, past Westfields. Carry the Foundry maul from the Ironworks.", chat:"Go up the valve tower and talk to the terminal. Five prompts: make the last one count, and use a joke the machine cannot ignore.", wait:"The assistant is out of tokens. Survive the infected it called until it comes back, then try the last prompt again.", fight:"The helmet is off. Hit Vic with the Foundry maul: nothing else hurts him."},
       "fathill.bosses":{go:"Follow the arrow to Bracken Coast. The road is open on low-tide days (even days).", fear:"Kill infected where the woman on the pier can see you: her fear is {n} of {max}. The violin is in the net shed.", david:"Wear David's guard down, then shove his vest off.", violin:"Play the violin near David, then strike while he stands there."},
@@ -350,6 +359,8 @@ const Data = (() => {
     stopWords:/\b(stand down|stop|halt|shut down|cancel|abort)\b/i,
     winWords:["stand down", "token"]
   };
+  // The last boss (docs/HISTORIA.md sections 7 and 10): a firefighter's coat falls under heavy damage; fire hurts the mutation.
+  const pipFight = {guardDamage:120, fireRange:2.6, fireMult:2.5, burnPerSecond:7, escort:8};
   const fatHill = {fearKills:10, fearSight:18, guardDamage:450, lureSeconds:22, luredDamage:2, playRange:22};
   const cinemaPatrol = [[13.5,8.5],[19.5,12.5],[14.5,17.5],[7.5,12.5],[12.5,10.5]];
   const cinemaTrap = {horde:50, tensionEvery:6, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
@@ -534,6 +545,7 @@ const Data = (() => {
     brute:{name:"Brute",speed:.68,hp:88,damage:19,color:"#777e68"},
     pierwoman:{name:"The woman on the pier",speed:.72,hp:100,damage:12,color:"#8a7d70",boss:true},
     david:{name:"David",speed:.62,hp:130,damage:17,color:"#75806f",boss:true},
+    pip:{name:"Pip",speed:.74,hp:320,damage:24,color:"#7a6a58",boss:true},
     vic:{name:"Vic",speed:.7,hp:150,damage:20,color:"#7b8470",boss:true}
   };
   const outfits = {
@@ -610,6 +622,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

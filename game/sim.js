@@ -1754,6 +1754,7 @@ const Sim = (() => {
         else notify(s, Data.campaignText.pipBraced);
         return 0;
       }
+      if (weapon(s).id === "harpoon" && z.hp < Data.pipFight.finishBelow) { notify(s, Data.campaignText.pipHarpoon, true); return z.hp; }
       if (Data.items[weapon(s).id]?.fire) z.burnUntil = s.elapsed + Data.fireRules.torchSeconds;
       return nearFire(s, z) || Data.items[weapon(s).id]?.fire ? amount * Data.pipFight.fireMult : amount;
     }

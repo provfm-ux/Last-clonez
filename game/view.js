@@ -1665,6 +1665,7 @@ const View = (() => {
     wrench: [[1,0,8,2,darkSteel],[2,0,6,1,steel],[8,-2,3,5,steel],[11,-2,2,1,lightSteel],[11,2,2,1,lightSteel]],
     fryingpan: [[1,0,7,2,darkSteel],[7,-2,7,6,darkSteel],[8,-3,5,1,steel],[8,4,5,1,steel],[13,-1,2,4,steel],[9,-1,3,3,"#4c5553"]],
     broom: [[1,0,11,1,lightWood],[11,-2,2,5,woodGrip],[13,-3,3,7,"#9e7643"],[14,-2,2,1,"#d1ae6a"],[14,1,2,1,"#c79b59"]],
+    harpoon: [[1,0,15,1,lightWood],[14,-1,3,3,darkSteel],[17,-2,2,5,steel],[18,0,2,1,lightSteel],[16,-3,2,1,steel],[16,3,2,1,steel]],
     torch: [[1,0,8,2,woodGrip],[8,-1,3,3,"#4a3a2b"],[10,-3,3,3,"#d6561f"],[11,-4,2,3,"#f2a23a"],[12,-3,1,1,"#ffe08a"]],
     rollingpin: [[1,0,13,1,lightWood],[3,-2,8,5,woodGrip],[4,-2,6,1,lightWood],[4,2,6,1,"#825132"]]
   };

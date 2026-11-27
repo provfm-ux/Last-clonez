@@ -1,6 +1,7 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Added the harpoon (fortress keep armoury): very long reach, very slow swing; it finishes Pip once he is below 100 hp.
 - Added the torch and the Molotov cocktail recipes (always available). The torch sets infected alight on a hit; a thrown Molotov leaves flames on the ground for 12 seconds. Both, and campfires, hurt Pip twice as much and make him burn.
 - Campaign: added the fortress (day 25, all five coordinates) beyond Pine Ridge and the last boss. Pip's firefighter coat comes off under heavy damage; fire (stone rings, built campfires) hurts the mutation twice as much and keeps burning. The fortress keeps a keep, larder, gardens and water as the endgame refuge.
 - Campaign: added Amigo 1 (days 14 to 20) and Patient zero (days 15 to 18) at Greywater Reservoir. Carry the Foundry maul; talk to the valve tower terminal (five prompts, a five minute pause when its tokens run out and a horde arrives), bring Vic down for the fortress map, and read his diary in the locked keeper's cottage.

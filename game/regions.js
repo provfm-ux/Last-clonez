@@ -532,7 +532,7 @@ const Regions = (() => {
       zone("yard","Fortress yard","#6b6f72"); zone("approach","Fortress approach","#6f6a54");
       road([[2,32],[14,32]],1.6,"trail","approach"); road([[58,32],[62,32]],1.6,"trail","approach");
       const keep = building(26,16,14,11,"Fortress keep","industrial","iron");
-      keep.stash(2,2,"locker","Armoury",{pistol:1,ammo:12,bandage:3,splint:1});
+      keep.stash(2,2,"locker","Armoury",{pistol:1,ammo:12,bandage:3,splint:1,harpoon:1});
       keep.stash(10,2,"fridge","Sealed larder",{food:6,water:6,fresh:1},{storage:true});
       keep.stash(2,7,"crate","Seed store",{radishseed:4,part:2,nails:10});
       keep.bed(10,7,"Keep bunk"); keep.bed(11,7,"Keep bunk"); keep.bench(6,7);

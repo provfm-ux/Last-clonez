@@ -2296,6 +2296,19 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("fogo: a tocha faz ao Pip mais dano do que o seu dano base e deixa-o a arder", torch > 13 * 1.5 && pip.burnUntil > f.elapsed, plain + " / " + torch);
 }
 
+{ // arpão: alcance grande, muito lento, mata o Pip abaixo de 100 hp
+  const f = Sim.create(11, "campaign", "carer", 2, undefined, "fortress"); Sim.testJump(f, 25, {}, {anyMode: true});
+  const pip = f.world.enemies.find(e => e.kind === "pip"), h = Data.items.harpoon;
+  check("arpão: tem mais alcance e é muito mais lento do que a maça da Foundry", h.range > Data.items.foundrymaul.range * 1.5 && h.delay > Data.items.foundrymaul.delay * 2);
+  check("arpão: está na armaria da fortaleza", f.world.objects.some(o => o.name === "Armoury" && o.loot.some(i => i.id === "harpoon")));
+  pip.guard = false; f.player.bag.push({id:"harpoon", qty:1, condition:100, born:0, uid:"hp1"}); f.player.weapon = "harpoon"; f.player.weaponUid = "hp1";
+  const strike = () => { f.player.cooldown = 0; f.player.stamina = 100; Object.assign(f.player, {x: pip.x - 2.4, y: pip.y}); Sim.attack(f, pip); };
+  pip.hp = 250; strike();
+  check("arpão: com o Pip acima de 100 hp só faz dano normal", pip.hp > 0 && pip.hp < 250 && pip.hp > 100 - 1, String(pip.hp));
+  pip.hp = 99; strike();
+  check("arpão: abaixo de 100 hp mata o Pip e fecha o desafio", pip.hp <= 0 && f.campaign.completed.includes("fortress.last-boss"));
+}
+
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
   const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"];
   let empty = 0, total = 0, sample = "";

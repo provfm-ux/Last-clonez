@@ -1767,7 +1767,8 @@ const View = (() => {
   }
 
   // 8-direction character atlases (game/assets/characters, one row of 8 cells per character, order N NE E SE S SW W NW).
-  // One static pose per direction, so motion is procedural (bob, lunge, recoil). Until the atlas has loaded, or when it cannot
+  // Idle is one static pose per direction; walking uses a baked 8-frame cycle (legs and forearms rotated about their joints),
+  // and strike / recoil stay procedural (lunge, recoil). Until the atlas has loaded, or when it cannot
   // (single.html has no asset folder), the old zombie atlas / procedural sprites are drawn instead. Debug: ?chars=off|mini|game|hd.
   const charTiers = {mini: 1, game: .5, hd: .25};      // world-size multiplier: the mini tier is the 40 px reference
   const charVectors = [[0, -1], [.7, -.7], [1, 0], [.7, .7], [0, 1], [-.7, .7], [-1, 0], [-.7, -.7]];
@@ -1790,6 +1791,12 @@ const View = (() => {
     return a.id === "eva" ? "eva" : null;
   }
 
+  function charImage(file) {
+    let img = charImages.get(file);
+    if (!img) { img = new Image(); img.src = "assets/characters/" + file; charImages.set(file, img); }
+    return img;
+  }
+
   function drawCharacter(a, isPlayer, x, y, scale, direction, stride, clock) {
     if (charState < 0 || charTier === "off" || typeof Image !== "function" || typeof fetch !== "function") return false;
     if (charState === 0) {
@@ -1805,28 +1812,26 @@ const View = (() => {
     if (charState !== 2) return false;
     const entry = charEntries.get(characterFor(a, isPlayer)), t = entry?.tiers[charTier];
     if (!t) return false;
-    let img = charImages.get(t.file);
-    if (!img) {
-      img = new Image();
-      img.src = "assets/characters/" + t.file;
-      charImages.set(t.file, img);
-      return false;
-    }
-    if (img.naturalWidth !== t.cell[0] * 8 || img.naturalHeight !== t.cell[1]) return false;   // not decoded yet (or wrong file)
+    const walk = a.moving ? entry.walk?.[charTier] : null;       // baked walk cycle: rows = 8 frames, columns = 8 directions
+    const walkImg = walk && charImage(walk.file);
+    const baked = Boolean(walkImg && walkImg.naturalWidth === walk.cell[0] * 8 && walkImg.naturalHeight === walk.cell[1] * walk.frames);
+    const src = baked ? walk : t, img = baked ? walkImg : charImage(t.file);
+    if (img.naturalWidth !== src.cell[0] * 8 || img.naturalHeight !== src.cell[1] * (baked ? walk.frames : 1)) return false;   // not decoded yet
     const index = direction & 4 ? (direction & 2 ? 0 : 4) : direction & 8 ? (direction & 1 ? 6 : 2) :
       direction & 2 ? (direction & 1 ? 7 : 1) : (direction & 1 ? 5 : 3);
     const kindScale = a.kind === "brute" ? 1.28 : a.kind === "runner" ? .94 : 1;   // already baked into those atlases
     const z = scale / kindScale * charTiers[charTier], vec = charVectors[index];
+    const frame = baked ? Math.floor(stride * walk.frames) % walk.frames : 0;
     let dx = 0, dy = 0;
-    if (a.moving) {                                    // step bob + sway on the stride phase
+    if (a.moving && !baked) {                          // no baked cycle for this size: step bob + sway on the stride phase
       const wave = Math.sin(stride * Math.PI * 2);
       dy = -Math.abs(wave) * 1.5 * scale; dx = wave * .6 * scale;
     }
     const lunge = a.swing > 0 ? 2.5 : a.windup > 0 ? -1.2 : a.flash > 0 ? -1.5 : 0;   // strike, wind-up, recoil
     dx += vec[0] * lunge * scale; dy += vec[1] * lunge * scale * .5;
-    ctx.drawImage(img, index * t.cell[0], 0, t.cell[0], t.cell[1],
-      Math.round(x - t.anchor[0] * z + dx), Math.round(y - t.anchor[1] * z + dy),
-      Math.round(t.cell[0] * z), Math.round(t.cell[1] * z));
+    ctx.drawImage(img, index * src.cell[0], frame * src.cell[1], src.cell[0], src.cell[1],
+      Math.round(x - src.anchor[0] * z + dx), Math.round(y - src.anchor[1] * z + dy),
+      Math.round(src.cell[0] * z), Math.round(src.cell[1] * z));
     return true;
   }
 

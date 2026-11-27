@@ -517,8 +517,10 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
       constructor() { this.naturalWidth = 672; this.naturalHeight = 800; }
       set src(v) {
         this._s = v;
-        for (const c of charIndex.characters) for (const t of Object.values(c.tiers))
-          if (v.endsWith("/" + t.file)) { this.naturalWidth = t.cell[0] * 8; this.naturalHeight = t.cell[1]; }
+        for (const c of charIndex.characters) {
+          for (const t of Object.values(c.tiers)) if (v.endsWith("/" + t.file)) { this.naturalWidth = t.cell[0] * 8; this.naturalHeight = t.cell[1]; }
+          for (const t of Object.values(c.walk ?? {})) if (v.endsWith("/" + t.file)) { this.naturalWidth = t.cell[0] * 8; this.naturalHeight = t.cell[1] * t.frames; }
+        }
       }
       get src() { return this._s; }
     };
@@ -535,6 +537,12 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
     const nw = cellOf("protagonist_mini"), brute = cellOf("brute_mini");
     check("personagens 8 direções: o jogador usa a Protagonista e a direção escolhe a célula (SE=3, NW=7)", se === 3 && nw === 7, "SE " + se + ", NW " + nw);
     check("personagens 8 direções: o infetado 'brute' usa o atlas Brute", brute >= 0, "célula " + brute);
+    charDraws.length = 0;                                                   // a andar: o ciclo de caminhada é desenhado e muda de linha com o passo
+    cs.player.moving = true;
+    for (let i = 0; i < 12; i++) { cs.player.x += .12; View.render(cs, .3 + i / 60, 1 / 60); }
+    const rows = new Set(charDraws.filter(a => a[0]._s.includes("protagonist_walk_mini")).map(a => a[2] / a[4]));
+    check("personagens 8 direções: a andar usa o ciclo de caminhada e muda de frame com o passo", rows.size >= 4, rows.size + " frames distintos");
+    cs.player.moving = false;
   }
 }
 

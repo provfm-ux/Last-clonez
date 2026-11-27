@@ -2057,6 +2057,10 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
       const d = dims(v.file);
       if (!d || d[0] !== v.cell[0] * 8 || d[1] !== v.cell[1] || v.anchor[0] >= v.cell[0] || v.anchor[1] > v.cell[1]) bad.push(c.id + "/" + t);
     }
+    for (const c of idx.characters) for (const [t, v] of Object.entries(c.walk ?? {})) {   // baked walk cycles: frames rows x 8 directions
+      const d = dims(v.file);
+      if (!d || d[0] !== v.cell[0] * 8 || d[1] !== v.cell[1] * v.frames || v.frames < 4 || v.anchor[0] >= v.cell[0] || v.anchor[1] > v.cell[1]) bad.push(c.id + "/walk-" + t);
+    }
     check("assets.characters 20 personagens x 3 tamanhos, 8 células iguais por PNG, âncora dentro da célula",
       idx.characters.length === 20 && idx.order.join() === "N,NE,E,SE,S,SW,W,NW" && idx.default_tier in idx.tiers && !bad.length, bad.join(","));
   }

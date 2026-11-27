@@ -75,6 +75,34 @@
      ],
      "scale": 0.1023
     }
+   },
+   "walk": {
+    "game": {
+     "file": "woman_walk_game.png",
+     "cell": [
+      61,
+      86
+     ],
+     "anchor": [
+      29,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.2046
+    },
+    "mini": {
+     "file": "woman_walk_mini.png",
+     "cell": [
+      30,
+      43
+     ],
+     "anchor": [
+      15,
+      42
+     ],
+     "frames": 8,
+     "scale": 0.1023
+    }
    }
   },
   {
@@ -127,6 +155,34 @@
       12,
       40
      ],
+     "scale": 0.1023
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "david_walk_game.png",
+     "cell": [
+      73,
+      86
+     ],
+     "anchor": [
+      35,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.2046
+    },
+    "mini": {
+     "file": "david_walk_mini.png",
+     "cell": [
+      37,
+      43
+     ],
+     "anchor": [
+      17,
+      42
+     ],
+     "frames": 8,
      "scale": 0.1023
     }
    }
@@ -183,6 +239,34 @@
      ],
      "scale": 0.10471
     }
+   },
+   "walk": {
+    "game": {
+     "file": "friend_walk_game.png",
+     "cell": [
+      55,
+      86
+     ],
+     "anchor": [
+      26,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20942
+    },
+    "mini": {
+     "file": "friend_walk_mini.png",
+     "cell": [
+      28,
+      43
+     ],
+     "anchor": [
+      13,
+      42
+     ],
+     "frames": 8,
+     "scale": 0.10471
+    }
    }
   },
   {
@@ -235,6 +319,34 @@
       13,
       40
      ],
+     "scale": 0.10336
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "pip_walk_game.png",
+     "cell": [
+      73,
+      86
+     ],
+     "anchor": [
+      37,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20672
+    },
+    "mini": {
+     "file": "pip_walk_mini.png",
+     "cell": [
+      37,
+      43
+     ],
+     "anchor": [
+      18,
+      42
+     ],
+     "frames": 8,
      "scale": 0.10336
     }
    }
@@ -291,6 +403,34 @@
      ],
      "scale": 0.10283
     }
+   },
+   "walk": {
+    "game": {
+     "file": "walker_walk_game.png",
+     "cell": [
+      57,
+      86
+     ],
+     "anchor": [
+      28,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20566
+    },
+    "mini": {
+     "file": "walker_walk_mini.png",
+     "cell": [
+      28,
+      43
+     ],
+     "anchor": [
+      14,
+      42
+     ],
+     "frames": 8,
+     "scale": 0.10283
+    }
    }
   },
   {
@@ -343,6 +483,34 @@
       13,
       38
      ],
+     "scale": 0.09973
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "runner_walk_game.png",
+     "cell": [
+      78,
+      80
+     ],
+     "anchor": [
+      37,
+      80
+     ],
+     "frames": 8,
+     "scale": 0.19947
+    },
+    "mini": {
+     "file": "runner_walk_mini.png",
+     "cell": [
+      39,
+      40
+     ],
+     "anchor": [
+      18,
+      40
+     ],
+     "frames": 8,
      "scale": 0.09973
     }
    }
@@ -399,6 +567,34 @@
      ],
      "scale": 0.13264
     }
+   },
+   "walk": {
+    "game": {
+     "file": "brute_walk_game.png",
+     "cell": [
+      122,
+      109
+     ],
+     "anchor": [
+      60,
+      108
+     ],
+     "frames": 8,
+     "scale": 0.26528
+    },
+    "mini": {
+     "file": "brute_walk_mini.png",
+     "cell": [
+      61,
+      55
+     ],
+     "anchor": [
+      30,
+      54
+     ],
+     "frames": 8,
+     "scale": 0.13264
+    }
    }
   },
   {
@@ -451,6 +647,34 @@
       8,
       40
      ],
+     "scale": 0.10178
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "construction_walk_game.png",
+     "cell": [
+      54,
+      85
+     ],
+     "anchor": [
+      26,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20356
+    },
+    "mini": {
+     "file": "construction_walk_mini.png",
+     "cell": [
+      27,
+      43
+     ],
+     "anchor": [
+      13,
+      42
+     ],
+     "frames": 8,
      "scale": 0.10178
     }
    }
@@ -507,6 +731,34 @@
      ],
      "scale": 0.1023
     }
+   },
+   "walk": {
+    "game": {
+     "file": "paramedic_walk_game.png",
+     "cell": [
+      56,
+      86
+     ],
+     "anchor": [
+      28,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.2046
+    },
+    "mini": {
+     "file": "paramedic_walk_mini.png",
+     "cell": [
+      28,
+      43
+     ],
+     "anchor": [
+      14,
+      42
+     ],
+     "frames": 8,
+     "scale": 0.1023
+    }
    }
   },
   {
@@ -559,6 +811,34 @@
       9,
       40
      ],
+     "scale": 0.10471
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "hiker_walk_game.png",
+     "cell": [
+      57,
+      86
+     ],
+     "anchor": [
+      29,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20942
+    },
+    "mini": {
+     "file": "hiker_walk_mini.png",
+     "cell": [
+      29,
+      43
+     ],
+     "anchor": [
+      15,
+      42
+     ],
+     "frames": 8,
      "scale": 0.10471
     }
    }
@@ -615,6 +895,34 @@
      ],
      "scale": 0.10204
     }
+   },
+   "walk": {
+    "game": {
+     "file": "police_walk_game.png",
+     "cell": [
+      57,
+      86
+     ],
+     "anchor": [
+      29,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20408
+    },
+    "mini": {
+     "file": "police_walk_mini.png",
+     "cell": [
+      28,
+      43
+     ],
+     "anchor": [
+      14,
+      42
+     ],
+     "frames": 8,
+     "scale": 0.10204
+    }
    }
   },
   {
@@ -667,6 +975,34 @@
       9,
       40
      ],
+     "scale": 0.10444
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "survivor_male_walk_game.png",
+     "cell": [
+      55,
+      86
+     ],
+     "anchor": [
+      28,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20888
+    },
+    "mini": {
+     "file": "survivor_male_walk_mini.png",
+     "cell": [
+      27,
+      43
+     ],
+     "anchor": [
+      14,
+      42
+     ],
+     "frames": 8,
      "scale": 0.10444
     }
    }
@@ -723,6 +1059,34 @@
      ],
      "scale": 0.10417
     }
+   },
+   "walk": {
+    "game": {
+     "file": "survivor_female_walk_game.png",
+     "cell": [
+      53,
+      86
+     ],
+     "anchor": [
+      27,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20833
+    },
+    "mini": {
+     "file": "survivor_female_walk_mini.png",
+     "cell": [
+      27,
+      43
+     ],
+     "anchor": [
+      14,
+      42
+     ],
+     "frames": 8,
+     "scale": 0.10417
+    }
    }
   },
   {
@@ -775,6 +1139,34 @@
       8,
       40
      ],
+     "scale": 0.10638
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "eva_walk_game.png",
+     "cell": [
+      57,
+      86
+     ],
+     "anchor": [
+      28,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.21277
+    },
+    "mini": {
+     "file": "eva_walk_mini.png",
+     "cell": [
+      29,
+      43
+     ],
+     "anchor": [
+      14,
+      42
+     ],
+     "frames": 8,
      "scale": 0.10638
     }
    }
@@ -831,6 +1223,34 @@
      ],
      "scale": 0.10471
     }
+   },
+   "walk": {
+    "game": {
+     "file": "protagonist_walk_game.png",
+     "cell": [
+      60,
+      85
+     ],
+     "anchor": [
+      30,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20942
+    },
+    "mini": {
+     "file": "protagonist_walk_mini.png",
+     "cell": [
+      30,
+      43
+     ],
+     "anchor": [
+      15,
+      42
+     ],
+     "frames": 8,
+     "scale": 0.10471
+    }
    }
   },
   {
@@ -883,6 +1303,34 @@
       8,
       40
      ],
+     "scale": 0.10178
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "missing_left_arm_walk_game.png",
+     "cell": [
+      55,
+      85
+     ],
+     "anchor": [
+      27,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20356
+    },
+    "mini": {
+     "file": "missing_left_arm_walk_mini.png",
+     "cell": [
+      27,
+      43
+     ],
+     "anchor": [
+      14,
+      42
+     ],
+     "frames": 8,
      "scale": 0.10178
     }
    }
@@ -939,6 +1387,34 @@
      ],
      "scale": 0.10309
     }
+   },
+   "walk": {
+    "game": {
+     "file": "missing_right_forearm_walk_game.png",
+     "cell": [
+      56,
+      86
+     ],
+     "anchor": [
+      28,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20619
+    },
+    "mini": {
+     "file": "missing_right_forearm_walk_mini.png",
+     "cell": [
+      28,
+      43
+     ],
+     "anchor": [
+      14,
+      42
+     ],
+     "frames": 8,
+     "scale": 0.10309
+    }
    }
   },
   {
@@ -991,6 +1467,34 @@
       11,
       40
      ],
+     "scale": 0.1023
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "limping_walk_game.png",
+     "cell": [
+      69,
+      86
+     ],
+     "anchor": [
+      34,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.2046
+    },
+    "mini": {
+     "file": "limping_walk_mini.png",
+     "cell": [
+      35,
+      43
+     ],
+     "anchor": [
+      17,
+      42
+     ],
+     "frames": 8,
      "scale": 0.1023
     }
    }
@@ -1099,6 +1603,34 @@
       12,
       40
      ],
+     "scale": 0.10204
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "elderly_female_walk_game.png",
+     "cell": [
+      77,
+      86
+     ],
+     "anchor": [
+      34,
+      85
+     ],
+     "frames": 8,
+     "scale": 0.20408
+    },
+    "mini": {
+     "file": "elderly_female_walk_mini.png",
+     "cell": [
+      38,
+      43
+     ],
+     "anchor": [
+      17,
+      42
+     ],
+     "frames": 8,
      "scale": 0.10204
     }
    }

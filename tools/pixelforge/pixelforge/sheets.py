@@ -10,12 +10,15 @@ import os
 import numpy as np
 from PIL import Image
 
+from . import walk as walkmod
 from .core import apply_palette, kmeans_palette
 
 DIRS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 KEY = np.array([251, 4, 250])
 # size tiers: name -> (height in px of a standard 1.0 figure, palette colours or 0 = keep all)
 TIERS = {"hd": (160, 0), "game": (80, 48), "mini": (40, 32)}
+WALK_TIERS = ("mini", "game")                          # hd keeps the static pose + procedural motion
+WALK_FRAMES = 8
 SCALE_CLASS = {"brute": 1.28, "runner": 0.94}          # same factors the game already uses in view.js
 ANCHOR_CENTROID = {"crawler"}                          # lies on the ground: anchor on the body, not feet
 
@@ -96,7 +99,24 @@ def to_tier(cells, anchor, cell_size, std_height, ncolors, factor, src_std):
     for i, a in enumerate(small):
         a[..., :3][a[..., 3] == 0] = 0
         atlas.paste(Image.fromarray(a), (i * cw, 0))
-    return atlas, (cw, ch), (round(anchor[0] * s), round(anchor[1] * s)), s
+    return atlas, (cw, ch), (round(anchor[0] * s), round(anchor[1] * s)), s, (pal if ncolors else None)
+
+
+def walk_tier(frames, cell_full, anchor_full, s, pal):
+    """frames[f][d] = full-res RGBA arrays -> atlas of F rows x 8 columns, same scale and palette as the idle atlas."""
+    cw, ch = max(1, round(cell_full[0] * s)), max(1, round(cell_full[1] * s))
+    F = len(frames)
+    atlas = Image.new("RGBA", (cw * 8, ch * F), (0, 0, 0, 0))
+    for f, row in enumerate(frames):
+        for d, arr in enumerate(row):
+            a = np.array(Image.fromarray(arr).resize((cw, ch), Image.BOX))
+            a[..., 3] = np.where(a[..., 3] >= 128, 255, 0)
+            if pal is not None:
+                idx = apply_palette(a[..., :3], [tuple(c) for c in pal])
+                a[..., :3] = pal[idx]
+            a[..., :3][a[..., 3] == 0] = 0
+            atlas.paste(Image.fromarray(a), (d * cw, f * ch))
+    return atlas, (cw, ch), (round(anchor_full[0] * s), round(anchor_full[1] * s))
 
 
 def build(package_dir, out_dir, only=None):
@@ -112,11 +132,24 @@ def build(package_dir, out_dir, only=None):
         entry = {"id": ch["id"], "name": ch["name"], "category": ch.get("category"), "order": DIRS,
                  "source": ch["image"], "tiers": {}}
         factor = SCALE_CLASS.get(ch["id"], 1.0)
+        walk_frames = None
+        if ch["id"] not in walkmod.NO_WALK:                                  # F frames x 8 directions, full resolution
+            per_dir = [walkmod.pose_frames(cells[d], anchor, ch["id"], DIRS[d], WALK_FRAMES) for d in range(8)]
+            mx, mt = per_dir[0][1]
+            walk_frames = [[per_dir[d][0][f] for d in range(8)] for f in range(WALK_FRAMES)]
+            walk_cell = (size[0] + 2 * mx, size[1] + mt)
+            walk_anchor = (anchor[0] + mx, anchor[1] + mt)
         for tname, (height, ncol) in TIERS.items():
-            atlas, cell, anc, s = to_tier(cells, anchor, size, height, ncol, factor, src_std)
+            atlas, cell, anc, s, pal = to_tier(cells, anchor, size, height, ncol, factor, src_std)
             fn = f"{ch['id']}_{tname}.png"
             atlas.save(os.path.join(out_dir, fn))
             entry["tiers"][tname] = {"file": fn, "cell": list(cell), "anchor": list(anc), "scale": round(s, 5)}
+            if walk_frames and tname in WALK_TIERS:
+                wa, wcell, wanc = walk_tier(walk_frames, walk_cell, walk_anchor, s, pal)
+                wfn = f"{ch['id']}_walk_{tname}.png"
+                wa.save(os.path.join(out_dir, wfn))
+                entry.setdefault("walk", {})[tname] = {"file": wfn, "cell": list(wcell), "anchor": list(wanc),
+                                                       "frames": WALK_FRAMES, "scale": round(s, 5)}
         json.dump(entry, open(os.path.join(out_dir, f"{ch['id']}.json"), "w"), indent=1)
         result.append(entry)
         print(ch["id"].ljust(14), {k: v["cell"] for k, v in entry["tiers"].items()})

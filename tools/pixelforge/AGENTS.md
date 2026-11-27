@@ -14,9 +14,12 @@ Never hand-draw pixels in chat. Run the CLI.
 
 No reference found / need true 8 directions: `python3 -m pixelforge model <name> -o out/<name>` renders a 3D box model
 from 8 camera angles (models in `pixelforge/models/*.py`, ~20 boxes each; add a new file + register in `models/__init__.py`).
-Built: `police`, `knight`, `zombie` (use --ppu 1.5 --colors 26).
-Model rule: boxes must not intersect or poke through each other (renders use a z-buffer, but overlaps look wrong); butt them together. Author a model once, reuse forever.
+Two renderers:
+- ORGANIC (preferred, smooth pixel art): ellipsoid scenes in `pixelforge/models/*.py` with `build()`; register in `ORGANIC`.
+  Helpers: `ball`, `ell`, `limb(a,b,r,mat)`, `front_x` (place eyes/spots on a surface). Built: `zombie`. ~4 cel tones per material.
+- BOXES (legacy, blocky): `police`, `knight`.
+Size: `--ppu` pixels per model unit (organic default 3.5 -> ~236 px tall; raise for finer pixels). Author a model once, reuse forever.
 
 Limits: one photo gives one view. `--dirs` makes S,SE,E,SW,W by squashing; N-facing needs a back view.
 Web images may be copyrighted: keep refs/*.json (source URL), do not commit refs/ or out/.
-Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py && python3 tests/test_voxel.py` (healthy = `Tudo OK` x3).
+Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py && python3 tests/test_voxel.py && python3 tests/test_organic.py` (healthy = `Tudo OK` x4).

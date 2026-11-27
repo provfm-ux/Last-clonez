@@ -46,8 +46,8 @@ def main(argv=None):
     d = sub.add_parser("model", help="render a built-in 3D box model in 8 true directions")
     d.add_argument("name", help="model name (see pixelforge/models)")
     d.add_argument("-o", "--out", default="out/model")
-    d.add_argument("--ppu", type=float, default=2, help="pixels per model unit (size)")
-    d.add_argument("--colors", type=int, default=20)
+    d.add_argument("--ppu", type=float, help="pixels per model unit (size); default 3.5 organic, 2 blocky")
+    d.add_argument("--colors", type=int, default=20, help="blocky models only")
     a = p.parse_args(argv)
 
     if a.cmd == "styles":
@@ -59,15 +59,20 @@ def main(argv=None):
             print(fetch(u))
         return
     if a.cmd == "model":
-        from .models import MODELS
-        from .voxel import render_sheet, sheet_image
-        if a.name not in MODELS:
-            sys.exit(f"unknown model; have: {', '.join(MODELS)}")
-        sp = render_sheet(MODELS[a.name], a.ppu, colors=a.colors)
+        from .models import MODELS, ORGANIC
+        from .voxel import sheet_image
+        if a.name in ORGANIC:
+            from .organic import render_sheet
+            sp = render_sheet(ORGANIC[a.name](), a.ppu or 3.5)
+        elif a.name in MODELS:
+            from .voxel import render_sheet
+            sp = render_sheet(MODELS[a.name], a.ppu or 2, colors=a.colors)
+        else:
+            sys.exit(f"unknown model; have: {', '.join([*ORGANIC, *MODELS])}")
         os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
         for k, im in sp.items():
             im.save(f"{a.out}_{k}.png")
-        sheet_image(sp).save(f"{a.out}_sheet.png")
+        sheet_image(sp, scale=2 if a.ppu is None or a.ppu >= 3 else 4).save(f"{a.out}_sheet.png")
         print(f"{a.out}_sheet.png  8 dirs, sprite size {next(iter(sp.values())).size}")
         return
     img = load_source(a.source, a.prompt)

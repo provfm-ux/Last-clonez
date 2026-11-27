@@ -1,3 +1,6 @@
 from . import police, knight, zombie
 
-MODELS = {"police": police.BOXES, "knight": knight.BOXES, "zombie": zombie.BOXES}
+# blocky legacy box models
+MODELS = {"police": police.BOXES, "knight": knight.BOXES}
+# organic ellipsoid models (build() -> Scene)
+ORGANIC = {"zombie": zombie.build}

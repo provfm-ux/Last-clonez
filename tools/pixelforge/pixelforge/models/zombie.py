@@ -1,83 +1,71 @@
-"""Shambling zombie woman: hunched (torso/head stepped forward), long brown hair, burgundy open
-cardigan, blood-spotted cream shirt, torn jeans, brown boots. ~47 units. Front = +x, up = +z."""
-SKIN = (124, 136, 114)
-SKIN_D = (98, 110, 92)
-HAIR = (84, 56, 42)
-HAIR_D = (60, 40, 32)
-CARD = (146, 54, 88)
-CARD_D = (110, 40, 66)
-SHIRT = (228, 222, 198)
-BLOOD = (150, 26, 32)
-JEANS = (58, 64, 80)
-JEANS_D = (44, 48, 62)
-BOOT = (136, 88, 52)
-BOOT_D = (98, 62, 38)
-RING = (66, 68, 60)
-EYE = (232, 232, 216)
-BLACK = (22, 22, 30)
+"""Shambling zombie woman built from ellipsoids (organic renderer).
+Hunched, head forward, long brown hair, burgundy open cardigan over blood-spotted cream shirt,
+torn jeans, brown boots, gaunt grey-green face. ~48 units tall. Front +x, left +y, up +z."""
+from ..organic import Scene
 
-B = []
+MATS = {
+    "skin": (128, 142, 120), "skin_d": (98, 112, 96), "jeans": (64, 72, 92),
+    "boot": (142, 94, 58), "sole": (76, 52, 40), "cardi": (152, 58, 94), "cardi_d": (118, 44, 74),
+    "shirt": (232, 226, 202), "blood": (150, 28, 34), "hair": (96, 64, 48), "hair_d": (68, 46, 36),
+    "eye": (238, 238, 224), "black": (22, 22, 30), "ring": (76, 80, 70), "mouth": (92, 32, 38),
+}
 
 
-def box(x0, y0, z0, x1, y1, z1, col):
-    B.append((x0, y0, z0, x1, y1, z1, col))
-
-
-# NOTE: boxes must not intersect (renderer orders whole boxes); butt them against each other.
-# --- legs (one stepping forward, knees bent) ---
-box(0.5, 0.4, 0, 7.0, 3.8, 3.0, BOOT)               # forward boot (+y side)
-box(0.5, 0.4, 3.0, 7.0, 3.8, 4.0, BOOT_D)           # boot cuff
-box(-3.5, -3.8, 0, 3.0, -0.4, 3.0, BOOT)            # back boot
-box(-3.5, -3.8, 3.0, 3.0, -0.4, 4.0, BOOT_D)
-box(1.0, 0.5, 4.0, 4.2, 3.6, 13.0, JEANS)           # forward shin
-box(4.2, 1.2, 8.6, 4.6, 2.9, 11.6, SKIN)            # torn knee, bare skin
-box(0.0, 0.5, 13.0, 4.0, 3.7, 22.5, JEANS)          # forward thigh
-box(-2.6, -3.6, 4.0, 0.6, -0.5, 13.0, JEANS_D)      # back shin
-box(-2.4, -3.7, 13.0, 1.4, -0.5, 22.5, JEANS_D)     # back thigh
-box(-3.0, -4.4, 22.5, 3.6, 4.4, 25.5, JEANS)        # hips
-# --- torso, stepped forward for the hunch ---
-box(0.0, -3.6, 25.5, 4.6, 3.6, 31.5, SHIRT)         # shirt lower
-box(0.8, -3.6, 31.5, 5.4, 3.6, 38.0, SHIRT)         # shirt upper / chest
-for (y, z) in ((-2.4, 27.0), (1.0, 29.2), (-0.8, 33.0), (1.6, 35.0)):  # blood spots
-    box(4.6 if z < 31.5 else 5.4, y, z, 5.0 if z < 31.5 else 5.8, y + 1.3, z + 1.3, BLOOD)
-# cardigan: ribbed hem, back, sides, open front flaps
-box(-1.4, -5.0, 24.2, 4.6, 5.0, 25.4, CARD_D)       # ribbed hem
-box(-1.4, -5.0, 25.4, 0.0, 5.0, 31.5, CARD)         # back lower
-box(-0.6, -5.0, 31.5, 0.8, 5.0, 38.2, CARD)         # back upper
-box(0.0, 3.6, 25.4, 4.6, 5.0, 31.5, CARD)           # side +y
-box(0.0, -5.0, 25.4, 4.6, -3.6, 31.5, CARD)         # side -y
-box(0.8, 3.6, 31.5, 5.4, 5.0, 38.2, CARD)
-box(0.8, -5.0, 31.5, 5.4, -3.6, 38.2, CARD)
-box(4.6, 1.7, 25.4, 5.3, 5.0, 31.5, CARD)           # front flaps
-box(4.6, -5.0, 25.4, 5.3, -1.7, 31.5, CARD)
-box(5.4, 1.7, 31.5, 6.1, 5.0, 38.0, CARD_D)
-box(5.4, -5.0, 31.5, 6.1, -1.7, 38.0, CARD_D)
-# --- arms hanging, limp, hands forward ---
-for s in (1, -1):
-    y0, y1 = (5.0, 7.2) if s > 0 else (-7.2, -5.0)
-    box(0.6, y0, 29.0, 3.8, y1, 37.8, CARD)         # upper arm
-    box(1.8, y0, 24.0, 5.0, y1, 29.0, CARD)         # forearm swings forward
-    box(1.8, y0, 23.4, 5.0, y1, 24.0, CARD_D)       # cuff
-    box(2.6, y0 + 0.1, 20.6, 6.0, y1 - 0.1, 23.4, SKIN)   # hand
-# --- neck + head (pushed forward, big cartoon head) ---
-box(2.4, -1.8, 37.6, 5.0, 1.8, 38.4, SKIN_D)
-box(3.0, -4.0, 38.4, 10.0, 4.0, 46.6, SKIN)         # head
-box(10.0, -0.6, 40.0, 10.8, 0.6, 42.2, SKIN)        # nose
-box(10.0, -3.4, 41.8, 10.3, -0.5, 44.6, RING)       # dark eye sockets
-box(10.0, 0.5, 41.8, 10.3, 3.4, 44.6, RING)
-box(10.3, -2.8, 42.4, 10.6, -1.0, 44.0, EYE)        # eyes
-box(10.3, 1.0, 42.4, 10.6, 2.8, 44.0, EYE)
-box(10.6, -2.2, 42.8, 10.9, -1.5, 43.6, BLACK)      # pupils
-box(10.6, 1.5, 42.8, 10.9, 2.2, 43.6, BLACK)
-box(10.0, -1.6, 38.9, 10.3, 1.6, 39.7, BLOOD)       # mouth
-box(10.0, -3.6, 38.8, 10.3, -2.4, 41.6, SKIN_D)     # hollow cheeks
-box(10.0, 2.4, 38.8, 10.3, 3.6, 41.6, SKIN_D)
-# --- long hair (kept above the shoulders so it never intersects the torso) ---
-box(1.2, -4.8, 46.6, 10.4, 4.8, 48.4, HAIR)         # top
-box(10.0, -4.0, 44.6, 10.5, 4.0, 46.6, HAIR_D)      # fringe
-box(1.2, -4.8, 38.4, 3.0, 4.8, 46.6, HAIR)          # back curtain
-box(3.0, 4.0, 38.4, 9.4, 5.0, 46.6, HAIR)           # side locks
-box(3.0, -5.0, 38.4, 9.4, -4.0, 46.6, HAIR)
-box(3.0, 5.0, 38.4, 7.0, 5.8, 41.4, HAIR_D)         # strands draping over shoulders
-box(3.0, -5.8, 38.4, 7.0, -5.0, 41.4, HAIR_D)
-BOXES = B
+def build():
+    s = Scene(MATS)
+    U = 5.0                                    # extra leg length: lifts everything above the knees
+    # ---- legs: left leg steps forward, knees bent ----
+    for hip, knee, ankle in (((0.2, 2.3, 23.5 + U), (4.0, 2.5, 14.0 + U / 2), (2.2, 2.5, 4.0)),
+                             ((0.2, -2.3, 23.5 + U), (0.6, -2.4, 13.5 + U / 2), (-2.0, -2.4, 4.0))):
+        s.limb(hip, knee, 2.35, "jeans")
+        s.ball(knee, 1.95, "jeans")
+        s.limb(knee, ankle, 1.75, "jeans")
+        s.limb(ankle, (ankle[0], ankle[1], 7.0), 2.0, "boot")                 # boot shaft
+        s.ell((ankle[0] + 1.6, ankle[1], 2.0), (3.3, 1.9, 2.0), "boot")       # foot
+        s.ell((ankle[0] + 1.8, ankle[1], 0.8), (3.5, 2.0, 0.8), "sole")
+    s.ell((5.9, 2.5, 14.0 + U / 2), (0.6, 1.2, 1.4), "skin")                  # torn knee
+    s.ell((5.7, 3.1, 11.6 + U / 2), (0.35, 0.5, 0.9), "blood")
+    s.ell((0.3, 0, 24.6 + U), (3.0, 4.2, 3.0), "jeans")                       # hips
+    # ---- torso (slim) ----
+    s.ell((0.5, 0, 31.8 + U), (2.4, 4.2, 7.0), "cardi")                        # cardigan back
+    s.ell((2.1, 0, 36.6 + U), (2.2, 4.6, 3.0), "cardi")                        # shoulders
+    for side in (1, -1):
+        s.ell((1.9, side * 3.2, 30.8 + U), (2.7, 1.9, 6.8), "cardi")           # open front flaps
+    shirt = s.ell((2.7, 0, 32.0 + U), (2.8, 2.8, 6.6), "shirt")
+    s.ell((1.4, 0, 25.0 + U), (3.0, 4.4, 0.9), "cardi_d")                      # ribbed hem
+    for y, z in ((-1.5, 29.0), (1.0, 31.4), (-0.4, 35.0), (1.8, 27.4), (-2.1, 33.0)):
+        s.ell((s.front_x(shirt, y, z + U) + 0.1, y, z + U), (0.35, 0.8, 0.65), "blood")
+    for side in (1, -1):
+        s.ell((3.9, side * 1.7, 38.7 + U), (1.1, 0.9, 1.5), "shirt")           # collar
+    s.limb((3.3, 0, 38.4 + U), (5.2, 0, 41.0 + U), 1.5, "skin_d")              # neck
+    # ---- arms hang limp, hands forward ----
+    for side in (1, -1):
+        sh = (2.2, side * 4.5, 36.4 + U)
+        el = (3.0, side * 5.3, 29.8 + U)
+        wr = (4.8, side * 5.2, 23.4 + U)
+        s.ball(sh, 2.0, "cardi")
+        s.limb(sh, el, 1.7, "cardi")
+        s.limb(el, wr, 1.5, "cardi")
+        s.ball(wr, 1.7, "cardi_d")
+        s.ell((5.5, side * 5.2, 20.9 + U), (1.0, 0.9, 2.5), "skin")
+    # ---- head ----
+    hz = 43.6 + U
+    skull = s.ell((6.2, 0, hz), (3.9, 3.3, 4.6), "skin")
+    for side in (1, -1):
+        y = side * 1.4
+        fx = s.front_x(skull, y, hz + 0.6)
+        s.ell((fx - 0.1, y, hz + 0.6), (0.7, 1.0, 1.05), "ring")
+        s.ell((fx + 0.2, y, hz + 0.6), (0.55, 0.75, 0.7), "eye")
+        s.ell((fx + 0.65, y, hz + 0.55), (0.2, 0.3, 0.3), "black")
+        s.ell((s.front_x(skull, side * 2.2, hz - 2.0), side * 2.2, hz - 2.0), (0.5, 0.9, 1.1), "skin_d")
+    s.ell((s.front_x(skull, 0, hz - 1.2) + 0.5, 0, hz - 1.2), (0.9, 0.55, 1.1), "skin")
+    s.ell((s.front_x(skull, 0, hz - 3.2) + 0.05, 0, hz - 3.2), (0.35, 1.5, 0.35), "mouth")
+    # ---- long hair ----
+    s.ell((5.0, 0, hz + 1.6), (4.3, 3.9, 4.5), "hair")
+    s.ell((3.2, 0, hz - 3.2), (2.0, 3.8, 5.6), "hair")
+    s.ell((2.5, 0, hz - 7.6), (1.7, 3.4, 2.4), "hair_d")
+    for side in (1, -1):
+        s.limb((7.0, side * 3.0, hz + 2.6), (5.6, side * 4.0, hz - 6.0), 1.4, "hair")
+        s.limb((6.2, side * 3.6, hz + 0.4), (4.4, side * 4.4, hz - 7.2), 1.2, "hair_d")
+    s.ell((8.9, -0.8, hz + 4.2), (2.0, 3.3, 1.4), "hair_d")
+    return s

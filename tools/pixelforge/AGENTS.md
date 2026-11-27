@@ -24,6 +24,9 @@ Character sheets (4x2 grid, magenta bg, order N NE E SE / S SW W NW): `python3 -
 writes per character 3 size tiers (hd 160 / game 80 / mini 40 px tall) as 8-cell row atlases + JSON (cell size, feet anchor, scale) + `index.json`.
 Originals are never modified. Brute x1.28, runner x0.94 (same factors as game/view.js); crawler anchors on the body.
 
+Walk cycles: `sheets` also bakes 8-frame walk atlases (mini, game) from `rigs.json`: per-character leg ratio, `arm_swing`, `leg_swing`, `bob`,
+and `arms` per anatomical side (full | upper = stump | none = missing). Edit `rigs.json`, then re-run with `--only <id>` (about 7 s per character).
+
 Limits: one photo gives one view. `--dirs` makes S,SE,E,SW,W by squashing; N-facing needs a back view.
 Web images may be copyrighted: keep refs/*.json (source URL), do not commit refs/ or out/.
 Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py && python3 tests/test_voxel.py && python3 tests/test_organic.py` (healthy = `Tudo OK` x4).

@@ -1,0 +1,22 @@
+{
+  "_help": "Rig settings per character for the walk cycles (python3 -m pixelforge sheets <package> --only <id>). Multipliers scale the default motion. arms: anatomical side -> full (upper arm + forearm swing) | upper (stump: only the upper arm swings) | none (no arm: nothing moves there).",
+  "default": {
+    "leg_ratio": 0.47,
+    "leg_swing": 1.0,
+    "arm_swing": 1.0,
+    "bob": 1.0,
+    "arms": {"left": "full", "right": "full"}
+  },
+  "characters": {
+    "protagonist": {"arm_swing": 1.7, "leg_swing": 1.05},
+    "survivor_male": {"arm_swing": 1.3},
+    "survivor_female": {"arm_swing": 1.3},
+    "eva": {"arm_swing": 1.3},
+    "runner": {"arm_swing": 1.5, "leg_swing": 1.2, "bob": 1.3},
+    "brute": {"leg_ratio": 0.36, "arm_swing": 0.6, "bob": 0.8},
+    "elderly_female": {"leg_ratio": 0.42, "arm_swing": 0.6, "leg_swing": 0.7},
+    "limping": {"leg_ratio": 0.44, "leg_swing": 0.8},
+    "missing_left_arm": {"arms": {"left": "full", "right": "none"}, "_note": "the zombie's RIGHT arm is cut off (screen-left in the S view)"},
+    "missing_right_forearm": {"arms": {"left": "upper", "right": "upper"}, "_note": "both forearms are cut off, only short stumps remain"}
+  }
+}

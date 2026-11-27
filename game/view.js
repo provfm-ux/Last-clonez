@@ -1778,7 +1778,14 @@ const View = (() => {
     const wanted = /[?&]chars=(off|mini|game|hd)\b/.exec(location.search)?.[1];
     if (wanted) charTier = wanted;
   } catch {}
-  const plainInfected = ["walker", "missing_left_arm", "missing_right_forearm", "limping", "elderly_female"];
+  // Mix of plain infected, as [character, weight]. The two cut-off-arm variants show up "sometimes" (2 of 9 here): edit the weights.
+  const plainInfected = [["walker", 4], ["limping", 2], ["elderly_female", 1], ["missing_left_arm", 1], ["missing_right_forearm", 1]];
+  const plainTotal = plainInfected.reduce((sum, [, weight]) => sum + weight, 0);
+  function pickPlainInfected(phase) {
+    let t = phase * plainTotal;
+    for (const [id, weight] of plainInfected) { if (t < weight) return id; t -= weight; }
+    return plainInfected[0][0];
+  }
   const infectedByOutfit = {worker: "construction", medic: "paramedic", patrol: "police", hiker: "hiker"};
 
   function characterFor(a, isPlayer) {
@@ -1786,7 +1793,7 @@ const View = (() => {
     if (a.stats) {                                    // infected: kind, then outfit, then a stable pick from the spawn phase
       if (a.kind === "brute" || a.kind === "runner") return a.kind;
       const phase = Number.isFinite(a.phase) ? a.phase : 0;
-      return infectedByOutfit[a.outfit] ?? plainInfected[Math.floor(phase * plainInfected.length) % plainInfected.length];
+      return infectedByOutfit[a.outfit] ?? pickPlainInfected(phase % 1);
     }
     return a.id === "eva" ? "eva" : null;
   }

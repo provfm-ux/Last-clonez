@@ -119,8 +119,9 @@ def walk_tier(frames, cell_full, anchor_full, s, pal):
     return atlas, (cw, ch), (round(anchor_full[0] * s), round(anchor_full[1] * s))
 
 
-def build(package_dir, out_dir, only=None):
+def build(package_dir, out_dir, only=None, rig_path=None):
     man = json.load(open(os.path.join(package_dir, "manifesto_8_direcoes.json")))
+    rig = walkmod.load_rig(rig_path)
     os.makedirs(out_dir, exist_ok=True)
     result = []
     for ch in man["characters"]:
@@ -134,7 +135,7 @@ def build(package_dir, out_dir, only=None):
         factor = SCALE_CLASS.get(ch["id"], 1.0)
         walk_frames = None
         if ch["id"] not in walkmod.NO_WALK:                                  # F frames x 8 directions, full resolution
-            per_dir = [walkmod.pose_frames(cells[d], anchor, ch["id"], DIRS[d], WALK_FRAMES) for d in range(8)]
+            per_dir = [walkmod.pose_frames(cells[d], anchor, ch["id"], DIRS[d], WALK_FRAMES, rig) for d in range(8)]
             mx, mt = per_dir[0][1]
             walk_frames = [[per_dir[d][0][f] for d in range(8)] for f in range(WALK_FRAMES)]
             walk_cell = (size[0] + 2 * mx, size[1] + mt)

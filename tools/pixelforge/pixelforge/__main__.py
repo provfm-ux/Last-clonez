@@ -52,6 +52,7 @@ def main(argv=None):
     c.add_argument("package", help="folder with manifesto_8_direcoes.json and the PNG sheets")
     c.add_argument("-o", "--out", default="out/chars")
     c.add_argument("--only", nargs="*", help="character ids")
+    c.add_argument("--rig", help="rig settings JSON (default: tools/pixelforge/rigs.json)")
     a = p.parse_args(argv)
 
     if a.cmd == "styles":
@@ -64,7 +65,7 @@ def main(argv=None):
         return
     if a.cmd == "sheets":
         from .sheets import build
-        build(a.package, a.out, a.only)
+        build(a.package, a.out, a.only, a.rig)
         return
     if a.cmd == "model":
         from .models import MODELS, ORGANIC

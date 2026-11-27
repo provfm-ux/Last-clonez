@@ -1829,6 +1829,8 @@ const View = (() => {
 
   function characterFor(a, isPlayer) {
     if (isPlayer) return a.appearance === "female" ? "survivor_female" : "protagonist";
+    if (a.kind === "pierwoman") return "woman";      // the story bosses of FatHill
+    if (a.kind === "david") return "david";
     if (a.stats) {                                    // infected: kind, then outfit, then a stable pick from the spawn phase
       if (a.kind === "runner") return "runner";
       if (a.kind === "mutant") return "brute";

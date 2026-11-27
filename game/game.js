@@ -654,7 +654,7 @@
     if (o.action === "bed") return state.player.fatigue >= 35 ? "Sleep" : "Rest";
     return ({bed:"Rest", barrel:"Collector", campfire:"Campfire", radio:"Radio", garden:"Garden", tap:"Tap", generator:"Generator",
       harvest:"Chop", dismantle:"Salvage", workbench:"Build", travel:"Cross", spring:"Fill", forage:"Forage", fish:"Fish",
-      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read","campaign-page":"Read","cinema-statue":"Take","eva-diary":"Read","cinema-note":"Read","ironworks-terminal":"Read","ironworks-cage":"Dismantle",crib:"Look"}[o.action] || "Use");
+      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read","campaign-page":"Read","grotto-plate":"Read","westfields-ledger":"Read","cinema-statue":"Take","eva-diary":"Read","cinema-note":"Read","ironworks-terminal":"Read","ironworks-cage":"Dismantle",crib:"Look"}[o.action] || "Use");
   }
 
   function canTalk() {
@@ -943,7 +943,7 @@
       const pinned = state.player.pinned.includes(item.id);
       const useLabel = item.id === "flashlight" ? item === Sim.activeLight(state) ? "Switch off" : "Switch on" :
         d.damage ? equipped ? "Unequip" : "Equip" : d.slot ? worn ? "Remove" : "Equip" :
-        ({book:state.player.readBooks?.includes(item.id) ? "Studied" : "Read", food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take"}[d.use] || "");
+        ({book:state.player.readBooks?.includes(item.id) ? "Studied" : "Read", food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take", violin:"Play"}[d.use] || "");
       return '<div class="item-row bag-item ' + (equipped || worn ? "equipped-item" : "") + '"><div><div class="item-top">' +
         itemIcon(item.id) + "<b>" + esc(Sim.itemName(state,item.id)) + " ×" + item.qty + '</b></div><div class="item-meta">' + itemDescription(item) + '</div></div><div class="item-actions">' +
         (useLabel ? button(useLabel, (equipped ? "unequip-" : "use-") + index, (d.use === "food" && Sim.isSpoiled(state,item)) || (d.use === "book" && state.player.readBooks?.includes(item.id)), "primary") : "") +
@@ -1773,6 +1773,14 @@
     }
     if (o.action === "campaign-page") {
       if (Sim.readCampaignPage(state,o)) save();
+      return;
+    }
+    if (o.action === "grotto-plate") {
+      if (Sim.readGrottoPlate(state,o)) save();
+      return;
+    }
+    if (o.action === "westfields-ledger") {
+      if (Sim.readFieldsLedger(state,o)) save();
       return;
     }
     if (o.action === "mushroom") {

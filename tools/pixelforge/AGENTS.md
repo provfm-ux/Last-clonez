@@ -31,6 +31,10 @@ Customisable characters (`recolor.IDS`: protagonist, survivor_male, survivor_fem
 (85 skin, 170 hair, 255 jacket) and `recolor` refs in `index.json`; the game recolours them from the player's style at load time.
 Tweak the HSV rules in `pixelforge/recolor.py` (`classify_cell`) if a region leaks, then re-run `--only <id>`.
 
+Extra characters (not in the package): `sources/characters.json` + one transparent PNG per direction in `sources/<id>/` (Pixel Lab `create-character-v3`
+export: `POST /v2/create-character-v3` ~3 generations at 128x128, poll `/v2/background-jobs/<id>`, `GET /v2/characters/<id>/zip`). `sheets` builds them like the rest
+(obese_male, obese_female = the big infected; the muscular `brute` is kept for mutated infected).
+
 Limits: one photo gives one view. `--dirs` makes S,SE,E,SW,W by squashing; N-facing needs a back view.
 Web images may be copyrighted: keep refs/*.json (source URL), do not commit refs/ or out/.
 Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py && python3 tests/test_voxel.py && python3 tests/test_organic.py` (healthy = `Tudo OK` x4).

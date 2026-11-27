@@ -1766,6 +1766,170 @@
      "scale": 0.10204
     }
    }
+  },
+  {
+   "id": "obese_male",
+   "name": "Infetado obeso (homem)",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "sources/obese_male",
+   "tiers": {
+    "hd": {
+     "file": "obese_male_hd.png",
+     "cell": [
+      186,
+      196
+     ],
+     "anchor": [
+      89,
+      190
+     ],
+     "scale": 1.5082
+    },
+    "game": {
+     "file": "obese_male_game.png",
+     "cell": [
+      93,
+      98
+     ],
+     "anchor": [
+      44,
+      95
+     ],
+     "scale": 0.7541
+    },
+    "mini": {
+     "file": "obese_male_mini.png",
+     "cell": [
+      46,
+      49
+     ],
+     "anchor": [
+      22,
+      48
+     ],
+     "scale": 0.37705
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "obese_male_walk_game.png",
+     "cell": [
+      117,
+      102
+     ],
+     "anchor": [
+      57,
+      99
+     ],
+     "frames": 8,
+     "scale": 0.7541
+    },
+    "mini": {
+     "file": "obese_male_walk_mini.png",
+     "cell": [
+      58,
+      51
+     ],
+     "anchor": [
+      28,
+      49
+     ],
+     "frames": 8,
+     "scale": 0.37705
+    }
+   }
+  },
+  {
+   "id": "obese_female",
+   "name": "Infetada obesa (mulher)",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "sources/obese_female",
+   "tiers": {
+    "hd": {
+     "file": "obese_female_hd.png",
+     "cell": [
+      142,
+      196
+     ],
+     "anchor": [
+      75,
+      190
+     ],
+     "scale": 1.49593
+    },
+    "game": {
+     "file": "obese_female_game.png",
+     "cell": [
+      71,
+      98
+     ],
+     "anchor": [
+      37,
+      95
+     ],
+     "scale": 0.74797
+    },
+    "mini": {
+     "file": "obese_female_mini.png",
+     "cell": [
+      36,
+      49
+     ],
+     "anchor": [
+      19,
+      47
+     ],
+     "scale": 0.37398
+    }
+   },
+   "walk": {
+    "game": {
+     "file": "obese_female_walk_game.png",
+     "cell": [
+      95,
+      102
+     ],
+     "anchor": [
+      49,
+      99
+     ],
+     "frames": 8,
+     "scale": 0.74797
+    },
+    "mini": {
+     "file": "obese_female_walk_mini.png",
+     "cell": [
+      47,
+      51
+     ],
+     "anchor": [
+      25,
+      50
+     ],
+     "frames": 8,
+     "scale": 0.37398
+    }
+   }
   }
  ]
 }

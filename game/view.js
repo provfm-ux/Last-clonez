@@ -1787,6 +1787,9 @@ const View = (() => {
     return plainInfected[0][0];
   }
   const infectedByOutfit = {worker: "construction", medic: "paramedic", patrol: "police", hiker: "hiker"};
+  // The big infected ("brute" kind) are obese men and women. The muscular Brute sprite is kept for mutated infected: kind "mutant"
+  // (nothing spawns it yet).
+  const bigInfected = ["obese_male", "obese_female"];
 
   // Player customisation on top of the sprites: skin, hair and jacket are recoloured from region masks when the atlas loads
   // (target colour x source brightness, so the shading survives). Masks and reference colours come from index.json (recolor).
@@ -1826,7 +1829,9 @@ const View = (() => {
   function characterFor(a, isPlayer) {
     if (isPlayer) return a.appearance === "female" ? "survivor_female" : "protagonist";
     if (a.stats) {                                    // infected: kind, then outfit, then a stable pick from the spawn phase
-      if (a.kind === "brute" || a.kind === "runner") return a.kind;
+      if (a.kind === "runner") return "runner";
+      if (a.kind === "mutant") return "brute";
+      if (a.kind === "brute") return bigInfected[Math.floor((Number.isFinite(a.phase) ? a.phase : 0) * 997) % bigInfected.length];
       const phase = Number.isFinite(a.phase) ? a.phase : 0;
       return infectedByOutfit[a.outfit] ?? pickPlainInfected(phase % 1);
     }

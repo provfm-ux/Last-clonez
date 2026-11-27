@@ -240,6 +240,10 @@ const Data = (() => {
     ironTools:"Each step needs a tool in good condition: ",
     ironWorn:"Your tools are too worn for this. Look for another in the Ironworks.",
     ironDone:"Inside the cage: the Foundry maul. Strong enough for the first friend.",
+    fieldsLoud:"The noise carries across the open fields. Something is coming.",
+    fieldsSeen:"Eyes on you. The ledger can wait until nothing in the fields has noticed you.",
+    fieldsDone:"FIELD LEDGER · Day 10, no names, just a column of numbers and one line underlined twice: the fourth coordinate. You slip it into your notes and leave the way you came.",
+    fieldsAgain:"The same column of numbers. You already have what you came for.",
     grottoDark:"A brass plate is bolted to the wall, but there is no light to read it by. You need a flashlight with charge.",
     grottoPlate:"SURVEY STATION 5 · The last coordinate is cut into the brass, with a line scratched under it: ‘If the batteries are dying, walk. Do not run the light for the way back.’ You copy it down.",
     grottoDone:"Daylight. The fifth coordinate is in your notes, and your hands are still shaking from the dark.",
@@ -277,6 +281,7 @@ const Data = (() => {
     {id:"pineridge.two-nights", area:"pineridge", text:"Survive two nights at Pine Ridge", detail:"From day 3. No barricades: bring a bedroll, wood and water. Stay warm."},
     {id:"eva.death", area:"eva", text:"Look after Eva", detail:"Until day 5. She keeps talking about the fortress rumour.", gone:"Read Eva's diary at the shelter"},
     {id:"ironworks.barricade", area:"ironworks", text:"Get the strong weapon", detail:"Ironworks machine shop, weekdays 08:00-18:00. The toolboard hammer and crowbar wear out: do not waste them."},
+    {id:"westfields.stealth", area:"westfields", text:"Slip through Westfields without a sound", detail:"From day 10. The farmer's ledger is in the Orchard farmhouse at the far west. Noise calls hordes, and infected that have noticed you will not let you read it. Keep to cover and use your knife."},
     {id:"cindergrotto.battery", area:"cindergrotto", text:"Read the surveyor's plate in Cinder Grotto", detail:"From day 12, through the survey tunnel on Pine Ridge. Bring a flashlight and spare batteries: the plate is in the far survey room and cannot be read in the dark.",
       reached:"Climb out of Cinder Grotto", reachedDetail:"You have read the plate. Get back up to Pine Ridge before the light dies."}
   ];

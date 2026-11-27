@@ -1,6 +1,7 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Campaign: added the Westfields challenge (day 10). Reach the farmer's ledger in the Orchard farmhouse for the fourth coordinate; loud noise calls a horde and infected that have noticed you block the reading.
 - Campaign: added the Cinder Grotto challenge (day 12). Read the surveyor's plate in the survey room by flashlight, then climb back out to Pine Ridge for the fifth coordinate.
 - Added 13 occupations with Cold Vale backstories, starting skills and equipment (from #17).
 - Added 30 point-budgeted traits chosen at setup; drawbacks pay for advantages.

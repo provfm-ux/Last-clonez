@@ -2013,7 +2013,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
 { // ui.campaign-goals (revisão, sugestão 1): objetivos da campanha no topo, no diário e na seta de direção
   const s = fresh("campaign");
   check("ui.campaign-goals começa com as 3 páginas, sem seta (encontrar as casas faz parte do desafio)",
-    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 6);
+    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 7);
   s.campaign.completed.push("coldvale.houses");
   check("ui.campaign-goals o cinema ainda fechado mostra quando abre e aponta para a saída",
     Sim.pinnedGoal(s) === "Take the golden idol · opens on day 2" && Sim.destination(s)?.id === "exit-cinema", Sim.pinnedGoal(s));
@@ -2027,7 +2027,9 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   c.campaign.completed.push("cinema.statue", "pineridge.two-nights"); Sim.testJump(c, 6, {}, {anyMode: true}); c.campaign.eva = "gone";
   check("ui.campaign-goals depois da Eva: ler o diário", Sim.pinnedGoal(c) === "Read Eva's diary at the shelter" && Sim.destination(c)?.id === "exit-coldvale");
   c.campaign.completed.push("eva.death", "ironworks.barricade");
-  check("ui.campaign-goals o objetivo seguinte mostra quando abre (dia 12, Cinder Grotto)", Sim.pinnedGoal(c) === "Read the surveyor's plate in Cinder Grotto · opens on day 12", Sim.pinnedGoal(c));
+  check("ui.campaign-goals o objetivo seguinte mostra quando abre (dia 10, Westfields)", Sim.pinnedGoal(c) === "Slip through Westfields without a sound · opens on day 10", Sim.pinnedGoal(c));
+  c.campaign.completed.push("westfields.stealth");
+  check("ui.campaign-goals depois mostra a Cinder Grotto (dia 12)", Sim.pinnedGoal(c) === "Read the surveyor's plate in Cinder Grotto · opens on day 12", Sim.pinnedGoal(c));
   c.campaign.completed.push("cindergrotto.battery");
   check("ui.campaign-goals com tudo feito por agora o objetivo avisa que há mais a caminho", /on its way/.test(Sim.pinnedGoal(c)) && Sim.destination(c) === null);
   const plain = fresh("survival"); plain.pinStory = true;
@@ -2102,11 +2104,39 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("cindergrotto: sair para Pine Ridge dá a quinta pista (1ª neste teste) e conclui o desafio",
     out?.world.region === "ridge" && out.campaign.completed.includes("cindergrotto.battery") && out.campaign.clues === 1, out ? out.world.region + " " + out.campaign.clues : "sem viagem");
   const goals = fresh("campaign"); Sim.testJump(goals, 12, {}, {anyMode: true});
-  goals.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade");
+  goals.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "westfields.stealth");
   check("cindergrotto: é o objetivo do dia 12 e há dicas para ele", Sim.campaignGoal(goals)?.id === "cindergrotto.battery" && context.CampaignHints.hints["cindergrotto.battery"].length === 3);
   const raw = JSON.parse(JSON.stringify(Sim.snapshot(goals))); delete raw.campaign.grotto;
   let bad = false; try { const broken = JSON.parse(JSON.stringify(Sim.snapshot(goals))); broken.campaign.grotto = "x"; Sim.restore(broken); } catch { bad = true; }
   check("cindergrotto: saves antigos sem 'grotto' carregam e valores inválidos são recusados", Sim.restore(raw).campaign.grotto === "" && bad);
+}
+
+{ // westfields.stealth: o livro da quinta; ruído alto chama uma horda; infetados que te viram impedem a leitura
+  const f = Sim.create(11, "campaign", "carer", 2, undefined, "fields");
+  Sim.testJump(f, 10, {}, {anyMode: true});
+  const ledger = f.world.objects.find(o => o.id === "westfields-ledger");
+  check("westfields: o livro do agricultor está na Orchard farmhouse", Boolean(ledger) && f.world.buildings.find(b => b.id === ledger.building)?.name === "Orchard farmhouse");
+  Object.assign(f.player, {x: ledger.x, y: ledger.y + .5});
+  const seen = f.world.enemies[0]; Object.assign(seen, {x: f.player.x + 3, y: f.player.y, hp: 40, dormant: false, alert: 10});
+  check("westfields: com um infetado que te viu não se lê", !Sim.readFieldsLedger(f, ledger) && !f.campaign.completed.includes("westfields.stealth"));
+  seen.alert = 0;
+  f.atmosphere.nextWave = f.atmosphere.time + 500;
+  Sim.noise(f, f.player.x, f.player.y, 5);
+  check("westfields: ruído baixo não chama a horda", f.campaign.fields.alerts === 0 && f.atmosphere.nextWave > f.atmosphere.time);
+  Sim.noise(f, f.player.x, f.player.y, 9);
+  check("westfields: ruído alto chama uma horda e fica registado", f.atmosphere.nextWave <= f.atmosphere.time && f.campaign.fields.alerts === 1);
+  f.atmosphere.nextWave = f.atmosphere.time + 500; Sim.noise(f, f.player.x, f.player.y, 9);
+  check("westfields: no máximo um alarme por minuto", f.campaign.fields.alerts === 1 && f.atmosphere.nextWave > f.atmosphere.time);
+  check("westfields: o estado guarda-se e carrega", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(f)))).campaign.fields.alerts === 1);
+  for (const e of f.world.enemies) e.alert = 0;
+  check("westfields: sem ninguém que te tenha visto, lê-se e dá a quarta pista",
+    Sim.readFieldsLedger(f, ledger) && f.campaign.completed.includes("westfields.stealth") && f.campaign.clues === 1);
+  const goals = fresh("campaign"); Sim.testJump(goals, 10, {}, {anyMode: true});
+  goals.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade");
+  check("westfields: é o objetivo do dia 10 e há dicas para ele", Sim.campaignGoal(goals)?.id === "westfields.stealth" && context.CampaignHints.hints["westfields.stealth"].length === 3);
+  const raw = JSON.parse(JSON.stringify(Sim.snapshot(goals))); delete raw.campaign.fields;
+  let bad = false; try { const broken = JSON.parse(JSON.stringify(Sim.snapshot(goals))); broken.campaign.fields = {alerts: -1, at: 0}; Sim.restore(broken); } catch { bad = true; }
+  check("westfields: saves antigos sem 'fields' carregam e valores inválidos são recusados", Sim.restore(raw).campaign.fields.alerts === 0 && bad);
 }
 
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>

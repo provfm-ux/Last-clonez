@@ -183,6 +183,20 @@ def _paint_blood(arr, mouth):
     return arr
 
 
+def _is_flesh(arrs, masks):
+    """True when the face skin is flesh / pink (hue below 25 or wrapping past 330) and not grey or olive."""
+    hs, ss = [], []
+    for a, (face, _, _) in zip(arrs, masks):
+        if face.any():
+            h, s, _ = _hsv(a[..., :3])
+            hs.append(h[face]); ss.append(s[face])
+    if not hs:
+        return False
+    h, s = np.concatenate(hs), np.concatenate(ss)
+    flesh = ((h < 25) | (h >= 330)) & (s >= 0.22)
+    return float(flesh.mean()) > 0.5
+
+
 def zombify(cells, dnames, cid, cfg=None):
     """cells: list of 8 RGBA PIL images (full res, same canvas). Returns new list."""
     full = cfg or load_cfg()
@@ -191,7 +205,10 @@ def zombify(cells, dnames, cid, cfg=None):
     head_frac = c.get("head_frac", 0.27)
     arrs = [np.array(im) for im in cells]
     masks = [skin_masks(a, hue, head_frac, bool(c.get("big_skin")), c.get("bright_factor", 0.78)) for a in arrs]
-    if c["skin"] == "green":
+    mode = c["skin"]
+    if mode == "auto":                                     # already green / grey / olive skin is left alone
+        mode = "green" if _is_flesh(arrs, masks) else "keep"
+    if mode == "green":
         target = np.array([int(c["skin_color"][i:i + 2], 16) for i in (1, 3, 5)], float)
         sel = [(f | b) for f, _, b in masks]
         px = np.concatenate([a[..., :3][m] for a, m in zip(arrs, sel) if m.any()])

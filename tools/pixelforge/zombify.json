@@ -1,7 +1,7 @@
 {
-  "_help": "Zombie look applied while building atlases (pixelforge/zombify.py). skin: 'green' recolours pink/pale skin (face, neck, hands) to a green keeping the shading; 'keep' leaves it. blood: paints blood on the mouth in the views where the face shows (S SE SW E W). skin_color is the mid-tone of the recolour.",
+  "_help": "Zombie look applied while building atlases (pixelforge/zombify.py). skin: 'auto' (default) recolours flesh/pink skin (hue below 25) to green and leaves skin that is already green, grey or olive alone; 'green' always recolours; 'keep' never does. blood: paints blood on the mouth in the views where the face shows (S SE SW E W). skin_color is the mid-tone of the recolour.",
   "default": {
-    "skin": "green",
+    "skin": "auto",
     "blood": true,
     "skin_color": "#7a9a68",
     "mouth_k": 0.8
@@ -20,7 +20,8 @@
         20,
         120
       ],
-      "mouth_y": 0.2
+      "mouth_y": 0.2,
+      "skin": "keep"
     },
     "elderly_female": {
       "skin": "keep",
@@ -53,14 +54,16 @@
         8,
         34
       ],
-      "head_frac": 0.55
+      "head_frac": 0.55,
+      "skin": "keep"
     },
     "runner": {
       "hue": [
         22,
         60
       ],
-      "head_frac": 0.35
+      "head_frac": 0.35,
+      "skin": "keep"
     },
     "construction": {
       "hue": [
@@ -72,6 +75,9 @@
       "head_frac": 0.2,
       "big_skin": true,
       "bright_factor": 0.55
+    },
+    "missing_left_arm": {
+      "skin": "keep"
     }
   },
   "ids": [

@@ -9,7 +9,7 @@ const files = [...html.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).f
 const pascal = f => f.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join("");
 const counts = {};
 let heldWeapon = null;
-const infectedFrames = [], survivorFrames = [];
+const infectedFrames = [], survivorFrames = [], charDraws = [];
 const bagPigments = new Set(["#3b2822","#c4875e","#985b40","#714534","#513629","#e0b784"]);
 const bagPixels = [];
 let lastTranslate = null;
@@ -48,6 +48,7 @@ const mk = () => new Proxy({globalAlpha:1, savedAlpha:[]}, {
       if (k === "drawImage" && args.length === 9 && args[3] === 24 && args[4] === 40) {
         infectedFrames.push(args.slice(1, 7));
       }
+      if (k === "drawImage" && args.length === 9 && typeof args[0]?._s === "string" && args[0]._s.includes("assets/characters/")) charDraws.push(args);
       if (k === "drawImage" && args.length === 9 && args[3] === 36 && args[4] === 48) {
         counts.actorBlit = (counts.actorBlit || 0) + 1;
         survivorFrames.push(args.slice(1, 3).join(","));
@@ -506,5 +507,36 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
   check("animation corpos que já estavam no chão aparecem logo deitados, com o mesmo sprite", Math.abs(old - 1.35) < 1e-6);
   check("animation a pancada achata o zombie (squash)", (hit.scale ?? 0) > (lying2.scale ?? 0), "scale " + (hit.scale ?? 0) + " vs " + (lying2.scale ?? 0));
 }
+{ // atlas das personagens em 8 direções: só desenham depois de carregados; a direção escolhe a célula; infetados usam a sua personagem
+  const idxFile = path.join(dir, "assets/characters/index.json");
+  if (fs.existsSync(idxFile)) {
+    const charIndex = JSON.parse(fs.readFileSync(idxFile, "utf8"));
+    const sync = v => ({then: f => sync(f(v)), catch: () => sync(v)});   // fetch síncrono: o teste não espera por microtarefas
+    context.fetch = () => sync({json: () => charIndex});
+    context.Image = class {
+      constructor() { this.naturalWidth = 672; this.naturalHeight = 800; }
+      set src(v) {
+        this._s = v;
+        for (const c of charIndex.characters) for (const t of Object.values(c.tiers))
+          if (v.endsWith("/" + t.file)) { this.naturalWidth = t.cell[0] * 8; this.naturalHeight = t.cell[1]; }
+      }
+      get src() { return this._s; }
+    };
+    const cs = Sim.createControl("survival", "carer", "shelter");
+    const z = cs.world.enemies[0];
+    Object.assign(z, {x: cs.player.x + 1, y: cs.player.y, kind: "brute", dormant: false, moving: false, flash: 0, windup: 0, swing: 0});
+    cs.world.enemies = [z];
+    cs.look = "dark"; View.prepare(cs.world);
+    const cellOf = name => { const d = charDraws.filter(a => a[0]._s.includes(name)).at(-1); return d ? d[1] / d[3] : -1; };
+    for (let i = 0; i < 4; i++) View.render(cs, i / 60, 1 / 60);
+    cs.player.headingX = 1; cs.player.headingY = 0; charDraws.length = 0; View.render(cs, .1, 1 / 60);
+    const se = cellOf("protagonist_mini");
+    cs.player.headingX = -1; cs.player.headingY = 0; charDraws.length = 0; View.render(cs, .2, 1 / 60);
+    const nw = cellOf("protagonist_mini"), brute = cellOf("brute_mini");
+    check("personagens 8 direções: o jogador usa a Protagonista e a direção escolhe a célula (SE=3, NW=7)", se === 3 && nw === 7, "SE " + se + ", NW " + nw);
+    check("personagens 8 direções: o infetado 'brute' usa o atlas Brute", brute >= 0, "célula " + brute);
+  }
+}
+
 console.log(failures ? "\n" + failures + " FALHA(S)" : "\nTudo OK");
 process.exit(failures ? 1 : 0);

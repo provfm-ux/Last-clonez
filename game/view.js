@@ -1766,6 +1766,70 @@ const View = (() => {
     return true;
   }
 
+  // 8-direction character atlases (game/assets/characters, one row of 8 cells per character, order N NE E SE S SW W NW).
+  // One static pose per direction, so motion is procedural (bob, lunge, recoil). Until the atlas has loaded, or when it cannot
+  // (single.html has no asset folder), the old zombie atlas / procedural sprites are drawn instead. Debug: ?chars=off|mini|game|hd.
+  const charTiers = {mini: 1, game: .5, hd: .25};      // world-size multiplier: the mini tier is the 40 px reference
+  const charVectors = [[0, -1], [.7, -.7], [1, 0], [.7, .7], [0, 1], [-.7, .7], [-1, 0], [-.7, -.7]];
+  const charImages = new Map(), charEntries = new Map();
+  let charTier = "mini", charState = 0;              // 0 not started, 1 loading, 2 ready, -1 unavailable
+  try {
+    const wanted = /[?&]chars=(off|mini|game|hd)\b/.exec(location.search)?.[1];
+    if (wanted) charTier = wanted;
+  } catch {}
+  const plainInfected = ["walker", "missing_left_arm", "missing_right_forearm", "limping", "elderly_female"];
+  const infectedByOutfit = {worker: "construction", medic: "paramedic", patrol: "police", hiker: "hiker"};
+
+  function characterFor(a, isPlayer) {
+    if (isPlayer) return "protagonist";
+    if (a.stats) {                                    // infected: kind, then outfit, then a stable pick from the spawn phase
+      if (a.kind === "brute" || a.kind === "runner") return a.kind;
+      const phase = Number.isFinite(a.phase) ? a.phase : 0;
+      return infectedByOutfit[a.outfit] ?? plainInfected[Math.floor(phase * plainInfected.length) % plainInfected.length];
+    }
+    return a.id === "eva" ? "eva" : null;
+  }
+
+  function drawCharacter(a, isPlayer, x, y, scale, direction, stride, clock) {
+    if (charState < 0 || charTier === "off" || typeof Image !== "function" || typeof fetch !== "function") return false;
+    if (charState === 0) {
+      charState = 1;
+      try {
+        fetch("assets/characters/index.json").then(r => r.json()).then(index => {
+          for (const c of index.characters) charEntries.set(c.id, c);
+          charState = 2;
+        }).catch(() => { charState = -1; });
+      } catch { charState = -1; }
+      return false;
+    }
+    if (charState !== 2) return false;
+    const entry = charEntries.get(characterFor(a, isPlayer)), t = entry?.tiers[charTier];
+    if (!t) return false;
+    let img = charImages.get(t.file);
+    if (!img) {
+      img = new Image();
+      img.src = "assets/characters/" + t.file;
+      charImages.set(t.file, img);
+      return false;
+    }
+    if (img.naturalWidth !== t.cell[0] * 8 || img.naturalHeight !== t.cell[1]) return false;   // not decoded yet (or wrong file)
+    const index = direction & 4 ? (direction & 2 ? 0 : 4) : direction & 8 ? (direction & 1 ? 6 : 2) :
+      direction & 2 ? (direction & 1 ? 7 : 1) : (direction & 1 ? 5 : 3);
+    const kindScale = a.kind === "brute" ? 1.28 : a.kind === "runner" ? .94 : 1;   // already baked into those atlases
+    const z = scale / kindScale * charTiers[charTier], vec = charVectors[index];
+    let dx = 0, dy = 0;
+    if (a.moving) {                                    // step bob + sway on the stride phase
+      const wave = Math.sin(stride * Math.PI * 2);
+      dy = -Math.abs(wave) * 1.5 * scale; dx = wave * .6 * scale;
+    }
+    const lunge = a.swing > 0 ? 2.5 : a.windup > 0 ? -1.2 : a.flash > 0 ? -1.5 : 0;   // strike, wind-up, recoil
+    dx += vec[0] * lunge * scale; dy += vec[1] * lunge * scale * .5;
+    ctx.drawImage(img, index * t.cell[0], 0, t.cell[0], t.cell[1],
+      Math.round(x - t.anchor[0] * z + dx), Math.round(y - t.anchor[1] * z + dy),
+      Math.round(t.cell[0] * z), Math.round(t.cell[1] * z));
+    return true;
+  }
+
   function microActor(a, isPlayer, state, alive, x, y, scale, clock = 0) {
     const moving = alive && a.moving;
     const running = moving && (isPlayer ? state.running : a.kind === "runner" && a.alert > 0);
@@ -1794,8 +1858,9 @@ const View = (() => {
     const profile = !axial && screenY <= screenX * .414;
     const direction = Number(across < 0) + 2 * Number(depth < 0 && !profile) +
       4 * Number(axial) + 8 * Number(profile);
-    const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, direction, stride.phase, clock);
-    if (!imported) {
+    const chars = alive && drawCharacter(a, isPlayer, x, y, scale, direction, stride.phase, clock);
+    const imported = chars || alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, direction, stride.phase, clock);
+    if (!imported || chars && isPlayer) {
       const palette = isPlayer ? survivorPalette(a) : null;
       const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : palette.jacket) :
         Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
@@ -1804,9 +1869,9 @@ const View = (() => {
         palette?.hair ?? "#413e35", direction, pose, step, lift,
         a.outfit === "hiker" || Boolean(isPlayer && a.backpack), gesture, palette?.cut);
       const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - spriteGround * scale);
-      ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
+      if (!chars) ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
         Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
-      if (isPlayer && frame.grip) {
+      if (isPlayer && frame.grip) {            // the held weapon keeps the grip point of the procedural pose
         const phase = swing ? (heldId === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
           a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : pose === "ready" ? (heldId === "pistol" ? 4 : 0) : 6;
         drawHeldWeapon(heldId, left + Math.round(frame.grip[0] * scale), top + Math.round(frame.grip[1] * scale), dx < dy ? -1 : 1, phase);

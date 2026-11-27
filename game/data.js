@@ -300,6 +300,22 @@ const Data = (() => {
     {id:"cindergrotto.battery", area:"cindergrotto", text:"Read the surveyor's plate in Cinder Grotto", detail:"From day 12, through the survey tunnel on Pine Ridge. Bring a flashlight and spare batteries: the plate is in the far survey room and cannot be read in the dark.",
       reached:"Climb out of Cinder Grotto", reachedDetail:"You have read the plate. Get back up to Pine Ridge before the light dies."}
   ];
+  // Campaign tips (Sim.campaignTip): always one concrete next step, shown under the pinned goal.
+  const campaignTips = {
+    idle:"The next story step will show here. Keep food, water and rest up, and explore for supplies.",
+    back:"Follow the arrow back to Cold Vale: the next step starts there.",
+    waiting:"Nothing new opens until day {day}. Until then gather food and water, build your defences and keep your gear in good shape.",
+    goals:{
+      "coldvale.houses":"Search the family houses around your shelter: three of them hide a torn page. Use opens each page. Pages read: {n} of 3.",
+      "cinema.statue":{go:"Follow the arrow to the Oxford Night Reel cinema. Bring a weapon and a way to break glass.", take:"Take the golden idol from the altar, then run for a window. A crowbar breaks glass faster.", escape:"Get out through a window before the horde catches you."},
+      "pineridge.two-nights":{go:"Follow the arrow to Pine Ridge. Bring a bedroll, wood and water: no barricades there.", stay:"Survive the night: keep a campfire lit and stay dry and warm. Nights done: {n} of 2."},
+      "eva.death":{follow:"Stay close to Eva and look after her until day 5.", wait:"Eva has gone out. Wait at the shelter: her diary turns up in the morning.", diary:"Read Eva's diary under the pillow at the shelter."},
+      "ironworks.barricade":{go:"Follow the arrow to the Ironworks. It is open on weekdays, 08:00 to 18:00.", cage:"Take the weapon cage apart in the machine shop with the toolboard hammer and crowbar. They wear out: do not waste them."},
+      "fathill.bosses":{go:"Follow the arrow to Bracken Coast. The road is open on low-tide days (even days).", fear:"Kill infected where the woman on the pier can see you: her fear is {n} of {max}. The violin is in the net shed.", david:"Wear David's guard down, then shove his vest off.", violin:"Play the violin near David, then strike while he stands there."},
+      "westfields.stealth":{go:"Follow the arrow to Westfields. Keep your knife and your footsteps quiet.", sneak:"Sneak west to the Orchard farmhouse and read the ledger. Do not fight: noise calls hordes.", noisy:"You made noise. Hide until the infected lose you, then read the ledger in the Orchard farmhouse."},
+      "cindergrotto.battery":{go:"Follow the arrow to Pine Ridge and take the survey tunnel. You need a flashlight with batteries.", plate:"Find the surveyor's plate in the far survey room. Watch your flashlight battery.", out:"You have the plate. Climb back out to Pine Ridge before the light dies."}
+    }
+  };
   const fatHill = {fearKills:10, fearSight:18, guardDamage:450, lureSeconds:22, luredDamage:2, playRange:22};
   const cinemaPatrol = [[13.5,8.5],[19.5,12.5],[14.5,17.5],[7.5,12.5],[12.5,10.5]];
   const cinemaTrap = {horde:50, tensionEvery:6, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
@@ -559,6 +575,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

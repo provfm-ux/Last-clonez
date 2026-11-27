@@ -678,7 +678,8 @@
     $("lesson").hidden = !lesson;
     const inRun = active() && !lesson;
     const goal = inRun ? state.longHaul ? state.longHaul.days + "/30 days" + (state.longHaul.complete ? " · complete" : "") : Sim.pinnedGoal(state) ?? "" : "";
-    const hint = inRun && $("guide-enabled").checked ? state.longHaul ? Sim.longHaulHint(state) : guideHints[state.guideStep] ?? "" : "";
+    const tip = inRun && !state.longHaul ? Sim.campaignTip(state) : "";   // campaign: always a next step, whatever the guide toggle says
+    const hint = tip || (inRun && $("guide-enabled").checked ? state.longHaul ? Sim.longHaulHint(state) : guideHints[state.guideStep] ?? "" : "");
     $("onboarding").hidden = !goal && !hint;
     if ($("pinned-goal").textContent !== goal) $("pinned-goal").textContent = goal;
     if ($("guide-hint").textContent !== hint) $("guide-hint").textContent = hint;

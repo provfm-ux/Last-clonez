@@ -40,6 +40,9 @@ Zombie look: every infected id in `zombify.json` gets blood on the mouth in the 
 views where the face shows. Per-character knobs: `skin` (green|keep), `hue`, `head_frac`, `bright_factor`, `big_skin`, `mouth_k`, `mouth_y` (mouth height as a
 fraction of the figure height, for dark faces). Edit, then re-run `sheets --only <id>`. Check with a face contact sheet before committing.
 
+Weapon hand: for the customisable characters (`recolor.IDS`) `sheets` also writes `hands` (idle: 8 points per size; walk: frames x 8) in `index.json`, found by
+`hands.py` as the skin blob of the hand on the side the character faces. The game draws the held weapon there (`view.js` charHand).
+
 Limits: one photo gives one view. `--dirs` makes S,SE,E,SW,W by squashing; N-facing needs a back view.
 Web images may be copyrighted: keep refs/*.json (source URL), do not commit refs/ or out/.
 Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py && python3 tests/test_voxel.py && python3 tests/test_organic.py` (healthy = `Tudo OK` x4).

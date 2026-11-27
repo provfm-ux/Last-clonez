@@ -2057,6 +2057,14 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
       const d = dims(v.file);
       if (!d || d[0] !== v.cell[0] * 8 || d[1] !== v.cell[1] || v.anchor[0] >= v.cell[0] || v.anchor[1] > v.cell[1]) bad.push(c.id + "/" + t);
     }
+    for (const c of idx.characters) if (c.id === "protagonist" || c.id === "survivor_female") {            // posição da mão da arma
+      for (const t of ["mini", "game"]) {
+        const h = c.tiers[t].hands, w = c.walk?.[t]?.hands;
+        const inside = (p, cell) => Array.isArray(p) && p[0] >= 0 && p[0] <= cell[0] && p[1] >= 0 && p[1] <= cell[1];
+        if (!h || h.length !== 8 || !h.every(p => inside(p, c.tiers[t].cell))) bad.push(c.id + "/hands-" + t);
+        if (!w || w.length !== c.walk[t].frames || !w.every(row => row.length === 8 && row.every(p => inside(p, c.walk[t].cell)))) bad.push(c.id + "/walk-hands-" + t);
+      }
+    }
     for (const c of idx.characters) for (const [t, v] of Object.entries(c.walk ?? {})) {   // baked walk cycles: frames rows x 8 directions
       const d = dims(v.file);
       if (!d || d[0] !== v.cell[0] * 8 || d[1] !== v.cell[1] * v.frames || v.frames < 4 || v.anchor[0] >= v.cell[0] || v.anchor[1] > v.cell[1]) bad.push(c.id + "/walk-" + t);

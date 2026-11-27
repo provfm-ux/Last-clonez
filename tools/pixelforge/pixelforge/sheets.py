@@ -10,6 +10,7 @@ import os
 import numpy as np
 from PIL import Image
 
+from . import hands as handsmod
 from . import recolor as recolormod
 from . import zombify as zombmod
 from . import walk as walkmod
@@ -176,6 +177,15 @@ def build(package_dir, out_dir, only=None, rig_path=None):
                                                        "frames": WALK_FRAMES, "scale": round(s, 5)}
         if ch["id"] in recolormod.IDS:                                       # customisable: skin / hair / jacket masks
             recolormod.add_masks(out_dir, entry)
+        if ch["id"] in recolormod.IDS:                                       # where the held weapon goes, per pose and size
+            idle_h = [handsmod.hand_point(np.array(cells[d]), anchor[0], DIRS[d]) for d in range(8)]
+            walk_h = ([[handsmod.hand_point(walk_frames[f][d], walk_anchor[0], DIRS[d]) for d in range(8)]
+                       for f in range(WALK_FRAMES)] if walk_frames else None)
+            for tname in ("mini", "game"):
+                sc = entry["tiers"][tname]["scale"]
+                entry["tiers"][tname]["hands"] = [[round(x * sc, 1), round(y * sc, 1)] for x, y in idle_h]
+                if walk_h and tname in entry.get("walk", {}):
+                    entry["walk"][tname]["hands"] = [[[round(x * sc, 1), round(y * sc, 1)] for x, y in row] for row in walk_h]
         json.dump(entry, open(os.path.join(out_dir, f"{ch['id']}.json"), "w"), indent=1)
         result.append(entry)
         print(ch["id"].ljust(14), {k: v["cell"] for k, v in entry["tiers"].items()})

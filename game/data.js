@@ -330,6 +330,7 @@ const Data = (() => {
     idle:"The next story step will show here. Keep food, water and rest up, and explore for supplies.",
     back:"Follow the arrow back to Cold Vale: the next step starts there.",
     waiting:"Nothing new opens until day {day}. Until then gather food and water, build your defences and keep your gear in good shape.",
+    optional:" Today you can also raid {place} for supplies.",
     goals:{
       "coldvale.houses":"Search the family houses around your shelter: three of them hide a torn page. Use opens each page. Pages read: {n} of 3.",
       "cinema.statue":{go:"Follow the arrow to the Oxford Night Reel cinema. Bring a weapon and a way to break glass.", take:"Take the golden idol from the altar, then run for a window. A crowbar breaks glass faster.", escape:"Get out through a window before the horde catches you."},
@@ -366,6 +367,17 @@ const Data = (() => {
     winWords:["stand down", "token"]
   };
   // The last boss (docs/HISTORIA.md sections 7 and 10): a firefighter's coat falls under heavy damage; fire hurts the mutation.
+  // Optional areas (docs/HISTORIA.md section 9): one supply cache each, in a named place. Never a clue. guards = infected placed around it.
+  const optionalAreas = {
+    "opt.fuel":{region:"coldvale", place:"the petrol station", cache:"Forecourt tank hatch", loot:{fuel:3, food:2, emptybottle:2}, guards:0},
+    "opt.clinic":{region:"coldvale", place:"the village clinic", cache:"Waiting room cabinet", loot:{bandage:4, painkiller:2, disinfectant:2, splint:1}, guards:3},
+    "opt.market":{region:"coldvale", place:"the market", cache:"Back-shelf crates", loot:{food:4, water:4, cannedbeans:2}, guards:0},
+    "opt.farm":{region:"fields", place:"the Orchard farmhouse in Westfields", cache:"Kitchen garden basket", building:"Orchard farmhouse", loot:{radishseed:2, strawberryseed:1, fresh:4, potato:3}, guards:2},
+    "opt.marina":{region:"coast", place:"the net shed on the Bracken pier", cache:"Marina tackle box", building:"Net shed", loot:{bait:3, tape:2, cloth:2, rawfish:2}, guards:0},
+    "opt.school":{region:"coldvale", place:"the big house with the school sign in Cold Vale", cache:"Cloakroom pile", loot:{wood:6, nails:8, scrap:2, cloth:2}, guards:4},
+    "opt.station":{region:"ironworks", place:"the freight depot at the Ironworks", cache:"Wagon toolbox", building:"Freight depot", loot:{battery:5, flashlight:1}, guards:2},
+    "opt.harvest":{region:"fields", place:"the hay barn in Westfields", cache:"Harvest sacks", building:"Hay barn", loot:{fresh:6, potato:4, radish:4, food:3}, guards:0}
+  };
   // Fire (torch, Molotov, flames on the ground): burn damage per second, how long a lit infected keeps burning, ground flames.
   const fireRules = {range:5, radius:1.9, seconds:12, burnPerSecond:9, torchSeconds:3, noise:7};
   const pipFight = {finishBelow:100, guardDamage:120, fireRange:2.6, fireMult:2.5, burnPerSecond:7, escort:8};
@@ -630,6 +642,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {fireRules,pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {optionalAreas,fireRules,pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

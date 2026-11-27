@@ -16,7 +16,7 @@ for (const file of files)
 let seed = 7; const random = () => (seed = seed * 16807 % 2147483647) / 2147483647;
 const context = {console, Math: Object.assign(Object.create(Math), {random}), Date, JSON, structuredClone};
 context.globalThis = context.window = context; vm.createContext(context); vm.runInContext(source, context);
-const {Sim, Data, World} = context, ctxRegions = context.Regions, ctxAtmosphere = context.Atmosphere;
+const {Sim, Data, World, Campaign} = context, ctxRegions = context.Regions, ctxAtmosphere = context.Atmosphere;
 
 let failures = 0;
 const check = (name, passed, detail = "") => { if (!passed) failures++; if (passed && quiet) return; console.log((passed ? "PASS " : "FAIL ") + name + (detail ? "  [" + detail + "]" : "")); };
@@ -2307,6 +2307,33 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("arpão: com o Pip acima de 100 hp só faz dano normal", pip.hp > 0 && pip.hp < 250 && pip.hp > 100 - 1, String(pip.hp));
   pip.hp = 99; strike();
   check("arpão: abaixo de 100 hp mata o Pip e fecha o desafio", pip.hp <= 0 && f.campaign.completed.includes("fortress.last-boss"));
+}
+
+{ // áreas opcionais: um esconderijo por área, aberto no dia marcado, nunca dá pista
+  const town = Sim.create(11, "campaign", "carer", 2);
+  const cache = (w, id) => w.world.objects.find(o => o.id === id);
+  const names = {"opt-fuel":"fuel", "opt-clinic":"clinic", "opt-market":"market"};
+  check("opcional: posto, clínica, mercado e escola existem em Cold Vale",
+    Object.entries(names).every(([id, type]) => town.world.buildings.find(b => b.id === cache(town, id)?.building)?.type === type) && Boolean(cache(town, "opt-school")));
+  check("opcional: antes do dia marcado o esconderijo está oculto", ["opt-fuel", "opt-clinic", "opt-school"].every(id => cache(town, id).active === false));
+  Sim.testJump(town, 9, {}, {anyMode: true}); Sim.tick(town, .033, idle);
+  check("opcional: no dia 9 a clínica abre e o posto também, a escola ainda não", cache(town, "opt-clinic").active && cache(town, "opt-fuel").active && !cache(town, "opt-school").active);
+  const mk = Sim.create(11, "campaign", "carer", 2); Sim.testJump(mk, 16, {}, {anyMode: true}); Sim.tick(mk, .033, idle);
+  check("opcional: o mercado fica fechado ao fim de semana (dia 16)", cache(mk, "opt-market").active === false);
+  const fields = Sim.create(11, "campaign", "carer", 2, undefined, "fields"), coast = Sim.create(11, "campaign", "carer", 2, undefined, "coast"), iron = Sim.create(11, "campaign", "carer", 2, undefined, "ironworks");
+  const inB = (w, id) => w.world.buildings.find(b => b.id === cache(w, id)?.building)?.name;
+  check("opcional: quinta, colheita, marina e estação estão nos edifícios certos",
+    inB(fields, "opt-farm") === "Orchard farmhouse" && inB(fields, "opt-harvest") === "Hay barn" && inB(coast, "opt-marina") === "Net shed" && inB(iron, "opt-station") === "Freight depot");
+  check("opcional: nenhum esconderijo dá pistas", Object.values(Data.optionalAreas).every(a => !Object.keys(a.loot).includes("clue")) && Object.keys(Data.optionalAreas).every(id => Campaign.areas[id]?.kind === "optional"));
+  const box = cache(town, "opt-clinic"); Object.assign(town.player, {x: box.x, y: box.y});
+  town.world.enemies = [];
+  check("opcional: tirar o saque regista a área como feita", Sim.collect(town, box, 0) > 0 && town.campaign.opt.includes("opt.clinic"));
+  check("opcional: a dica menciona o que se pode vasculhar hoje", /raid/.test(Sim.campaignTip(town)) || town.campaign.opt.length > 0);
+  const back = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(town))));
+  check("opcional: o registo guarda-se e carrega", back.campaign.opt.includes("opt.clinic"));
+  const old = JSON.parse(JSON.stringify(Sim.snapshot(town))); delete old.campaign.opt;
+  let bad = false; try { const broken = JSON.parse(JSON.stringify(Sim.snapshot(town))); broken.campaign.opt = ["opt.x"]; Sim.restore(broken); } catch { bad = true; }
+  check("opcional: saves antigos sem 'opt' carregam e valores inválidos são recusados", Sim.restore(old).campaign.opt.length === 0 && bad);
 }
 
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio

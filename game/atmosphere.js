@@ -33,13 +33,16 @@ const Atmosphere = (() => {
     lighthouse:[
       {name:"the headland path",entry:[32,60],goal:[31,46]}
     ],
+    fortress:[
+      {name:"the west gate",entry:[3,32],goal:[20,32]}, {name:"the east gate",entry:[60,32],goal:[48,32]}
+    ],
     cavern:[]
   };
   for (const [id,district] of Object.entries(Expedition.districts)) {
     arrivals[id] = [{name:"the eastern lane",entry:[district.width-3,60],goal:[83,60]},
       {name:"the north road",entry:[district.width-3,34],goal:[83,34]}];
   }
-  const nestBuildings = {coldvale:"Workshop",ridge:"Ranger station",ironworks:"Power substation",coast:"Weather hut",fields:"Hay barn",quarry:"Crusher shed",reservoir:"Pump house",lighthouse:"Boat shed"};
+  const nestBuildings = {coldvale:"Workshop",ridge:"Ranger station",ironworks:"Power substation",coast:"Weather hut",fields:"Hay barn",quarry:"Crusher shed",reservoir:"Pump house",fortress:"Fortress keep",lighthouse:"Boat shed"};
   const furnishings = {
     home:["wardrobe","sideboard","bookcase","armchair","sink"],
     farm:["sideboard","wardrobe","washstand","armchair"],
@@ -99,7 +102,7 @@ const Atmosphere = (() => {
     const outpost = {coldvale:[67,52,"Roadside emergency box",{cloth:1,water:1}],ridge:[83,101,"Trail supply box",{bandage:1,wood:2}],
       ironworks:[99,51,"Service apron crate",{scrap:2,tape:1}],coast:[92,103,"Sandbank salvage box",{bait:2,cloth:1}],
       fields:[102,59,"Field supply crate",{radishseed:2,wood:1}],
-      quarry:[10,30,"Gate supply box",{bandage:1,water:1}],reservoir:[10,30,"Track supply box",{cloth:1,water:1}],
+      quarry:[10,30,"Gate supply box",{bandage:1,water:1}],reservoir:[10,30,"Track supply box",{cloth:1,water:1}],fortress:[10,30,"Gate supply box",{bandage:1,water:2}],
       lighthouse:[30,56,"Headland supply box",{bandage:1,cloth:1}]}[world.region];
     const [ox,oy,name,supply] = outpost;
     const site = [[ox,oy],[ox+1,oy],[ox-1,oy],[ox,oy+1]].find(([ix,iy]) => clearCell(ix,iy));

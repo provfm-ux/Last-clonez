@@ -704,6 +704,38 @@ const Sim = (() => {
     return null;
   }
 
+  // The campaign tip: always one concrete next step for the current objective, so the player never feels lost. Pure text from state.
+  function campaignTip(s) {
+    if (!isCampaign(s) || s.mode === "dead") return "";
+    const T = Data.campaignTips, c = s.campaign, region = s.world.region, day = runDay(s.minutes), hour = Math.floor(s.minutes % 1440 / 60);
+    const goal = campaignGoal(s);
+    if (!goal) return T.idle;
+    if (goal.opens) return T.waiting.replace("{day}", goal.opens);
+    const area = Data.campaignGoals.find(g => g.id === goal.id).area, closed = Campaign.closedReason(area, day, hour);
+    const at = {coldvale:Regions.home, cinema:"cinema", pineridge:"ridge", ironworks:"ironworks", fathill:"coast", westfields:"fields", cindergrotto:Regions.cavern}[area];
+    const text = T.goals[goal.id], f = c.fathill, pages = s.world.objects.filter(o => o.action === "campaign-page" && o.read).length;
+    switch (goal.id) {
+      case "coldvale.houses": return region !== Regions.home ? T.back : text.replace("{n}", pages);
+      case "cinema.statue": {
+        if (region !== "cinema") return closed || text.go;
+        return s.world.objects.find(o => o.id === "cinema-statue")?.active ? text.take : text.escape;
+      }
+      case "pineridge.two-nights": return region !== "ridge" ? closed || text.go : text.stay.replace("{n}", c.ridge.nights);
+      case "eva.death": return region !== Regions.home && c.eva !== "" ? T.back : c.eva === "gone" ? text.diary : c.eva === "left" ? text.wait : text.follow;
+      case "ironworks.barricade": return region !== "ironworks" ? closed || text.go : text.cage;
+      case "fathill.bosses":
+        if (region !== "coast") return closed || text.go;
+        if (f.vest) return text.violin;
+        if (f.coat) return text.david;
+        return text.fear.replace("{n}", Math.min(f.fear, Data.fatHill.fearKills)).replace("{max}", Data.fatHill.fearKills);
+      case "westfields.stealth": return region !== "fields" ? closed || text.go : c.fields.alerts ? text.noisy : text.sneak;
+      case "cindergrotto.battery":
+        if (region === Regions.cavern) return c.grotto === "reached" ? text.out : text.plate;
+        return closed || text.go;
+    }
+    return T.idle;
+  }
+
   function pinnedGoal(s) {
     if (isCampaign(s)) {
       const goal = campaignGoal(s);
@@ -4283,7 +4315,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, isCampaign, campaignGoals, campaignGoal, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

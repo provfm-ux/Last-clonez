@@ -2186,6 +2186,30 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("fathill: saves antigos sem 'fathill' carregam e valores inválidos são recusados", Sim.restore(raw).campaign.fathill.fear === 0 && bad);
 }
 
+{ // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
+  const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery"];
+  let empty = 0, total = 0, sample = "";
+  for (let day = 1; day <= 30; day++) for (let done = 0; done <= goalsOrder.length; done++) {
+    const s = fresh("campaign"); Sim.testJump(s, day, {}, {anyMode: true});
+    s.campaign.completed.push(...goalsOrder.slice(0, done));
+    const tip = Sim.campaignTip(s); total++;
+    if (typeof tip !== "string" || tip.length < 20) { empty++; sample = day + "/" + done; }
+  }
+  check("ui.campaign-tip em 30 dias x 9 estados de progresso há sempre uma dica", empty === 0, empty + " vazias de " + total + " " + sample);
+  const t0 = fresh("campaign");
+  check("ui.campaign-tip no início explica as páginas", /torn page/.test(Sim.campaignTip(t0)) && /0 of 3/.test(Sim.campaignTip(t0)), Sim.campaignTip(t0));
+  const pre = fresh("campaign"); pre.campaign.completed.push("coldvale.houses");
+  check("ui.campaign-tip com o cinema ainda fechado diz quando abre", /day 2/.test(Sim.campaignTip(pre)), Sim.campaignTip(pre));
+  const fh = Sim.create(11, "campaign", "carer", 2, undefined, "coast"); Sim.testJump(fh, 8, {}, {anyMode: true});
+  fh.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade");
+  check("ui.campaign-tip no FatHill pede para matar infetados à vista da mulher", /fear is 0 of 10/.test(Sim.campaignTip(fh)) && /violin/.test(Sim.campaignTip(fh)), Sim.campaignTip(fh));
+  fh.campaign.fathill.coat = true; const coat = Sim.campaignTip(fh); fh.campaign.fathill.vest = true;
+  check("ui.campaign-tip acompanha os passos do chefe (casaco, colete)", /guard down/.test(coat) && /Play the violin/.test(Sim.campaignTip(fh)), coat + " | " + Sim.campaignTip(fh));
+  const done = fresh("campaign"); Sim.testJump(done, 12, {}, {anyMode: true}); done.campaign.completed.push(...goalsOrder);
+  check("ui.campaign-tip com tudo feito por agora mantém uma dica", /next story step/.test(Sim.campaignTip(done)), Sim.campaignTip(done));
+  check("ui.campaign-tip fora da campanha não aparece", Sim.campaignTip(fresh("survival")) === "");
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

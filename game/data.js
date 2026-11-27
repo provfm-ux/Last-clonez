@@ -240,6 +240,9 @@ const Data = (() => {
     ironTools:"Each step needs a tool in good condition: ",
     ironWorn:"Your tools are too worn for this. Look for another in the Ironworks.",
     ironDone:"Inside the cage: the Foundry maul. Strong enough for the first friend.",
+    grottoDark:"A brass plate is bolted to the wall, but there is no light to read it by. You need a flashlight with charge.",
+    grottoPlate:"SURVEY STATION 5 · The last coordinate is cut into the brass, with a line scratched under it: ‘If the batteries are dying, walk. Do not run the light for the way back.’ You copy it down.",
+    grottoDone:"Daylight. The fifth coordinate is in your notes, and your hands are still shaking from the dark.",
     ironTerminals:[
       "LINE 3 · SHIFT LOG 06:00 · The assistant scheduled the weapon cage audit. Order of work: frame bolts (hammer), plates (crowbar), chain last. Operators reminded: the assistant cannot be argued with, only asked.",
       "SUBSTATION · POWER LOG · The assistant requested priority power for PROJECT FORTRESS. Approved automatically. Weekly token budget: 82% used. Nobody on site remembers starting that project.",
@@ -273,7 +276,9 @@ const Data = (() => {
     {id:"cinema.statue", area:"cinema", text:"Take the golden idol", detail:"Oxford Night Reel cinema, from day 2. Then get out through a window."},
     {id:"pineridge.two-nights", area:"pineridge", text:"Survive two nights at Pine Ridge", detail:"From day 3. No barricades: bring a bedroll, wood and water. Stay warm."},
     {id:"eva.death", area:"eva", text:"Look after Eva", detail:"Until day 5. She keeps talking about the fortress rumour.", gone:"Read Eva's diary at the shelter"},
-    {id:"ironworks.barricade", area:"ironworks", text:"Get the strong weapon", detail:"Ironworks machine shop, weekdays 08:00-18:00. The toolboard hammer and crowbar wear out: do not waste them."}
+    {id:"ironworks.barricade", area:"ironworks", text:"Get the strong weapon", detail:"Ironworks machine shop, weekdays 08:00-18:00. The toolboard hammer and crowbar wear out: do not waste them."},
+    {id:"cindergrotto.battery", area:"cindergrotto", text:"Read the surveyor's plate in Cinder Grotto", detail:"From day 12, through the survey tunnel on Pine Ridge. Bring a flashlight and spare batteries: the plate is in the far survey room and cannot be read in the dark.",
+      reached:"Climb out of Cinder Grotto", reachedDetail:"You have read the plate. Get back up to Pine Ridge before the light dies."}
   ];
   const cinemaPatrol = [[13.5,8.5],[19.5,12.5],[14.5,17.5],[7.5,12.5],[12.5,10.5]];
   const cinemaTrap = {horde:50, tensionEvery:6, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};

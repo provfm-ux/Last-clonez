@@ -1,6 +1,7 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Campaign: added the Cinder Grotto challenge (day 12). Read the surveyor's plate in the survey room by flashlight, then climb back out to Pine Ridge for the fifth coordinate.
 - Added 13 occupations with Cold Vale backstories, starting skills and equipment (from #17).
 - Added 30 point-budgeted traits chosen at setup; drawbacks pay for advantages.
 - Added Sandbox controls for infected speed, sight, hearing and sound memory, food lifetime and bite chance.

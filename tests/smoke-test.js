@@ -2013,7 +2013,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
 { // ui.campaign-goals (revisão, sugestão 1): objetivos da campanha no topo, no diário e na seta de direção
   const s = fresh("campaign");
   check("ui.campaign-goals começa com as 3 páginas, sem seta (encontrar as casas faz parte do desafio)",
-    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 5);
+    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 6);
   s.campaign.completed.push("coldvale.houses");
   check("ui.campaign-goals o cinema ainda fechado mostra quando abre e aponta para a saída",
     Sim.pinnedGoal(s) === "Take the golden idol · opens on day 2" && Sim.destination(s)?.id === "exit-cinema", Sim.pinnedGoal(s));
@@ -2027,6 +2027,8 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   c.campaign.completed.push("cinema.statue", "pineridge.two-nights"); Sim.testJump(c, 6, {}, {anyMode: true}); c.campaign.eva = "gone";
   check("ui.campaign-goals depois da Eva: ler o diário", Sim.pinnedGoal(c) === "Read Eva's diary at the shelter" && Sim.destination(c)?.id === "exit-coldvale");
   c.campaign.completed.push("eva.death", "ironworks.barricade");
+  check("ui.campaign-goals o objetivo seguinte mostra quando abre (dia 12, Cinder Grotto)", Sim.pinnedGoal(c) === "Read the surveyor's plate in Cinder Grotto · opens on day 12", Sim.pinnedGoal(c));
+  c.campaign.completed.push("cindergrotto.battery");
   check("ui.campaign-goals com tudo feito por agora o objetivo avisa que há mais a caminho", /on its way/.test(Sim.pinnedGoal(c)) && Sim.destination(c) === null);
   const plain = fresh("survival"); plain.pinStory = true;
   check("ui.campaign-goals fora da campanha nada muda", Sim.pinnedGoal(plain) === "Find Eva" && Sim.campaignGoals === Sim.campaignGoals);
@@ -2080,6 +2082,31 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     check("assets.characters 22 personagens x 3 tamanhos, 8 células iguais por PNG, âncora dentro da célula",
       idx.characters.length === 22 && idx.order.join() === "N,NE,E,SE,S,SW,W,NW" && idx.default_tier in idx.tiers && !bad.length, bad.join(","));
   }
+}
+
+{ // cindergrotto.battery: a placa na sala de levantamento só se lê com lanterna; a pista só conta ao sair para Pine Ridge
+  const g = Sim.create(11, "campaign", "carer", 2, undefined, ctxRegions.cavern);
+  Sim.testJump(g, 12, {}, {anyMode: true});
+  const plate = g.world.objects.find(o => o.id === "grotto-plate");
+  check("cindergrotto: a gruta tem a placa do agrimensor na sala de levantamento", Boolean(plate) && plate.zone === "survey", plate?.zone);
+  g.player.bag = g.player.bag.filter(i => i.id !== "flashlight");
+  Object.assign(g.player, {x: plate.x, y: plate.y + .5});
+  check("cindergrotto: sem lanterna a placa não se lê", !Sim.readGrottoPlate(g, plate) && g.campaign.grotto === "");
+  g.player.bag.push({id: "flashlight", qty: 1, uid: "t-flashlight", condition: 100, charge: 60});
+  check("cindergrotto: com lanterna lê-se e a pista ainda não conta",
+    Sim.readGrottoPlate(g, plate) && g.campaign.grotto === "reached" && g.campaign.clues === 0 && !g.campaign.completed.includes("cindergrotto.battery"));
+  check("cindergrotto: o estado guarda-se e carrega", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(g)))).campaign.grotto === "reached");
+  const exit = g.world.objects.find(o => o.id === "exit-ridge");
+  Object.assign(g.player, {x: exit.x, y: exit.y + .5});
+  const out = Sim.travel(g, exit);
+  check("cindergrotto: sair para Pine Ridge dá a quinta pista (1ª neste teste) e conclui o desafio",
+    out?.world.region === "ridge" && out.campaign.completed.includes("cindergrotto.battery") && out.campaign.clues === 1, out ? out.world.region + " " + out.campaign.clues : "sem viagem");
+  const goals = fresh("campaign"); Sim.testJump(goals, 12, {}, {anyMode: true});
+  goals.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade");
+  check("cindergrotto: é o objetivo do dia 12 e há dicas para ele", Sim.campaignGoal(goals)?.id === "cindergrotto.battery" && context.CampaignHints.hints["cindergrotto.battery"].length === 3);
+  const raw = JSON.parse(JSON.stringify(Sim.snapshot(goals))); delete raw.campaign.grotto;
+  let bad = false; try { const broken = JSON.parse(JSON.stringify(Sim.snapshot(goals))); broken.campaign.grotto = "x"; Sim.restore(broken); } catch { bad = true; }
+  check("cindergrotto: saves antigos sem 'grotto' carregam e valores inválidos são recusados", Sim.restore(raw).campaign.grotto === "" && bad);
 }
 
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>

@@ -9,6 +9,7 @@ const CampaignHints = (() => {
   const hints = {
     "coldvale.houses":["Prepper notes tend to hide in ordinary homes, not shops.", "Three houses in Cold Vale each hold a torn page.",
       "Search inside the family houses around the shelter for torn pages."],
+    "cindergrotto.battery":["The survey tunnel on Pine Ridge only opens from day 12.", "The plate is deep, in the survey room. It needs a lit flashlight to read.", "Bring spare batteries and plan the way back out before the light dies."],
     "amigo1.lockdown-chat":["It still listens to prompts.", "It is mid-lockdown. Words may work where blows did not.", "Ask it to stand down."],
     "fortress.last-boss":["The coat is scorched but whole.", "Fire made it what it is. Fire can unmake it.", "It's mutated. It burns."]
   };

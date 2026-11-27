@@ -654,7 +654,7 @@
     if (o.action === "bed") return state.player.fatigue >= 35 ? "Sleep" : "Rest";
     return ({bed:"Rest", barrel:"Collector", campfire:"Campfire", radio:"Radio", garden:"Garden", tap:"Tap", generator:"Generator",
       harvest:"Chop", dismantle:"Salvage", workbench:"Build", travel:"Cross", spring:"Fill", forage:"Forage", fish:"Fish",
-      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read","campaign-page":"Read","cinema-statue":"Take","eva-diary":"Read","cinema-note":"Read","ironworks-terminal":"Read","ironworks-cage":"Dismantle",crib:"Look"}[o.action] || "Use");
+      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read","campaign-page":"Read","grotto-plate":"Read","cinema-statue":"Take","eva-diary":"Read","cinema-note":"Read","ironworks-terminal":"Read","ironworks-cage":"Dismantle",crib:"Look"}[o.action] || "Use");
   }
 
   function canTalk() {
@@ -1773,6 +1773,10 @@
     }
     if (o.action === "campaign-page") {
       if (Sim.readCampaignPage(state,o)) save();
+      return;
+    }
+    if (o.action === "grotto-plate") {
+      if (Sim.readGrottoPlate(state,o)) save();
       return;
     }
     if (o.action === "mushroom") {

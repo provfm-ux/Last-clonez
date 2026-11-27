@@ -521,6 +521,7 @@ const Sim = (() => {
     }
     if (difficulty === "campaign") {
       s.waypoint = "";
+      if (region === Regions.cavern) placeGrottoPlate(world);
       if (town) {
         placeEvaDiary(world);
         CampaignHints.track(s.campaign.hints, "coldvale.houses", s.minutes);
@@ -661,6 +662,7 @@ const Sim = (() => {
       let text = goal.id === "eva.death" && c.eva === "gone" ? goal.gone : goal.text, detail = goal.detail;
       if (goal.id === "coldvale.houses" && !done && pages) detail += " Torn pages " + pages + " of 3.";
       if (goal.id === "pineridge.two-nights" && !done && c.ridge.nights) detail += " Nights " + c.ridge.nights + " of 2.";
+      if (goal.id === "cindergrotto.battery" && !done && c.grotto === "reached") { text = goal.reached; detail = goal.reachedDetail; }
       const opens = !done && day < area.from ? area.from : null;
       return {id:goal.id, done, text, detail, opens};
     });
@@ -682,6 +684,10 @@ const Sim = (() => {
     if (goal.id === "pineridge.two-nights") return region === "ridge" ? null : region === Regions.home ? find("exit-ridge") : find("exit-" + Regions.home);
     if (goal.id === "ironworks.barricade") return region === "ironworks" ? find("iron-cage") : region === Regions.home ? find("exit-ironworks") : find("exit-" + Regions.home);
     if (goal.id === "eva.death" && s.campaign.eva === "gone") return region === Regions.home ? find("eva-diary") : find("exit-" + Regions.home);
+    if (goal.id === "cindergrotto.battery") {
+      if (region === Regions.cavern) return find(s.campaign.grotto === "reached" ? "exit-ridge" : "grotto-plate");
+      return region === "ridge" ? find("exit-" + Regions.cavern) : region === Regions.home ? find("exit-ridge") : find("exit-" + Regions.home);
+    }
     return null;
   }
 
@@ -719,7 +725,7 @@ const Sim = (() => {
     ...(item.id === "housekey" ? {lock:item.lock, label:item.label, uid:item.uid} : {})});
 
   // Loose notes the player has not read yet: the Use button opens them first.
-  const noteActions = new Set(["field-note", "campaign-page", "eva-diary", "ironworks-terminal", "cinema-note"]);
+  const noteActions = new Set(["field-note", "campaign-page", "eva-diary", "ironworks-terminal", "cinema-note", "grotto-plate"]);
 
   function readCinemaNote(s, note) {
     if (s.mode !== "play" || s.player.vehicle || note?.action !== "cinema-note" || !s.world.objects.includes(note) || !reachableObject(s,note)) return false;
@@ -1404,7 +1410,7 @@ const Sim = (() => {
   }
 
   // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
-  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:""});
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:""});
   // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
   const isCampaign = s => s.difficulty === "campaign";
   const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
@@ -1419,7 +1425,8 @@ const Sim = (() => {
         night !== null && (!night || !Number.isFinite(night.start) || night.start < 0 || !["","cold","barricade"].includes(night.fail) ||
           !Number.isInteger(night.built) || night.built < 0)) throw new Error("Invalid campaign progress.");
     if (raw.eva !== undefined && !["", "left", "gone"].includes(raw.eva)) throw new Error("Invalid campaign progress.");
-    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "",
+    if (raw.grotto !== undefined && !["", "reached"].includes(raw.grotto)) throw new Error("Invalid campaign progress.");
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "",
       ridge:{nights:ridge.nights, night:night && {start:night.start, fail:night.fail, built:night.built}}};
   }
   // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
@@ -1599,6 +1606,35 @@ const Sim = (() => {
     notify(s, Data.campaignText.ironTerminals[terminal.line] ?? "The screen is dark.");
     return true;
   }
+  // cindergrotto.battery: a surveyor's brass plate in the survey room holds the fifth coordinate. It can only be read by flashlight, and
+  // the clue is only yours once you climb back out to Pine Ridge. Fixed tile, no rng.
+  function placeGrottoPlate(world) {
+    const tile = World.tileAt(world, 34, 9);
+    if (!tile || tile.solid) return;
+    world.objects.push({id:"grotto-plate", x:tile.x+.5, y:tile.y+.5, zone:tile.zone, building:null, tint:.6, kind:"record",
+      action:"grotto-plate", name:"Surveyor's plate", read:false, active:true, solid:false});
+  }
+
+  function readGrottoPlate(s, plate) {
+    if (!s.campaign || s.mode !== "play" || s.player.vehicle || plate?.action !== "grotto-plate" || !plate.active ||
+        !s.world.objects.includes(plate) || !reachableObject(s,plate)) return false;
+    if (!s.player.bag.some(item => item.id === "flashlight" && item.charge > 0)) { notify(s, Data.campaignText.grottoDark, true); return false; }
+    plate.read = true;
+    if (s.campaign.grotto === "") { s.campaign.grotto = "reached"; CampaignHints.progress(s.campaign.hints, s.minutes); }
+    notify(s, Data.campaignText.grottoPlate);
+    return true;
+  }
+
+  // Back out on Pine Ridge with the plate read: the fifth coordinate is yours.
+  function finishGrotto(s) {
+    const c = s.campaign;
+    if (!c || c.grotto !== "reached" || c.completed.includes("cindergrotto.battery")) return;
+    c.completed.push("cindergrotto.battery");
+    c.clues = Math.min(5, c.clues + 1);
+    CampaignHints.progress(c.hints, s.minutes);
+    notify(s, Data.campaignText.grottoDone);
+  }
+
   // eva.death: Eva's diary waits, hidden, in the shelter from the first day; it appears on the morning of day 6.
   function placeEvaDiary(world) {
     const b = world.base, crate = world.objects.find(o => o.storage && o.building === b.id), tiles = [];
@@ -1718,6 +1754,7 @@ const Sim = (() => {
         notify(next,"You made it back. Check the road before carrying supplies through town.");
       }
       explore(next);
+      if (from === Regions.cavern && to === "ridge") finishGrotto(next);
       notify(next, "Entered " + Regions.definitions[to].name + ". " + (to === Regions.home ? "The other routes are on your map." : Regions.definitions[to].detail));
       recordDaily(next,"crossings");
       settleDispatch(next, true);
@@ -3712,7 +3749,7 @@ const Sim = (() => {
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
       campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}, buffUntil:s.campaign.buffUntil,
-        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva} : undefined,
+        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva, grotto:s.campaign.grotto} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
@@ -4078,7 +4115,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, isCampaign, campaignGoals, campaignGoal, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, isCampaign, campaignGoals, campaignGoal, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

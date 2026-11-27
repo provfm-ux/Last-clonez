@@ -1665,6 +1665,8 @@ const View = (() => {
     wrench: [[1,0,8,2,darkSteel],[2,0,6,1,steel],[8,-2,3,5,steel],[11,-2,2,1,lightSteel],[11,2,2,1,lightSteel]],
     fryingpan: [[1,0,7,2,darkSteel],[7,-2,7,6,darkSteel],[8,-3,5,1,steel],[8,4,5,1,steel],[13,-1,2,4,steel],[9,-1,3,3,"#4c5553"]],
     broom: [[1,0,11,1,lightWood],[11,-2,2,5,woodGrip],[13,-3,3,7,"#9e7643"],[14,-2,2,1,"#d1ae6a"],[14,1,2,1,"#c79b59"]],
+    harpoon: [[1,0,15,1,lightWood],[14,-1,3,3,darkSteel],[17,-2,2,5,steel],[18,0,2,1,lightSteel],[16,-3,2,1,steel],[16,3,2,1,steel]],
+    torch: [[1,0,8,2,woodGrip],[8,-1,3,3,"#4a3a2b"],[10,-3,3,3,"#d6561f"],[11,-4,2,3,"#f2a23a"],[12,-3,1,1,"#ffe08a"]],
     rollingpin: [[1,0,13,1,lightWood],[3,-2,8,5,woodGrip],[4,-2,6,1,lightWood],[4,2,6,1,"#825132"]]
   };
   const weaponSprites = new Map();
@@ -1831,6 +1833,8 @@ const View = (() => {
     if (isPlayer) return a.appearance === "female" ? "survivor_female" : "protagonist";
     if (a.kind === "pierwoman") return "woman";      // the story bosses of FatHill
     if (a.kind === "david") return "david";
+    if (a.kind === "vic") return "friend";
+    if (a.kind === "pip") return "pip";
     if (a.stats) {                                    // infected: kind, then outfit, then a stable pick from the spawn phase
       if (a.kind === "runner") return "runner";
       if (a.kind === "mutant") return "brute";
@@ -2834,6 +2838,17 @@ const View = (() => {
           for(let k=0;k<=32;k++){const a=k/32*Math.PI*2,[rx,ry]=p(ring.x+Math.cos(a)*radius,ring.y+Math.sin(a)*radius);k?ctx.lineTo(rx,ry):ctx.moveTo(rx,ry);}
           ctx.stroke();ctx.restore();
         }
+      }
+      for(const fire of state.fires ?? []){
+        if(fire.until<=state.elapsed)continue;
+        const left=Math.min(1,(fire.until-state.elapsed)/2);
+        for(let k=0;k<7;k++){
+          const a=k/7*Math.PI*2+state.elapsed*.7,r=(k%3)*.55,[fx,fy]=p(fire.x+Math.cos(a)*r,fire.y+Math.sin(a)*r,4);
+          const flick=Math.sin(state.elapsed*13+k*2.1)*.5+.5;
+          ctx.globalAlpha=.55*left+.25*flick;ctx.fillStyle=flick>.5?"#f2a23a":"#d6561f";
+          ctx.beginPath();ctx.ellipse(fx,fy,7+flick*4,4+flick*3,0,0,Math.PI*2);ctx.fill();
+        }
+        ctx.globalAlpha=1;
       }
       for(const effect of state.effects){
         const [x,y]=p(effect.x,effect.y,25+(1-effect.life)*23);

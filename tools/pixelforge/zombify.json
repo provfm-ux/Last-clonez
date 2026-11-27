@@ -95,7 +95,9 @@
     "elderly_female",
     "obese_male",
     "obese_female",
-    "david"
+    "david",
+    "friend",
+    "pip"
   ],
   "_mouth_y": "mouth_y = mouth height as a fraction of the figure height, used instead of face detection for dark/odd faces"
 }

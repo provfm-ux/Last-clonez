@@ -489,6 +489,17 @@
     }
   }
 
+  // The assistant terminal (amigo1.lockdown-chat): a short chat with five prompts; the sim keeps the log and the pause.
+  function aiChat() {
+    const chat = state.campaign.chat, A = Data.aiChat, waiting = chat.until > Date.now();
+    const lines = chat.log.map(l => '<p class="item-meta"><strong>' + (l.who === "you" ? "You" : "Patchwork") + ':</strong> ' + esc(l.text) + '</p>').join("");
+    const left = Math.max(0, A.prompts - chat.used);
+    show("Assistant terminal", lines + (chat.done ? '<p>The terminal is quiet.</p>' + button("Back", "resume") :
+      '<p>' + (waiting ? "Out of tokens. Try again in " + Math.ceil((chat.until - Date.now()) / 60000) + " min." : "Prompts left: " + left) + '</p>' +
+      '<form id="ai-form"><input id="ai-input" maxlength="200" autocomplete="off" aria-label="Prompt"> <button class="primary" type="submit">Send</button></form>' + button("Back away", "resume")), "ai-chat");
+    $("ai-input")?.focus();
+  }
+
   function show(title, html, view) {
     resetInput();
     state.target = null; state.interaction = null; state.player.path = [];
@@ -654,7 +665,7 @@
     if (o.action === "bed") return state.player.fatigue >= 35 ? "Sleep" : "Rest";
     return ({bed:"Rest", barrel:"Collector", campfire:"Campfire", radio:"Radio", garden:"Garden", tap:"Tap", generator:"Generator",
       harvest:"Chop", dismantle:"Salvage", workbench:"Build", travel:"Cross", spring:"Fill", forage:"Forage", fish:"Fish",
-      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read","campaign-page":"Read","grotto-plate":"Read","westfields-ledger":"Read","cinema-statue":"Take","eva-diary":"Read","cinema-note":"Read","ironworks-terminal":"Read","ironworks-cage":"Dismantle",crib:"Look"}[o.action] || "Use");
+      "ledger-record":"Read", "ledger-event":"Investigate", "ledger-desk":"Dispatch",fungus:"Inspect",mushroom:"Inspect","field-note":"Read","campaign-page":"Read","grotto-plate":"Read","westfields-ledger":"Read","ai-terminal":"Talk","vic-diary":"Read","cinema-statue":"Take","eva-diary":"Read","cinema-note":"Read","ironworks-terminal":"Read","ironworks-cage":"Dismantle",crib:"Look"}[o.action] || "Use");
   }
 
   function canTalk() {
@@ -944,7 +955,7 @@
       const pinned = state.player.pinned.includes(item.id);
       const useLabel = item.id === "flashlight" ? item === Sim.activeLight(state) ? "Switch off" : "Switch on" :
         d.damage ? equipped ? "Unequip" : "Equip" : d.slot ? worn ? "Remove" : "Equip" :
-        ({book:state.player.readBooks?.includes(item.id) ? "Studied" : "Read", food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take", violin:"Play"}[d.use] || "");
+        ({book:state.player.readBooks?.includes(item.id) ? "Studied" : "Read", food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take", violin:"Play",molotov:"Throw"}[d.use] || "");
       return '<div class="item-row bag-item ' + (equipped || worn ? "equipped-item" : "") + '"><div><div class="item-top">' +
         itemIcon(item.id) + "<b>" + esc(Sim.itemName(state,item.id)) + " ×" + item.qty + '</b></div><div class="item-meta">' + itemDescription(item) + '</div></div><div class="item-actions">' +
         (useLabel ? button(useLabel, (equipped ? "unequip-" : "use-") + index, (d.use === "food" && Sim.isSpoiled(state,item)) || (d.use === "book" && state.player.readBooks?.includes(item.id)), "primary") : "") +
@@ -1780,6 +1791,14 @@
       if (Sim.readGrottoPlate(state,o)) save();
       return;
     }
+    if (o.action === "ai-terminal") {
+      if (Sim.useAiTerminal(state,o)) aiChat();
+      return;
+    }
+    if (o.action === "vic-diary") {
+      if (Sim.readVicDiary(state,o)) save();
+      return;
+    }
     if (o.action === "westfields-ledger") {
       if (Sim.readFieldsLedger(state,o)) save();
       return;
@@ -2032,7 +2051,11 @@
   }
 
   body.addEventListener("submit", event => {
-    if (event.target.id === "pin-form") { event.preventDefault(); savePinForm(); }
+    if (event.target.id === "ai-form") {
+      event.preventDefault();
+      if (Sim.aiSend(state, $("ai-input").value)) { save(); aiChat(); }
+    }
+    else if (event.target.id === "pin-form") { event.preventDefault(); savePinForm(); }
     else if (event.target.id === "difficulty-form") applyDifficulty(event);
     else if (event.target.id === "atmosphere-form") applyAtmosphere(event);
     else if (event.target.id === "profile-form" && dialogView === "edit-survivor" && active()) {

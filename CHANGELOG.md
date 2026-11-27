@@ -1,6 +1,10 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Added the harpoon (fortress keep armoury): very long reach, very slow swing; it finishes Pip once he is below 100 hp.
+- Added the torch and the Molotov cocktail recipes (always available). The torch sets infected alight on a hit; a thrown Molotov leaves flames on the ground for 12 seconds. Both, and campfires, hurt Pip twice as much and make him burn.
+- Campaign: added the fortress (day 25, all five coordinates) beyond Pine Ridge and the last boss. Pip's firefighter coat comes off under heavy damage; fire (stone rings, built campfires) hurts the mutation twice as much and keeps burning. The fortress keeps a keep, larder, gardens and water as the endgame refuge.
+- Campaign: added Amigo 1 (days 14 to 20) and Patient zero (days 15 to 18) at Greywater Reservoir. Carry the Foundry maul; talk to the valve tower terminal (five prompts, a five minute pause when its tokens run out and a horde arrives), bring Vic down for the fortress map, and read his diary in the locked keeper's cottage.
 - Campaign: a permanent tip under the pinned goal always says the next concrete step (where to go, what to do, progress such as pages read or the woman's fear), including while waiting for the next day.
 - Campaign: added the FatHill challenge (day 8): the woman on the pier (her coat falls when you kill infected in her sight) and David (wear his guard down, shove the vest off, lure him with the violin from the net shed). First boss framework: guarded bosses, fear, a lure.
 - Campaign: added the Westfields challenge (day 10). Reach the farmer's ledger in the Orchard farmhouse for the fourth coordinate; loud noise calls a horde and infected that have noticed you block the reading.

@@ -40,7 +40,7 @@ const World = (() => {
     return roll < 9 && districtOutfits[building?.type] || commonOutfits[roll - 5];
   }
 
-  const areaDensity = {ridge:.12, ironworks:.24, coast:.12, fields:.14, cavern:.05, quarry:.10, reservoir:.12, lighthouse:.08};
+  const areaDensity = {ridge:.12, ironworks:.24, coast:.12, fields:.14, cavern:.05, quarry:.10, reservoir:.12, lighthouse:.08, fortress:.1};
   const infectedCount = (region, count) => region === "cinema" ? 0 : region === Regions.home || !count ?
     count : Math.max(1, Math.round(count * (areaDensity[region] ?? .24)));
 

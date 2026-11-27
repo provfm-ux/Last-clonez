@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image
 
 from . import recolor as recolormod
+from . import zombify as zombmod
 from . import walk as walkmod
 from .core import apply_palette, kmeans_palette
 
@@ -134,6 +135,7 @@ def walk_tier(frames, cell_full, anchor_full, s, pal):
 def build(package_dir, out_dir, only=None, rig_path=None):
     man = json.load(open(os.path.join(package_dir, "manifesto_8_direcoes.json")))
     rig = walkmod.load_rig(rig_path)
+    zcfg = zombmod.load_cfg()
     os.makedirs(out_dir, exist_ok=True)
     result = []
     extras_file = os.path.join(os.path.dirname(__file__), "..", "sources", "characters.json")
@@ -147,6 +149,8 @@ def build(package_dir, out_dir, only=None, rig_path=None):
             ch = {**ch, "image": "sources/" + ch["dir"]}
         else:
             cells, size, anchor = prepare(os.path.join(package_dir, ch["image"]), ch["id"])
+        if ch["id"] in zcfg.get("ids", []):                                  # every zombie: green skin, blood on the mouth
+            cells = zombmod.zombify(cells, DIRS, ch["id"], zcfg)
         src_std = 385 if ch["id"] in ANCHOR_CENTROID else max(
             c.getchannel("A").getbbox()[3] - c.getchannel("A").getbbox()[1] for c in cells)   # crawler: same px/px as the others
         entry = {"id": ch["id"], "name": ch["name"], "category": ch.get("category"), "order": DIRS,

@@ -70,6 +70,19 @@ class Scene:
         return p["c"][0] + p["r"][0] * math.sqrt(max(0.0, t))
 
 
+def stripe(scene, i, y0, z0, y1, z1, width, mat, back=False, step=0.45):
+    """Thin straight band on the front (or back) surface of axis-aligned ellipsoid i,
+    from (y0,z0) to (y1,z1); built from small ellipsoids that follow the curvature."""
+    p = scene.P[i]
+    n = max(1, int(math.hypot(y1 - y0, z1 - z0) / step))
+    for k in range(n + 1):
+        t = k / n
+        y, z = y0 + (y1 - y0) * t, z0 + (z1 - z0) * t
+        fx = scene.front_x(i, y, z)
+        x = p["c"][0] - (fx - p["c"][0]) if back else fx
+        scene.ell((x, y, z), (0.3, width / 2 + 0.12, width / 2 + 0.12), mat)
+
+
 def _rotz(a):
     c, s = math.cos(a), math.sin(a)
     return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1.0]])

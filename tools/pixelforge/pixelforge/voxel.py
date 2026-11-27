@@ -40,33 +40,45 @@ def _canvas(boxes, pp):
 
 
 def render_dir(boxes, yaw_deg, ppu=8, canvas=None):
-    """Render one direction at ppu px per unit, flat shaded, painter's algorithm."""
+    """Render one direction at ppu px per unit, flat shaded, with a per-pixel z-buffer.
+    The view axis is (1,1,1) in camera space, so depth = x+y+z and is affine in screen space."""
     a = math.radians(yaw_deg)
-    quads = []
+    canvas, oy = _canvas(boxes, ppu) if canvas is None else (canvas, canvas[1] - 70)
+    W, H = canvas
+    ox = W / 2
+    color = np.zeros((H, W, 4), dtype=np.uint8)
+    zbuf = np.full((H, W), -1e9, dtype=np.float64)
     for (x0, y0, z0, x1, y1, z1, col) in boxes:
         for name, (n, corners) in FACES.items():
             nw = _rot(n, a)
-            if nw[0] + nw[1] + nw[2] * 0.6 <= 1e-6 and nw[2] <= 0:        # back-facing
+            if nw[0] + nw[1] + nw[2] <= 1e-6:                  # back-facing
                 continue
-            if nw[0] <= 1e-6 and nw[1] <= 1e-6 and nw[2] <= 1e-6:
+            pts3 = [_rot((x0 + (x1 - x0) * fx, y0 + (y1 - y0) * fy, z0 + (z1 - z0) * fz), a)
+                    for fx, fy, fz in corners]
+            pts2 = [(ox + _project(p)[0] * ppu, oy + _project(p)[1] * ppu) for p in pts3]
+            dep = [p[0] + p[1] + p[2] for p in pts3]
+            m = np.array([[pts2[i][0], pts2[i][1], 1.0] for i in range(3)])
+            if abs(np.linalg.det(m)) < 1e-6:
                 continue
-            pts = []
-            for fx, fy, fz in corners:
-                p = (x0 + (x1 - x0) * fx, y0 + (y1 - y0) * fy, z0 + (z1 - z0) * fz)
-                pts.append(_rot(p, a))
-            depth = sum(q[0] + q[1] for q in pts) / 4 + sum(q[2] for q in pts) / 4 * 0.01
+            ca, cb, cc = np.linalg.solve(m, np.array(dep[:3]))
+            bx0 = max(0, int(math.floor(min(p[0] for p in pts2))))
+            by0 = max(0, int(math.floor(min(p[1] for p in pts2))))
+            bx1 = min(W, int(math.ceil(max(p[0] for p in pts2))) + 1)
+            by1 = min(H, int(math.ceil(max(p[1] for p in pts2))) + 1)
+            if bx1 <= bx0 or by1 <= by0:
+                continue
+            mask = Image.new("L", (bx1 - bx0, by1 - by0), 0)
+            ImageDraw.Draw(mask).polygon([(px - bx0, py - by0) for px, py in pts2], fill=255, outline=255)
+            mk = np.array(mask) > 0
+            ys, xs = np.mgrid[by0:by1, bx0:bx1]
+            d = ca * (xs + 0.5) + cb * (ys + 0.5) + cc
+            sub = zbuf[by0:by1, bx0:bx1]
+            win = mk & (d >= sub - 1e-6)
             shade = 0.42 + 0.7 * max(0.0, float(np.dot(nw, LIGHT)))
-            rgb = tuple(min(255, int(c * shade)) for c in col)
-            quads.append((depth, pts, rgb))
-    quads.sort(key=lambda q: q[0])
-    canvas, oy = _canvas(boxes, ppu) if canvas is None else (canvas, canvas[1] - 70)
-    img = Image.new("RGBA", canvas, (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    ox = canvas[0] / 2
-    for _, pts, rgb in quads:
-        poly = [(ox + _project(p)[0] * ppu, oy + _project(p)[1] * ppu) for p in pts]
-        d.polygon(poly, fill=rgb + (255,), outline=rgb + (255,))
-    return img
+            rgb = [min(255, int(c * shade)) for c in col]
+            sub[win] = d[win]
+            color[by0:by1, bx0:bx1][win] = rgb + [255]
+    return Image.fromarray(color)
 
 
 def render_sheet(boxes, ppu=2, ss=4, colors=20, do_outline=True):

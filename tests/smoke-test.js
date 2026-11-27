@@ -2261,6 +2261,41 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("fortress: depois da vitória fica uma dica de refúgio", /fortress is yours/.test(Sim.campaignTip(f)) || Sim.campaignTip(f).length > 20);
 }
 
+{ // tochas e cocktails molotov: receitas sempre disponíveis, fogo queima infetados e o Pip
+  const s = Sim.create(11, "survival", "carer", 2);
+  const add = (id, n) => { s.player.bag.push({id, qty:n, condition:100, born:0, uid:"t-" + id}); };
+  add("wood",2); add("cloth",2); add("emptybottle",1); add("fuel",1);
+  check("fogo: as receitas da tocha e do molotov existem", Data.recipes.some(r => r.id === "torch") && Data.recipes.some(r => r.id === "molotov"));
+  check("fogo: fabrica a tocha", Sim.craft(s, "torch") && Sim.quantity(s.player.bag, "torch") === 1);
+  check("fogo: fabrica o molotov", Sim.craft(s, "molotov") && Sim.quantity(s.player.bag, "molotov") === 1 && Sim.quantity(s.player.bag, "fuel") === 0);
+  const z = s.world.enemies.find(e => e.hp > 0 && !e.stats.boss);
+  Object.assign(s.player, {x: 20.5, y: 20.5, headingX: 1, headingY: 0}); s.target = null;
+  const clear = (() => { for (let r = 0; r < 20; r++) for (let a = 0; a < 6.28; a += .5) { const x = 30 + Math.cos(a) * r, y = 30 + Math.sin(a) * r; if (context.World.clear(s.world, x, y, .4) && context.World.clear(s.world, x + 4, y, .4)) return {x, y}; } return null; })();
+  Object.assign(s.player, {x: clear.x, y: clear.y}); Object.assign(z, {x: clear.x + 4, y: clear.y, hp: 20, dormant: false, alert: 0});
+  const idx = s.player.bag.findIndex(i => i.id === "molotov");
+  check("fogo: atirar o molotov cria chamas e gasta a garrafa", Sim.use(s, idx) && s.fires.length === 1 && Sim.quantity(s.player.bag, "molotov") === 0);
+  s.fires[0].x = z.x; s.fires[0].y = z.y;
+  run(s, 150);
+  check("fogo: as chamas matam o infetado que lá estiver", z.hp <= 0, String(z.hp));
+  s.fires[0].until = s.elapsed - 1; Sim.tick(s, .033, idle);
+  check("fogo: as chamas apagam-se", s.fires.length === 0, s.mode + " " + s.fires.length + " " + s.elapsed);
+  const t = Sim.create(11, "survival", "carer", 2), w = t.world.enemies.find(e => e.hp > 0 && !e.stats.boss);
+  t.player.bag.push({id:"torch", qty:1, condition:100, born:0, uid:"tt"}); t.player.weapon = "torch"; t.player.weaponUid = "tt";
+  Object.assign(w, {hp: 60, dormant: false, x: t.player.x + .8, y: t.player.y}); t.player.cooldown = 0; t.player.stamina = 100;
+  Sim.attack(t, w); const after = w.hp; run(t, 90);
+  check("fogo: a tocha incendeia o infetado e ele continua a arder", after > 0 && w.hp < after, after + " -> " + w.hp);
+  const f = Sim.create(11, "campaign", "carer", 2, undefined, "fortress"); Sim.testJump(f, 25, {}, {anyMode: true});
+  const pip = f.world.enemies.find(e => e.kind === "pip"); pip.guard = false;
+  const far = f.world.objects.filter(o => o.kind === "campfire").sort((a, b) => b.x - a.x)[0];
+  Object.assign(pip, {x: far.x + 9, y: far.y});
+  const hit = () => { f.player.cooldown = 0; f.player.stamina = 100; Object.assign(f.player, {x: pip.x - 1, y: pip.y}); const b = pip.hp; Sim.attack(f, pip); return b - pip.hp; };
+  f.player.bag.push({id:"foundrymaul", qty:1, condition:100, born:0, uid:"m3"}); f.player.weapon = "foundrymaul"; f.player.weaponUid = "m3";
+  const plain = hit();
+  f.player.bag.push({id:"torch", qty:1, condition:100, born:0, uid:"t3"}); f.player.weapon = "torch"; f.player.weaponUid = "t3"; pip.burnUntil = 0;
+  const torch = hit();
+  check("fogo: a tocha faz ao Pip mais dano do que o seu dano base e deixa-o a arder", torch > 13 * 1.5 && pip.burnUntil > f.elapsed, plain + " / " + torch);
+}
+
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
   const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"];
   let empty = 0, total = 0, sample = "";

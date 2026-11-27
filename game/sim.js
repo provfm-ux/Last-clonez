@@ -964,6 +964,7 @@ const Sim = (() => {
     const data = Data.items[item.id];
     if (item.id === "flashlight") return toggleLight(s, item);
     if (item.id === "violin") return playViolin(s);
+    if (item.id === "molotov") return throwMolotov(s, index);
     if (data.slot) {
       const worn = wornItem(s,data.slot) === item;
       p.gear[data.slot] = worn ? null : item.id;
@@ -1753,7 +1754,8 @@ const Sim = (() => {
         else notify(s, Data.campaignText.pipBraced);
         return 0;
       }
-      return nearFire(s, z) ? amount * Data.pipFight.fireMult : amount;
+      if (Data.items[weapon(s).id]?.fire) z.burnUntil = s.elapsed + Data.fireRules.torchSeconds;
+      return nearFire(s, z) || Data.items[weapon(s).id]?.fire ? amount * Data.pipFight.fireMult : amount;
     }
     if (z.kind === "vic" && z.guard) { notify(s, Data.campaignText.vicBraced, true); return 0; }
     if (z.guard) {
@@ -1864,9 +1866,41 @@ const Sim = (() => {
     void keep;
   }
 
-  const nearFire = (s, z) => s.world.objects.some(o => o.kind === "campfire" && o.active !== false && distance(o, z) <= Data.pipFight.fireRange);
+  const nearFire = (s, z) => s.world.objects.some(o => o.kind === "campfire" && o.active !== false && distance(o, z) <= Data.pipFight.fireRange) ||
+    (s.fires ?? []).some(f => f.until > s.elapsed && distance(f, z) <= Data.fireRules.radius + .6);
+  const burning = (s, z) => (z.burnUntil ?? 0) > s.elapsed || (s.fires ?? []).some(f => f.until > s.elapsed && distance(f, z) <= Data.fireRules.radius);
+
+  // Molotov: thrown at the target (or where the player faces); ground flames last a few seconds. Flames are transient and not saved.
+  function throwMolotov(s, index) {
+    const p = s.player, R = Data.fireRules;
+    if (s.mode !== "play" || p.vehicle || !s.player.bag[index] || s.player.bag[index].id !== "molotov") return false;
+    let dx = p.headingX || 0, dy = p.headingY || 1;
+    if (s.target && s.target.hp > 0 && distance(p, s.target) <= R.range + 1) { dx = s.target.x - p.x; dy = s.target.y - p.y; }
+    const len = Math.hypot(dx, dy) || 1, reach = s.target && s.target.hp > 0 && distance(p, s.target) <= R.range + 1 ? Math.min(R.range, distance(p, s.target)) : R.range;
+    let x = p.x + dx / len * reach, y = p.y + dy / len * reach;
+    for (let k = 0; k < 12 && !World.clear(s.world, x, y, .1); k++) { x -= dx / len * .5; y -= dy / len * .5; }
+    if (!World.clear(s.world, x, y, .1)) { x = p.x; y = p.y; }
+    remove(p.bag, "molotov", 1);
+    (s.fires ??= []).push({x, y, until: s.elapsed + R.seconds});
+    s.effects.push({x, y, text:"FIRE", color:"#ef9a3a", life:1.2, impact:.3});
+    noise(s, x, y, R.noise);
+    notify(s, "The bottle bursts into flames.", true);
+    return true;
+  }
+
+  // Each tick: drop spent flames, burn every infected in them or still alight from a torch. Bosses keep at least 1 hp: they fall to a blow.
+  function updateFire(s, dt) {
+    if (!s.fires?.length && !s.world.enemies.some(z => z.burnUntil > s.elapsed)) return;
+    s.fires = (s.fires ?? []).filter(f => f.until > s.elapsed);
+    for (const z of s.world.enemies) {
+      if (z.hp <= 0 || z.stats.boss || z.dormant || !burning(s, z)) continue;
+      z.hp = Math.max(0, z.hp - Data.fireRules.burnPerSecond * dt);
+      z.flash = .15; z.alert = Math.max(z.alert, 6); z.chaseX = s.player.x; z.chaseY = s.player.y;
+      if (z.hp <= 0) { z.hp = 0; defeat(s, z); }
+    }
+  }
   function pipBurn(s, z, dt) {
-    if (z.guard || z.hp <= 0 || !nearFire(s, z)) { z.burning = false; return; }
+    if (z.guard || z.hp <= 0 || !(nearFire(s, z) || (z.burnUntil ?? 0) > s.elapsed)) { z.burning = false; return; }
     if (!z.burning) { z.burning = true; notify(s, Data.campaignText.pipBurning, true); }
     z.hp = Math.max(1, z.hp - Data.pipFight.burnPerSecond * dt);
     z.flash = .15;
@@ -3335,6 +3369,7 @@ const Sim = (() => {
     const amount = hit ? Math.round(w.damage * matchup * damageFactor(s) * (w.firearm ? 1 : 1 + level(s, "strength") * .03) * (item.condition < 20 ? .8 : 1)) : 0;
     const dealt = bossDamage(s, z, amount);
     z.hp = Math.max(0, z.hp - dealt);
+    if (hit && Data.items[item.id]?.fire && !z.stats.boss) z.burnUntil = s.elapsed + Data.fireRules.torchSeconds;
     if (hit) {
       if (z.hp > 0) hearZombie(s,"hit",z);
       z.flash = .2;
@@ -3901,6 +3936,7 @@ const Sim = (() => {
     updateDoorLure(s, dt);
     updateFungalAlert(s);
     updateEnemies(s, dt);
+    updateFire(s, dt);
     updateNpc(s, dt);
     updateNeeds(s, dt);
     updateSickness(s, dt);

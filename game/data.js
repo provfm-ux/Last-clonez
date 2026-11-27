@@ -13,6 +13,8 @@ const Data = (() => {
     raffletrophy:{name:"Golden Raffle Trophy",group:"Equipment",weight:.35,icon:"badge",
       detail:"Congratulations. You survived the raffle. The winner didn't."},
     bat: {combat:"blunt", name:"Wooden bat", group:"Weapons", weight:1.4, damage:25, range:1.4, delay:.55, effort:6, noise:3, wear:.6, icon:"bat"},
+    torch: {combat:"blunt", name:"Torch", group:"Weapons", weight:.6, damage:13, range:1.4, delay:.6, effort:6, noise:1, wear:.9, icon:"bat", fire:true, detail:"Sets infected alight for a few seconds. Burns down with use"},
+    molotov: {name:"Molotov cocktail", group:"Equipment", weight:.6, use:"molotov", icon:"bolt", detail:"Throw it where you face or at your target. The flames burn on the ground for a few seconds"},
     pipe: {combat:"blunt", name:"Steel pipe", group:"Weapons", weight:1.8, damage:31, range:1.4, delay:.68, effort:8, noise:4, wear:.35, icon:"bat"},
     flintknife:{combat:"quick",name:"Flint knife",group:"Weapons",weight:.26,damage:15,range:1.05,delay:.39,effort:3,noise:1.5,wear:1.1,icon:"bat"},
     carvedspear:{combat:"reach",name:"Carved spear",group:"Weapons",weight:1.15,damage:31,range:1.9,delay:.64,effort:6,noise:2.5,wear:1.4,icon:"bat"},
@@ -122,6 +124,8 @@ const Data = (() => {
 
   const recipes = [
     {id:"bandage",name:"Tear cloth",out:"bandage",qty:2,inputs:{cloth:1},desc:"Makes two clean bandages."},
+    {id:"torch",name:"Make a torch",out:"torch",qty:1,inputs:{wood:1,cloth:1},desc:"A burning brand. Sets infected alight; the mutation at the fortress fears it."},
+    {id:"molotov",name:"Make a Molotov cocktail",out:"molotov",qty:1,inputs:{emptybottle:1,cloth:1,fuel:1},desc:"A bottle of fuel with a rag fuse. Throw it to start a fire on the ground."},
     {id:"splint",name:"Make a splint",out:"splint",qty:1,inputs:{wood:1,cloth:1},desc:"A rigid brace that helps a broken leg heal."},
     {id:"spear",name:"Improvised spear",out:"spear",qty:1,inputs:{wood:1,tape:1},desc:"Longer reach with faster wear."},
     {id:"carvedspear",name:"Carve a spear",out:"carvedspear",qty:1,inputs:{wood:1},tool:"knife",skill:"carving",
@@ -330,7 +334,7 @@ const Data = (() => {
       "pineridge.two-nights":{go:"Follow the arrow to Pine Ridge. Bring a bedroll, wood and water: no barricades there.", stay:"Survive the night: keep a campfire lit and stay dry and warm. Nights done: {n} of 2."},
       "eva.death":{follow:"Stay close to Eva and look after her until day 5.", wait:"Eva has gone out. Wait at the shelter: her diary turns up in the morning.", diary:"Read Eva's diary under the pillow at the shelter."},
       "ironworks.barricade":{go:"Follow the arrow to the Ironworks. It is open on weekdays, 08:00 to 18:00.", cage:"Take the weapon cage apart in the machine shop with the toolboard hammer and crowbar. They wear out: do not waste them."},
-      "fortress.last-boss":{go:"You have all five coordinates. Follow the arrow through Pine Ridge to the fortress road. Bring fire: a campfire, and a good weapon.", coat:"Beat Pip down until his coat comes apart. Hit hard and keep your distance from the escort.", fire:"His coat is off. Lead him to a stone fire ring or a campfire you built: fire hurts him and keeps burning.", done:"The fortress is yours. Garden, cook, collect water and kill at your pace."},
+      "fortress.last-boss":{go:"You have all five coordinates. Follow the arrow through Pine Ridge to the fortress road. Bring fire: a torch, Molotov cocktails or a campfire, and a good weapon.", coat:"Beat Pip down until his coat comes apart. Hit hard and keep your distance from the escort.", fire:"His coat is off. Fire hurts him and keeps burning: hit him with a torch, throw a Molotov at his feet, or lead him to a fire.", done:"The fortress is yours. Garden, cook, collect water and kill at your pace."},
       "viragem.zero":{go:"Follow the arrow to Greywater Reservoir, past Westfields. The diary is in the locked keeper's cottage: look for the key in the pump house.", read:"Read Vic's diary in the keeper's cottage. Days 15 to 18 only."},
       "amigo1.lockdown-chat":{go:"Follow the arrow to Greywater Reservoir, past Westfields. Carry the Foundry maul from the Ironworks.", chat:"Go up the valve tower and talk to the terminal. Five prompts: make the last one count, and use a joke the machine cannot ignore.", wait:"The assistant is out of tokens. Survive the infected it called until it comes back, then try the last prompt again.", fight:"The helmet is off. Hit Vic with the Foundry maul: nothing else hurts him."},
       "fathill.bosses":{go:"Follow the arrow to Bracken Coast. The road is open on low-tide days (even days).", fear:"Kill infected where the woman on the pier can see you: her fear is {n} of {max}. The violin is in the net shed.", david:"Wear David's guard down, then shove his vest off.", violin:"Play the violin near David, then strike while he stands there."},
@@ -360,6 +364,8 @@ const Data = (() => {
     winWords:["stand down", "token"]
   };
   // The last boss (docs/HISTORIA.md sections 7 and 10): a firefighter's coat falls under heavy damage; fire hurts the mutation.
+  // Fire (torch, Molotov, flames on the ground): burn damage per second, how long a lit infected keeps burning, ground flames.
+  const fireRules = {range:5, radius:1.9, seconds:12, burnPerSecond:9, torchSeconds:3, noise:7};
   const pipFight = {guardDamage:120, fireRange:2.6, fireMult:2.5, burnPerSecond:7, escort:8};
   const fatHill = {fearKills:10, fearSight:18, guardDamage:450, lureSeconds:22, luredDamage:2, playRange:22};
   const cinemaPatrol = [[13.5,8.5],[19.5,12.5],[14.5,17.5],[7.5,12.5],[12.5,10.5]];
@@ -484,7 +490,7 @@ const Data = (() => {
   };
   const weaponSkills = {axe:"axe",hatchet:"axe",bat:"long_blunt",pipe:"long_blunt",golfclub:"long_blunt",
     crowbar:"long_blunt",foundrymaul:"long_blunt",shovel:"long_blunt",fryingpan:"short_blunt",wrench:"short_blunt",rollingpin:"short_blunt",
-    machete:"long_blade",knife:"short_blade",flintknife:"short_blade",spear:"spear",carvedspear:"spear",broom:"spear"};
+    machete:"long_blade",torch:"short_blunt",knife:"short_blade",flintknife:"short_blade",spear:"spear",carvedspear:"spear",broom:"spear"};
   const skillGroups = {
     "Physical & movement":["fitness","strength","running","lightfooted","nimble","sneaking"],
     "Combat & equipment":["combat","marksmanship","axe","long_blunt","short_blunt","long_blade","short_blade","spear","maintenance"],
@@ -622,6 +628,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {fireRules,pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

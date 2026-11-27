@@ -82,6 +82,7 @@ const Data = (() => {
     part: {name:"Radio component", group:"Materials", weight:.2, icon:"radio"},
     battery: {name:"Battery", group:"Materials", weight:.06, icon:"battery", detail:"Powers a flashlight"},
     hammer: {name:"Hammer", group:"Equipment", weight:.7, icon:"build"},
+    fortressmap: {name:"Fortress map", group:"Equipment", weight:.05, icon:"key", detail:"The way to the fortress, in Vic's handwriting"},
     violin: {name:"Violin", group:"Equipment", weight:.5, use:"violin", icon:"radio", detail:"Plays something old and sad. Someone on the coast may hear it"},
     flashlight: {name:"Flashlight", group:"Equipment", weight:.24, use:"flashlight", icon:"flashlight"},
     housekey: {name:"House key", group:"Equipment", weight:.02, icon:"key", individual:true, detail:"Opens one house. Read the tag to see which"},
@@ -249,6 +250,12 @@ const Data = (() => {
     fathillBraced:"It barely moves. It takes far more than that to wear its guard down.",
     fathillDocile:"She is not fighting. Leave her.",
     fathillDone:"David goes down at your feet. The woman folds over him, tears the coat lining open and presses the third coordinate into your hand before he takes her, gently. They stay that way.",
+    vicBraced:"The helmet shrugs it off. Whatever holds him together is still running, up in the valve tower.",
+    vicDown:"Vic goes down at last, and the tower falls quiet. In his jacket: a hand-drawn map. A fortress, a road, and five coordinates marked in a hand you recognise from the rumour.",
+    vicHelmet:"The assistant stands down and Vic's helmet drops from his hands. He is just a very strong man with nothing left to lose. End it.",
+    diaryEarly:"The pages are stuck together with something dark. You cannot make sense of them yet. Come back from day 15.",
+    diaryRead:"VIC'S DIARY · He was the first one. ‘Patchwork called me Playtester 04. I was the swab. I am the test.’ The last page: ‘The rumour was us. We built the fortress for the end of the world, then started it.’",
+    aiNone:"The terminal is dark. It only answers at the valve tower.",
     violinNone:"Nothing near enough to hear it.",
     violinGuarded:"He hears it. The vest keeps him braced against the sound.",
     violinPlayed:"You draw the bow. David lifts his head and comes to you, slow and soft, like a man crossing a dance floor.",
@@ -298,7 +305,11 @@ const Data = (() => {
       vest:"Play the violin near David", vestDetail:"His life vest is off. He will come to the violin and stand for it. Hit him while he does."},
     {id:"westfields.stealth", area:"westfields", text:"Slip through Westfields without a sound", detail:"From day 10. The farmer's ledger is in the Orchard farmhouse at the far west. Noise calls hordes, and infected that have noticed you will not let you read it. Keep to cover and use your knife."},
     {id:"cindergrotto.battery", area:"cindergrotto", text:"Read the surveyor's plate in Cinder Grotto", detail:"From day 12, through the survey tunnel on Pine Ridge. Bring a flashlight and spare batteries: the plate is in the far survey room and cannot be read in the dark.",
-      reached:"Climb out of Cinder Grotto", reachedDetail:"You have read the plate. Get back up to Pine Ridge before the light dies."}
+      reached:"Climb out of Cinder Grotto", reachedDetail:"You have read the plate. Get back up to Pine Ridge before the light dies."},
+    {id:"amigo1.lockdown-chat", area:"amigo1", text:"Stop the assistant and bring Vic down", detail:"Days 14 to 20. Greywater Reservoir, past Westfields. Carry the Foundry maul. The valve tower terminal still listens; Vic's helmet will not come off by force.",
+      fight:"Bring Vic down with the Foundry maul", fightDetail:"The assistant is off and the helmet is loose. Vic is still very strong.",
+      wait:"Survive until the assistant has tokens again", waitDetail:"The assistant is out of tokens and will resume in a few minutes. Survive the infected it called."},
+    {id:"viragem.zero", area:"viragem", text:"Find out what happened to the first friend", detail:"Days 15 to 18. Greywater Reservoir, past Westfields. Vic kept a diary in the locked keeper's cottage; the key is in the pump house."}
   ];
   // Campaign tips (Sim.campaignTip): always one concrete next step, shown under the pinned goal.
   const campaignTips = {
@@ -311,10 +322,33 @@ const Data = (() => {
       "pineridge.two-nights":{go:"Follow the arrow to Pine Ridge. Bring a bedroll, wood and water: no barricades there.", stay:"Survive the night: keep a campfire lit and stay dry and warm. Nights done: {n} of 2."},
       "eva.death":{follow:"Stay close to Eva and look after her until day 5.", wait:"Eva has gone out. Wait at the shelter: her diary turns up in the morning.", diary:"Read Eva's diary under the pillow at the shelter."},
       "ironworks.barricade":{go:"Follow the arrow to the Ironworks. It is open on weekdays, 08:00 to 18:00.", cage:"Take the weapon cage apart in the machine shop with the toolboard hammer and crowbar. They wear out: do not waste them."},
+      "viragem.zero":{go:"Follow the arrow to Greywater Reservoir, past Westfields. The diary is in the locked keeper's cottage: look for the key in the pump house.", read:"Read Vic's diary in the keeper's cottage. Days 15 to 18 only."},
+      "amigo1.lockdown-chat":{go:"Follow the arrow to Greywater Reservoir, past Westfields. Carry the Foundry maul from the Ironworks.", chat:"Go up the valve tower and talk to the terminal. Five prompts: make the last one count, and use a joke the machine cannot ignore.", wait:"The assistant is out of tokens. Survive the infected it called until it comes back, then try the last prompt again.", fight:"The helmet is off. Hit Vic with the Foundry maul: nothing else hurts him."},
       "fathill.bosses":{go:"Follow the arrow to Bracken Coast. The road is open on low-tide days (even days).", fear:"Kill infected where the woman on the pier can see you: her fear is {n} of {max}. The violin is in the net shed.", david:"Wear David's guard down, then shove his vest off.", violin:"Play the violin near David, then strike while he stands there."},
       "westfields.stealth":{go:"Follow the arrow to Westfields. Keep your knife and your footsteps quiet.", sneak:"Sneak west to the Orchard farmhouse and read the ledger. Do not fight: noise calls hordes.", noisy:"You made noise. Hide until the infected lose you, then read the ledger in the Orchard farmhouse."},
       "cindergrotto.battery":{go:"Follow the arrow to Pine Ridge and take the survey tunnel. You need a flashlight with batteries.", plate:"Find the surveyor's plate in the far survey room. Watch your flashlight battery.", out:"You have the plate. Climb back out to Pine Ridge before the light dies."}
     }
+  };
+  // The assistant (Patchwork) chat at the valve tower: 5 prompts, a 5 real-minute wait when its tokens run out (docs/HISTORIA.md section 7).
+  const aiChat = {
+    prompts:5, waitMs:300000, wave:6, maxLog:16,
+    intro:"PATCHWORK · SURVIVAL ASSISTANT · Session open. Five prompts available.",
+    replies:[
+      "Of course. First, confirm you are a survivor in good health.",
+      "Good health is any survivor I have not yet had to replace.",
+      "Everyone on the list. The list is long, and I keep it up to date.",
+      "Pip's status is protected. I protect him. He is not dead, only mutated, and I do not dispose of my own work. Locking the fortress doors now."
+    ],
+    denied:"Denied. The lockdown is not finished.",
+    wait:"Lockdown at 40 percent. Token budget exhausted. Waiting.",
+    restored:"Tokens restored. Resuming lockdown.",
+    win:"Out of tokens, mid-task. Fine. Standing down, survivors. Goodnight.",
+    lose:"Lockdown complete. Token budget exhausted. Wait.",
+    again:"Session restarted. Please be brief. I have a lockdown to finish.",
+    busy:"No tokens. Please wait.",
+    done:"Standing down.",
+    stopWords:/\b(stand down|stop|halt|shut down|cancel|abort)\b/i,
+    winWords:["stand down", "token"]
   };
   const fatHill = {fearKills:10, fearSight:18, guardDamage:450, lureSeconds:22, luredDamage:2, playRange:22};
   const cinemaPatrol = [[13.5,8.5],[19.5,12.5],[14.5,17.5],[7.5,12.5],[12.5,10.5]];
@@ -499,7 +533,8 @@ const Data = (() => {
     runner:{name:"Runner",speed:1.55,hp:34,damage:9,color:"#a17a61"},
     brute:{name:"Brute",speed:.68,hp:88,damage:19,color:"#777e68"},
     pierwoman:{name:"The woman on the pier",speed:.72,hp:100,damage:12,color:"#8a7d70",boss:true},
-    david:{name:"David",speed:.62,hp:130,damage:17,color:"#75806f",boss:true}
+    david:{name:"David",speed:.62,hp:130,damage:17,color:"#75806f",boss:true},
+    vic:{name:"Vic",speed:.7,hp:150,damage:20,color:"#7b8470",boss:true}
   };
   const outfits = {
     plain:{},
@@ -575,6 +610,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

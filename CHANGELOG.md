@@ -1,6 +1,7 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Campaign: added Amigo 1 (days 14 to 20) and Patient zero (days 15 to 18) at Greywater Reservoir. Carry the Foundry maul; talk to the valve tower terminal (five prompts, a five minute pause when its tokens run out and a horde arrives), bring Vic down for the fortress map, and read his diary in the locked keeper's cottage.
 - Campaign: a permanent tip under the pinned goal always says the next concrete step (where to go, what to do, progress such as pages read or the woman's fear), including while waiting for the next day.
 - Campaign: added the FatHill challenge (day 8): the woman on the pier (her coat falls when you kill infected in her sight) and David (wear his guard down, shove the vest off, lure him with the violin from the net shed). First boss framework: guarded bosses, fear, a lure.
 - Campaign: added the Westfields challenge (day 10). Reach the farmer's ledger in the Orchard farmhouse for the fourth coordinate; loud noise calls a horde and infected that have noticed you block the reading.

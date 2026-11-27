@@ -2013,7 +2013,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
 { // ui.campaign-goals (revisão, sugestão 1): objetivos da campanha no topo, no diário e na seta de direção
   const s = fresh("campaign");
   check("ui.campaign-goals começa com as 3 páginas, sem seta (encontrar as casas faz parte do desafio)",
-    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 8);
+    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 10);
   s.campaign.completed.push("coldvale.houses");
   check("ui.campaign-goals o cinema ainda fechado mostra quando abre e aponta para a saída",
     Sim.pinnedGoal(s) === "Take the golden idol · opens on day 2" && Sim.destination(s)?.id === "exit-cinema", Sim.pinnedGoal(s));
@@ -2033,6 +2033,8 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   c.campaign.completed.push("westfields.stealth");
   check("ui.campaign-goals depois mostra a Cinder Grotto (dia 12)", Sim.pinnedGoal(c) === "Read the surveyor's plate in Cinder Grotto · opens on day 12", Sim.pinnedGoal(c));
   c.campaign.completed.push("cindergrotto.battery");
+  check("ui.campaign-goals depois mostra o primeiro amigo (dia 14)", /opens on day 14/.test(Sim.pinnedGoal(c)) && /Stop the assistant/.test(Sim.pinnedGoal(c)), Sim.pinnedGoal(c));
+  c.campaign.completed.push("amigo1.lockdown-chat", "viragem.zero");
   check("ui.campaign-goals com tudo feito por agora o objetivo avisa que há mais a caminho", /on its way/.test(Sim.pinnedGoal(c)) && Sim.destination(c) === null);
   const plain = fresh("survival"); plain.pinStory = true;
   check("ui.campaign-goals fora da campanha nada muda", Sim.pinnedGoal(plain) === "Find Eva" && Sim.campaignGoals === Sim.campaignGoals);
@@ -2186,8 +2188,44 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("fathill: saves antigos sem 'fathill' carregam e valores inválidos são recusados", Sim.restore(raw).campaign.fathill.fear === 0 && bad);
 }
 
+{ // amigo1.lockdown-chat + viragem.zero: o Vic no valve tower, o chat com o assistente, o diário na cabana
+  const f = Sim.create(11, "campaign", "carer", 2, undefined, "reservoir");
+  Sim.testJump(f, 15, {}, {anyMode: true});
+  const vic = f.world.enemies.find(z => z.kind === "vic"), term = f.world.objects.find(o => o.id === "ai-terminal"), diary = f.world.objects.find(o => o.id === "vic-diary");
+  const at = id => f.world.buildings.find(b => b.id === id)?.name;
+  check("amigo1: Vic, terminal e diário existem nos sítios certos", Boolean(vic && term && diary) && at(term.building) === "Valve tower" && at(diary.building) === "Keeper's cottage" && vic.guard && vic.hp === 150);
+  Object.assign(f.player, {x: term.x, y: term.y});
+  check("amigo1: o terminal abre a conversa", Sim.useAiTerminal(f, term) && f.campaign.chat.log.length === 1);
+  const T0 = 1e6;
+  for (let i = 0; i < 4; i++) Sim.aiSend(f, i === 1 ? "please stop" : "hello", T0 + i);
+  check("amigo1: quatro prompts têm resposta guionada e o 'stop' é negado", f.campaign.chat.used === 4 && f.campaign.chat.log.some(l => l.text === Data.aiChat.denied));
+  f.atmosphere.nextWave = f.atmosphere.time + 900;
+  Sim.aiSend(f, "stand down", T0 + 10);
+  check("amigo1: o 5º prompt sem a piada esgota os tokens, chama infetados e pausa 5 minutos",
+    !f.campaign.chat.done && f.campaign.chat.until === T0 + 10 + 300000 && f.atmosphere.nextWave <= f.atmosphere.time && vic.guard);
+  const n = f.campaign.chat.log.length; Sim.aiSend(f, "stand down, token", T0 + 20);
+  check("amigo1: durante a pausa o assistente não responde", !f.campaign.chat.done && f.campaign.chat.log.slice(n).some(l => l.text === Data.aiChat.busy));
+  const raw = JSON.parse(JSON.stringify(Sim.snapshot(f)));
+  check("amigo1: a pausa e o registo guardam-se e carregam", Sim.restore(raw).campaign.chat.until === T0 + 300010 && Sim.restore(raw).campaign.chat.log.length === f.campaign.chat.log.length);
+  f.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery");
+  Sim.aiSend(f, "Stand down, you are out of tokens", T0 + 400000);
+  check("amigo1: depois da pausa, 'stand down' + 'token' no 5º prompt desliga o assistente e tira o capacete",
+    f.campaign.chat.done && !vic.guard && Sim.campaignTip(f) === Data.campaignTips.goals["amigo1.lockdown-chat"].fight);
+  Object.assign(f.player, {x: vic.x - 1, y: vic.y}); f.player.weapon = "foundrymaul"; f.player.bag.push({id:"foundrymaul", qty:1, condition:100, born:0, uid:"fm-test"}); f.player.weaponUid = "fm-test"; vic.hp = 1; vic.stagger = 0; f.player.cooldown = 0;
+  for (let i = 0; i < 6 && vic.hp > 0; i++) { f.player.cooldown = 0; f.player.stamina = 100; Sim.attack(f, vic); }
+  check("amigo1: com o capacete fora o Vic cai, dá a 2ª pista (aqui a 1ª) e o mapa da fortaleza",
+    vic.hp <= 0 && f.campaign.completed.includes("amigo1.lockdown-chat") && f.campaign.clues === 1 && Sim.quantity(f.player.bag, "fortressmap") === 1, vic.hp + " " + f.campaign.clues);
+  const p = Sim.create(11, "campaign", "carer", 2, undefined, "reservoir"); Sim.testJump(p, 15, {}, {anyMode: true});
+  check("viragem: antes do dia 15 o diário recusa", (() => { const q = Sim.create(11, "campaign", "carer", 2, undefined, "reservoir"); Sim.testJump(q, 14, {}, {anyMode: true}); const d = q.world.objects.find(o => o.id === "vic-diary"); Object.assign(q.player, {x: d.x, y: d.y}); return !Sim.readVicDiary(q, d); })());
+  const d2 = p.world.objects.find(o => o.id === "vic-diary"); Object.assign(p.player, {x: d2.x, y: d2.y});
+  check("viragem: no dia 15 lê-se o diário e conclui o desafio", Sim.readVicDiary(p, d2) && p.campaign.completed.includes("viragem.zero"));
+  const old = JSON.parse(JSON.stringify(Sim.snapshot(p))); delete old.campaign.chat;
+  let bad = false; try { const broken = JSON.parse(JSON.stringify(Sim.snapshot(p))); broken.campaign.chat.used = 9; Sim.restore(broken); } catch { bad = true; }
+  check("amigo1: saves antigos sem 'chat' carregam e valores inválidos são recusados", Sim.restore(old).campaign.chat.used === 0 && bad);
+}
+
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
-  const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery"];
+  const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero"];
   let empty = 0, total = 0, sample = "";
   for (let day = 1; day <= 30; day++) for (let done = 0; done <= goalsOrder.length; done++) {
     const s = fresh("campaign"); Sim.testJump(s, day, {}, {anyMode: true});
@@ -2195,7 +2233,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     const tip = Sim.campaignTip(s); total++;
     if (typeof tip !== "string" || tip.length < 20) { empty++; sample = day + "/" + done; }
   }
-  check("ui.campaign-tip em 30 dias x 9 estados de progresso há sempre uma dica", empty === 0, empty + " vazias de " + total + " " + sample);
+  check("ui.campaign-tip em 30 dias x 11 estados de progresso há sempre uma dica", empty === 0, empty + " vazias de " + total + " " + sample);
   const t0 = fresh("campaign");
   check("ui.campaign-tip no início explica as páginas", /torn page/.test(Sim.campaignTip(t0)) && /0 of 3/.test(Sim.campaignTip(t0)), Sim.campaignTip(t0));
   const pre = fresh("campaign"); pre.campaign.completed.push("coldvale.houses");

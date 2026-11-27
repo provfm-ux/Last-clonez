@@ -24,7 +24,7 @@ const Campaign = (() => {
     fathill:{name:"FatHill", kind:"clue", from:8, tide:true, clue:3},
     westfields:{name:"Westfields", kind:"clue", from:10, clue:4},
     cindergrotto:{name:"Cinder Grotto", kind:"clue", from:12, clue:5, requires:{items:["flashlight", "battery"], text:"a flashlight with batteries"}},
-    amigo1:{name:"The first friend", kind:"clue", from:14, to:20},
+    amigo1:{name:"The first friend", kind:"clue", from:14, to:20, requires:{items:["foundrymaul"], text:"the Foundry maul from the Ironworks"}},
     viragem:{name:"Patient zero", kind:"event", from:15, to:18},
     fortress:{name:"The fortress", kind:"clue", from:25, requires:{clues:5}},
     "opt.fuel":{name:"Petrol station", kind:"optional", from:7},
@@ -64,7 +64,7 @@ const Campaign = (() => {
   ].map(([day,type,intensity]) => ({day,type,intensity}));
 
   // Game regions that belong to a campaign area (travel there follows the calendar). Other regions stay free.
-  const regions = {coldvale:"coldvale", cinema:"cinema", ridge:"pineridge", ironworks:"ironworks", coast:"fathill", fields:"westfields", cavern:"cindergrotto"};
+  const regions = {coldvale:"coldvale", cinema:"cinema", ridge:"pineridge", ironworks:"ironworks", coast:"fathill", fields:"westfields", cavern:"cindergrotto", reservoir:"amigo1"};
 
   const day = minutes => Math.floor(minutes / 1440) + 1;
   const weekday = d => weekdays[(d - 1 + firstWeekday) % 7];

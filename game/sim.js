@@ -524,6 +524,7 @@ const Sim = (() => {
       if (region === Regions.cavern) placeGrottoPlate(world);
       if (region === "fields") placeFieldsLedger(world);
       if (region === "coast") placeFatHill(world, seed, rules);
+      if (region === "reservoir") placeAmigo1(world, rules);
       if (town) {
         placeEvaDiary(world);
         CampaignHints.track(s.campaign.hints, "coldvale.houses", s.minutes);
@@ -670,6 +671,11 @@ const Sim = (() => {
         else if (c.fathill.coat) { text = goal.coat; detail = goal.coatDetail; }
         else if (c.fathill.fear) detail += " Fear " + Math.min(c.fathill.fear, Data.fatHill.fearKills) + " of " + Data.fatHill.fearKills + ".";
       }
+      if (goal.id === "amigo1.lockdown-chat" && !done) {
+        if (c.chat.done) { text = goal.fight; detail = goal.fightDetail; }
+        else if (c.chat.until > Date.now()) { text = goal.wait; detail = goal.waitDetail; }
+        else if (c.chat.used) detail += " Prompts used " + c.chat.used + " of " + Data.aiChat.prompts + ".";
+      }
       if (goal.id === "westfields.stealth" && !done && c.fields.alerts) detail += " The noise you made drew " + (c.fields.alerts === 1 ? "one group" : c.fields.alerts + " groups") + ".";
       const opens = !done && day < area.from ? area.from : null;
       return {id:goal.id, done, text, detail, opens};
@@ -696,6 +702,11 @@ const Sim = (() => {
       if (region === "coast") return s.player.bag.some(i => i.id === "violin") ? null : find("fathill-case");
       return region === Regions.home ? find("exit-coast") : find("exit-" + Regions.home);
     }
+    if (goal.id === "viragem.zero") return region === "reservoir" ? find("vic-diary") : region === "fields" ? find("exit-reservoir") : region === Regions.home ? find("exit-fields") : find("exit-" + Regions.home);
+    if (goal.id === "amigo1.lockdown-chat") {
+      if (region === "reservoir") return s.campaign.chat.done ? null : find("ai-terminal");
+      return region === "fields" ? find("exit-reservoir") : region === Regions.home ? find("exit-fields") : find("exit-" + Regions.home);
+    }
     if (goal.id === "westfields.stealth") return region === "fields" ? find("westfields-ledger") : region === Regions.home ? find("exit-fields") : find("exit-" + Regions.home);
     if (goal.id === "cindergrotto.battery") {
       if (region === Regions.cavern) return find(s.campaign.grotto === "reached" ? "exit-ridge" : "grotto-plate");
@@ -712,7 +723,7 @@ const Sim = (() => {
     if (!goal) return T.idle;
     if (goal.opens) return T.waiting.replace("{day}", goal.opens);
     const area = Data.campaignGoals.find(g => g.id === goal.id).area, closed = Campaign.closedReason(area, day, hour);
-    const at = {coldvale:Regions.home, cinema:"cinema", pineridge:"ridge", ironworks:"ironworks", fathill:"coast", westfields:"fields", cindergrotto:Regions.cavern}[area];
+    const at = {coldvale:Regions.home, cinema:"cinema", pineridge:"ridge", ironworks:"ironworks", fathill:"coast", westfields:"fields", cindergrotto:Regions.cavern, viragem:"reservoir", amigo1:"reservoir"}[area];
     const text = T.goals[goal.id], f = c.fathill, pages = s.world.objects.filter(o => o.action === "campaign-page" && o.read).length;
     switch (goal.id) {
       case "coldvale.houses": return region !== Regions.home ? T.back : text.replace("{n}", pages);
@@ -728,6 +739,10 @@ const Sim = (() => {
         if (f.vest) return text.violin;
         if (f.coat) return text.david;
         return text.fear.replace("{n}", Math.min(f.fear, Data.fatHill.fearKills)).replace("{max}", Data.fatHill.fearKills);
+      case "viragem.zero": return region !== "reservoir" ? closed || text.go : text.read;
+      case "amigo1.lockdown-chat":
+        if (region !== "reservoir") return closed || text.go;
+        return c.chat.done ? text.fight : c.chat.until > Date.now() ? text.wait : text.chat;
       case "westfields.stealth": return region !== "fields" ? closed || text.go : c.fields.alerts ? text.noisy : text.sneak;
       case "cindergrotto.battery":
         if (region === Regions.cavern) return c.grotto === "reached" ? text.out : text.plate;
@@ -1456,7 +1471,7 @@ const Sim = (() => {
   }
 
   // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
-  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:"", fields:{alerts:0, at:-1e9}, fathill:{fear:0, coat:false, vest:false}});
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:"", fields:{alerts:0, at:-1e9}, fathill:{fear:0, coat:false, vest:false}, chat:{used:0, until:0, done:false, log:[]}});
   // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
   const isCampaign = s => s.difficulty === "campaign";
   const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
@@ -1475,8 +1490,11 @@ const Sim = (() => {
     const fathill = raw.fathill ?? {fear:0, coat:false, vest:false};
     if (!Number.isInteger(fathill.fear) || fathill.fear < 0 || fathill.fear > 999 || typeof fathill.coat !== "boolean" || typeof fathill.vest !== "boolean") throw new Error("Invalid campaign progress.");
     const fields = raw.fields ?? {alerts:0, at:-1e9};
+    const chat = raw.chat ?? {used:0, until:0, done:false, log:[]};
+    if (!Number.isInteger(chat.used) || chat.used < 0 || chat.used > Data.aiChat.prompts || !Number.isFinite(chat.until) || chat.until < 0 || typeof chat.done !== "boolean" ||
+        !Array.isArray(chat.log) || chat.log.length > Data.aiChat.maxLog || chat.log.some(l => !l || !["you","ai"].includes(l.who) || typeof l.text !== "string" || l.text.length > 400)) throw new Error("Invalid campaign progress.");
     if (!Number.isInteger(fields.alerts) || fields.alerts < 0 || fields.alerts > 999 || !Number.isFinite(fields.at)) throw new Error("Invalid campaign progress.");
-    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "", fields:{alerts:fields.alerts, at:fields.at}, fathill:{fear:fathill.fear, coat:fathill.coat, vest:fathill.vest},
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "", fields:{alerts:fields.alerts, at:fields.at}, fathill:{fear:fathill.fear, coat:fathill.coat, vest:fathill.vest}, chat:{used:chat.used, until:chat.until, done:chat.done, log:chat.log.map(l => ({who:l.who, text:l.text}))},
       ridge:{nights:ridge.nights, night:night && {start:night.start, fail:night.fail, built:night.built}}};
   }
   // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
@@ -1714,6 +1732,7 @@ const Sim = (() => {
   // Damage that reaches a boss's hit points: nothing while guarded (it builds towards breaking the guard), double while lured.
   function bossDamage(s, z, amount) {
     if (!z.stats.boss) return amount;
+    if (z.kind === "vic" && z.guard) { notify(s, Data.campaignText.vicBraced, true); return 0; }
     if (z.guard) {
       z.guardDmg = (z.guardDmg ?? 0) + amount;
       if (!z.guardBroken && z.guardDmg >= Data.fatHill.guardDamage) {
@@ -1765,6 +1784,92 @@ const Sim = (() => {
     david.lured = Data.fatHill.lureSeconds; david.docile = false;
     hear(s, "near", david);
     notify(s, Data.campaignText.violinPlayed, true);
+    return true;
+  }
+
+  // amigo1.lockdown-chat and viragem.zero (docs/HISTORIA.md sections 7 and 9): Vic, the first friend, is held in his motorbike helmet by the
+  // survival assistant in the valve tower. Hits only count once the chat ends the assistant's control; his diary sits in the locked cottage.
+  function spotIn(world, b) {
+    const centre = {x:b.x + b.w / 2, y:b.y + b.h / 2}, tiles = [];
+    for (let y = b.y + 1; y < b.y + b.h - 1; y++) for (let x = b.x + 1; x < b.x + b.w - 1; x++) tiles.push(World.tileAt(world,x,y));
+    return tiles.filter(t => t && t.building === b.id && World.clear(world,t.x+.5,t.y+.5,.28) && !world.objects.some(o => Math.floor(o.x) === t.x && Math.floor(o.y) === t.y) &&
+      World.route(world,world.start.x,world.start.y,t.x+.5,t.y+.5,0,true).length)
+      .sort((a,c) => distance({x:a.x+.5,y:a.y+.5},centre) - distance({x:c.x+.5,y:c.y+.5},centre) || a.y - c.y || a.x - c.x);
+  }
+
+  function placeAmigo1(world, rules) {
+    const tower = world.buildings.find(b => b.name === "Valve tower"), cottage = world.buildings.find(b => b.name === "Keeper's cottage");
+    if (tower) {
+      const spots = spotIn(world, tower), term = spots[0], vic = spots.find(t => term && (t.x !== term.x || t.y !== term.y) && Math.hypot(t.x - term.x, t.y - term.y) >= 2) ?? spots[1];
+      if (term) world.objects.push({id:"ai-terminal", x:term.x+.5, y:term.y+.5, building:tower.id, zone:term.zone, tint:.6, kind:"terminal", action:"ai-terminal", name:"Assistant terminal", active:true, solid:false});
+      if (vic) {
+        const z = World.infected(world, "valve-vic", vic.x+.5, vic.y+.5, rules.mix, Level.seeded(0x71c0), "boss");
+        Object.assign(z, {kind:"vic", stats:Data.infected.vic, hp:Data.infected.vic.hp, outfit:"plain", guard:true, guardDmg:0, guardBroken:false, docile:false, lured:0, dormant:false});
+        world.enemies.push(z);
+      }
+    }
+    if (cottage) {
+      const t = spotIn(world, cottage).reverse()[0];
+      if (t) world.objects.push({id:"vic-diary", x:t.x+.5, y:t.y+.5, building:cottage.id, zone:t.zone, tint:.54, kind:"record", action:"vic-diary", name:"Vic's diary", read:false, active:true, solid:false});
+    }
+  }
+
+  const chatLog = (chat, who, text) => { chat.log.push({who, text}); while (chat.log.length > Data.aiChat.maxLog) chat.log.shift(); };
+
+  // One prompt to the assistant. Pure state machine: `now` (ms) is injected so tests control the five-minute pause.
+  function aiSend(s, raw, now = Date.now()) {
+    const c = s.campaign, A = Data.aiChat, chat = c?.chat;
+    if (!chat || s.mode !== "play" || s.world.region !== "reservoir" || chat.done || c.completed.includes("amigo1.lockdown-chat")) return false;
+    const text = String(raw ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+    if (!text) return false;
+    chatLog(chat, "you", text);
+    if (chat.until > now) { chatLog(chat, "ai", A.busy); return true; }
+    if (chat.until) { chat.until = 0; chatLog(chat, "ai", A.restored); }
+    const lower = text.toLowerCase();
+    if (chat.used < A.prompts - 1) {
+      chatLog(chat, "ai", A.stopWords.test(lower) ? A.denied : A.replies[chat.used]);
+      chat.used++;
+      return true;
+    }
+    if (A.winWords.every(w => lower.includes(w))) {
+      chat.done = true;
+      chatLog(chat, "ai", A.win);
+      const vic = s.world.enemies.find(z => z.kind === "vic" && z.hp > 0);
+      if (vic) { vic.guard = false; vic.guardBroken = false; }
+      notify(s, Data.campaignText.vicHelmet, true);
+      return true;
+    }
+    chatLog(chat, "ai", A.lose); chatLog(chat, "ai", A.wait);
+    chat.until = now + A.waitMs;
+    s.atmosphere.nextWave = Math.min(s.atmosphere.nextWave, s.atmosphere.time);
+    return true;
+  }
+
+  function useAiTerminal(s, o) {
+    if (!s.campaign || s.mode !== "play" || o?.action !== "ai-terminal" || s.world.region !== "reservoir" || !s.world.objects.includes(o) || !reachableObject(s,o)) return false;
+    if (!s.campaign.chat.log.length) chatLog(s.campaign.chat, "ai", Data.aiChat.intro);
+    return true;
+  }
+
+  function vicFinale(s) {
+    const c = s.campaign;
+    if (!c || c.completed.includes("amigo1.lockdown-chat")) return;
+    c.completed.push("amigo1.lockdown-chat");
+    c.clues = Math.min(5, c.clues + 1);
+    add(s.player.bag, "fortressmap", 1);
+    CampaignHints.progress(c.hints, s.minutes);
+    notify(s, Data.campaignText.vicDown, true);
+  }
+
+  function readVicDiary(s, diary) {
+    if (!s.campaign || s.mode !== "play" || s.player.vehicle || diary?.action !== "vic-diary" || !s.world.objects.includes(diary) || !reachableObject(s,diary)) return false;
+    if (runDay(s.minutes) < Campaign.areas.viragem.from) { notify(s, Data.campaignText.diaryEarly, true); return false; }
+    diary.read = true;
+    if (!s.campaign.completed.includes("viragem.zero")) {
+      s.campaign.completed.push("viragem.zero");
+      CampaignHints.progress(s.campaign.hints, s.minutes);
+    }
+    notify(s, Data.campaignText.diaryRead, true);
     return true;
   }
 
@@ -3123,6 +3228,7 @@ const Sim = (() => {
     recordDaily(s,enemy.kind);
     fathillFear(s, enemy);
     if (enemy.kind === "david") fathillFinale(s, enemy);
+    if (enemy.kind === "vic") vicFinale(s);
     hearZombie(s,"death",enemy);
     const winner = enemy.origin === "cinema-winner";
     const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item, supply = winner ? null : carriedSupply(s, enemy);
@@ -3198,7 +3304,7 @@ const Sim = (() => {
     p.stamina -= effort; p.cooldown = .7; p.swing = .18;
     if (near.stats.boss && near.guard) {
       if (near.guardBroken) removeGuard(s, near);
-      else notify(s, Data.campaignText.fathillBraced, true);
+      else notify(s, near.kind === "vic" ? Data.campaignText.vicBraced : Data.campaignText.fathillBraced, true);
     }
     const brute = near.kind === "brute" || near.stats.boss;
     if (!brute || near.windup <= 0) {
@@ -3949,7 +4055,7 @@ const Sim = (() => {
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
       campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}, buffUntil:s.campaign.buffUntil,
-        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva, grotto:s.campaign.grotto, fields:{...s.campaign.fields}, fathill:{...s.campaign.fathill}} : undefined,
+        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva, grotto:s.campaign.grotto, fields:{...s.campaign.fields}, fathill:{...s.campaign.fathill}, chat:{...s.campaign.chat, log:s.campaign.chat.log.map(l => ({...l}))}} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
@@ -4315,7 +4421,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, aiSend, useAiTerminal, readVicDiary, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

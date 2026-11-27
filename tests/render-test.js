@@ -9,7 +9,7 @@ const files = [...html.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).f
 const pascal = f => f.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join("");
 const counts = {};
 let heldWeapon = null;
-const infectedFrames = [], survivorFrames = [], charDraws = [];
+const infectedFrames = [], survivorFrames = [], charDraws = [], charRequests = [];
 const bagPigments = new Set(["#3b2822","#c4875e","#985b40","#714534","#513629","#e0b784"]);
 const bagPixels = [];
 let lastTranslate = null;
@@ -516,7 +516,8 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
     context.Image = class {
       constructor() { this.naturalWidth = 672; this.naturalHeight = 800; }
       set src(v) {
-        this._s = v;
+        this._s = v; charRequests.push(v);
+        if (v.endsWith("_mask.png")) v = v.replace("_mask.png", ".png");   // a mask has the size of its atlas
         for (const c of charIndex.characters) {
           for (const t of Object.values(c.tiers)) if (v.endsWith("/" + t.file)) { this.naturalWidth = t.cell[0] * 8; this.naturalHeight = t.cell[1]; }
           for (const t of Object.values(c.walk ?? {})) if (v.endsWith("/" + t.file)) { this.naturalWidth = t.cell[0] * 8; this.naturalHeight = t.cell[1] * t.frames; }
@@ -543,6 +544,13 @@ check("outer district shares the isometric renderer",districtDraw.fill > 0);
     const rows = new Set(charDraws.filter(a => a[0]._s.includes("protagonist_walk_mini")).map(a => a[2] / a[4]));
     check("personagens 8 direções: a andar usa o ciclo de caminhada e muda de frame com o passo", rows.size >= 4, rows.size + " frames distintos");
     cs.player.moving = false;
+    check("personagens 8 direções: o jogador pede as máscaras de recolor (pele, cabelo, casaco)",
+      charRequests.some(r => r.endsWith("protagonist_mini_mask.png")) && charRequests.some(r => r.endsWith("protagonist_walk_mini_mask.png")),
+      charRequests.filter(r => r.includes("mask")).length + " máscaras");
+    cs.player.appearance = "female"; charDraws.length = 0;
+    for (let i = 0; i < 3; i++) View.render(cs, .5 + i / 60, 1 / 60);
+    check("personagens 8 direções: aparência feminina usa o sprite da sobrevivente", cellOf("survivor_female_mini") >= 0);
+    cs.player.appearance = "male";
   }
 }
 

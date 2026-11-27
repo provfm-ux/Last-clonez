@@ -1788,8 +1788,43 @@ const View = (() => {
   }
   const infectedByOutfit = {worker: "construction", medic: "paramedic", patrol: "police", hiker: "hiker"};
 
+  // Player customisation on top of the sprites: skin, hair and jacket are recoloured from region masks when the atlas loads
+  // (target colour x source brightness, so the shading survives). Masks and reference colours come from index.json (recolor).
+  const recoloured = new Map();
+  const hexRgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  const mixRgb = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  // returns the recoloured canvas, undefined while the mask is still loading, null if it cannot be done (use the plain atlas)
+  function recolouredAtlas(img, maskFile, refs, colours) {
+    const key = maskFile + "|" + colours.join("|");
+    if (recoloured.has(key)) return recoloured.get(key);
+    const mask = charImage(maskFile);
+    if (mask.naturalWidth !== img.naturalWidth || mask.naturalHeight !== img.naturalHeight) return undefined;
+    let out = null;
+    try {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const canvas = document.createElement("canvas"), side = document.createElement("canvas");
+      canvas.width = side.width = w; canvas.height = side.height = h;
+      const c = canvas.getContext("2d"), m = side.getContext("2d");
+      c.drawImage(img, 0, 0); m.drawImage(mask, 0, 0);
+      const pix = c.getImageData(0, 0, w, h), regions = ["skin", "hair", "jacket"];
+      const md = m.getImageData(0, 0, w, h).data, d = pix.data;
+      const lum = (r, g, b) => .299 * r + .587 * g + .114 * b;
+      for (let i = 0; i < d.length; i += 4) {
+        const region = Math.round(md[i] / 85);
+        if (!region || d[i + 3] === 0) continue;
+        const target = colours[region - 1], ref = refs[regions[region - 1]];
+        const ratio = Math.min(1.7, Math.max(.35, lum(d[i], d[i + 1], d[i + 2]) / lum(ref[0], ref[1], ref[2])));
+        d[i] = Math.min(255, target[0] * ratio); d[i + 1] = Math.min(255, target[1] * ratio); d[i + 2] = Math.min(255, target[2] * ratio);
+      }
+      c.putImageData(pix, 0, 0);
+      out = canvas;
+    } catch {}
+    recoloured.set(key, out);
+    return out;
+  }
+
   function characterFor(a, isPlayer) {
-    if (isPlayer) return "protagonist";
+    if (isPlayer) return a.appearance === "female" ? "survivor_female" : "protagonist";
     if (a.stats) {                                    // infected: kind, then outfit, then a stable pick from the spawn phase
       if (a.kind === "brute" || a.kind === "runner") return a.kind;
       const phase = Number.isFinite(a.phase) ? a.phase : 0;
@@ -1828,6 +1863,16 @@ const View = (() => {
       direction & 2 ? (direction & 1 ? 7 : 1) : (direction & 1 ? 5 : 3);
     const kindScale = a.kind === "brute" ? 1.28 : a.kind === "runner" ? .94 : 1;   // already baked into those atlases
     const z = scale / kindScale * charTiers[charTier], vec = charVectors[index];
+    let sheet = img;                                   // the player's skin, hair and jacket follow the character settings
+    const rc = isPlayer && entry.recolor?.[charTier], maskFile = rc && (baked ? rc.walkMask : rc.mask);
+    if (maskFile) {
+      const pal = survivorPalette(a);
+      const hair = pal.cut === "shaved" ? mixRgb(hexRgb(pal.skin), [40, 30, 28], .45) : hexRgb(pal.hair);
+      const jacket = hexRgb(a.gear?.body === "raincoat" ? "#9b8652" : pal.jacket);
+      sheet = recolouredAtlas(img, maskFile, rc.refs, [hexRgb(pal.skin), hair, jacket]);
+      if (sheet === undefined) return false;           // mask still loading: draw the procedural sprite meanwhile
+      sheet ||= img;
+    }
     const frame = baked ? Math.floor(stride * walk.frames) % walk.frames : 0;
     let dx = 0, dy = 0;
     if (a.moving && !baked) {                          // no baked cycle for this size: step bob + sway on the stride phase
@@ -1836,7 +1881,7 @@ const View = (() => {
     }
     const lunge = a.swing > 0 ? 2.5 : a.windup > 0 ? -1.2 : a.flash > 0 ? -1.5 : 0;   // strike, wind-up, recoil
     dx += vec[0] * lunge * scale; dy += vec[1] * lunge * scale * .5;
-    ctx.drawImage(img, index * src.cell[0], frame * src.cell[1], src.cell[0], src.cell[1],
+    ctx.drawImage(sheet, index * src.cell[0], frame * src.cell[1], src.cell[0], src.cell[1],
       Math.round(x - src.anchor[0] * z + dx), Math.round(y - src.anchor[1] * z + dy),
       Math.round(src.cell[0] * z), Math.round(src.cell[1] * z));
     return true;

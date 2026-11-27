@@ -10,6 +10,7 @@ import os
 import numpy as np
 from PIL import Image
 
+from . import recolor as recolormod
 from . import walk as walkmod
 from .core import apply_palette, kmeans_palette
 
@@ -151,9 +152,16 @@ def build(package_dir, out_dir, only=None, rig_path=None):
                 wa.save(os.path.join(out_dir, wfn))
                 entry.setdefault("walk", {})[tname] = {"file": wfn, "cell": list(wcell), "anchor": list(wanc),
                                                        "frames": WALK_FRAMES, "scale": round(s, 5)}
+        if ch["id"] in recolormod.IDS:                                       # customisable: skin / hair / jacket masks
+            recolormod.add_masks(out_dir, entry)
         json.dump(entry, open(os.path.join(out_dir, f"{ch['id']}.json"), "w"), indent=1)
         result.append(entry)
         print(ch["id"].ljust(14), {k: v["cell"] for k, v in entry["tiers"].items()})
+    idx = os.path.join(out_dir, "index.json")
+    if only and os.path.exists(idx):                                          # --only: merge into the existing index
+        byid = {c["id"]: c for c in json.load(open(idx))["characters"]}
+        byid.update({c["id"]: c for c in result})
+        result = [byid[c["id"]] for c in man["characters"] if c["id"] in byid]
     json.dump({"order": DIRS, "default_tier": "mini", "tiers": {k: {"height": v[0]} for k, v in TIERS.items()},
                "layout": "one row of 8 cells (order above), every cell the same size, anchor = feet (crawler: body)",
                "characters": result}, open(os.path.join(out_dir, "index.json"), "w"), indent=1)

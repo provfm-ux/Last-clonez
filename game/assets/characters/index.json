@@ -1005,6 +1005,50 @@
      "frames": 8,
      "scale": 0.10444
     }
+   },
+   "recolor": {
+    "mini": {
+     "mask": "survivor_male_mini_mask.png",
+     "refs": {
+      "skin": [
+       184,
+       121,
+       93
+      ],
+      "hair": [
+       81,
+       58,
+       45
+      ],
+      "jacket": [
+       95,
+       87,
+       61
+      ]
+     },
+     "walkMask": "survivor_male_walk_mini_mask.png"
+    },
+    "game": {
+     "mask": "survivor_male_game_mask.png",
+     "refs": {
+      "skin": [
+       189,
+       125,
+       96
+      ],
+      "hair": [
+       77,
+       54,
+       45
+      ],
+      "jacket": [
+       98,
+       91,
+       62
+      ]
+     },
+     "walkMask": "survivor_male_walk_game_mask.png"
+    }
    }
   },
   {
@@ -1086,6 +1130,50 @@
      ],
      "frames": 8,
      "scale": 0.10417
+    }
+   },
+   "recolor": {
+    "mini": {
+     "mask": "survivor_female_mini_mask.png",
+     "refs": {
+      "skin": [
+       178,
+       111,
+       84
+      ],
+      "hair": [
+       75,
+       46,
+       41
+      ],
+      "jacket": [
+       90,
+       87,
+       58
+      ]
+     },
+     "walkMask": "survivor_female_walk_mini_mask.png"
+    },
+    "game": {
+     "mask": "survivor_female_game_mask.png",
+     "refs": {
+      "skin": [
+       182,
+       113,
+       85
+      ],
+      "hair": [
+       74,
+       46,
+       42
+      ],
+      "jacket": [
+       95,
+       91,
+       60
+      ]
+     },
+     "walkMask": "survivor_female_walk_game_mask.png"
     }
    }
   },
@@ -1250,6 +1338,50 @@
      ],
      "frames": 8,
      "scale": 0.10471
+    }
+   },
+   "recolor": {
+    "mini": {
+     "mask": "protagonist_mini_mask.png",
+     "refs": {
+      "skin": [
+       175,
+       119,
+       89
+      ],
+      "hair": [
+       75,
+       54,
+       43
+      ],
+      "jacket": [
+       91,
+       81,
+       56
+      ]
+     },
+     "walkMask": "protagonist_walk_mini_mask.png"
+    },
+    "game": {
+     "mask": "protagonist_game_mask.png",
+     "refs": {
+      "skin": [
+       193,
+       130,
+       97
+      ],
+      "hair": [
+       67,
+       49,
+       40
+      ],
+      "jacket": [
+       94,
+       84,
+       57
+      ]
+     },
+     "walkMask": "protagonist_walk_game_mask.png"
     }
    }
   },

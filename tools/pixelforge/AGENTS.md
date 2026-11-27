@@ -35,6 +35,10 @@ Extra characters (not in the package): `sources/characters.json` + one transpare
 export: `POST /v2/create-character-v3` ~3 generations at 128x128, poll `/v2/background-jobs/<id>`, `GET /v2/characters/<id>/zip`). `sheets` builds them like the rest
 (obese_male, obese_female = the big infected; the muscular `brute` is kept for mutated infected).
 
+Zombie look: every infected id in `zombify.json` gets green skin (face, neck, hands recoloured keeping the shading) and blood on the mouth in the
+views where the face shows. Per-character knobs: `skin` (green|keep), `hue`, `head_frac`, `bright_factor`, `big_skin`, `mouth_k`, `mouth_y` (mouth height as a
+fraction of the figure height, for dark faces). Edit, then re-run `sheets --only <id>`. Check with a face contact sheet before committing.
+
 Limits: one photo gives one view. `--dirs` makes S,SE,E,SW,W by squashing; N-facing needs a back view.
 Web images may be copyrighted: keep refs/*.json (source URL), do not commit refs/ or out/.
 Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py && python3 tests/test_voxel.py && python3 tests/test_organic.py` (healthy = `Tudo OK` x4).

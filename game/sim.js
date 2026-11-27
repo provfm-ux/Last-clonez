@@ -383,7 +383,7 @@ const Sim = (() => {
   const reportLimit = 45;
   const runDay = minutes => Math.floor(minutes/1440)+1;
   const newDaily = day => ({day,...Object.fromEntries(dailyKeys.map(key=>[key,0]))});
-  const recordDaily = (s,key,count=1) => { s.daily[key] += count; };
+  const recordDaily = (s,key,count=1) => { if (Number.isFinite(s.daily[key])) s.daily[key] += count; };
 
   function closeDaily(s) {
     const day = runDay(s.minutes);
@@ -522,6 +522,8 @@ const Sim = (() => {
     if (difficulty === "campaign") {
       s.waypoint = "";
       if (region === Regions.cavern) placeGrottoPlate(world);
+      if (region === "fields") placeFieldsLedger(world);
+      if (region === "coast") placeFatHill(world, seed, rules);
       if (town) {
         placeEvaDiary(world);
         CampaignHints.track(s.campaign.hints, "coldvale.houses", s.minutes);
@@ -663,6 +665,12 @@ const Sim = (() => {
       if (goal.id === "coldvale.houses" && !done && pages) detail += " Torn pages " + pages + " of 3.";
       if (goal.id === "pineridge.two-nights" && !done && c.ridge.nights) detail += " Nights " + c.ridge.nights + " of 2.";
       if (goal.id === "cindergrotto.battery" && !done && c.grotto === "reached") { text = goal.reached; detail = goal.reachedDetail; }
+      if (goal.id === "fathill.bosses" && !done) {
+        if (c.fathill.vest) { text = goal.vest; detail = goal.vestDetail; }
+        else if (c.fathill.coat) { text = goal.coat; detail = goal.coatDetail; }
+        else if (c.fathill.fear) detail += " Fear " + Math.min(c.fathill.fear, Data.fatHill.fearKills) + " of " + Data.fatHill.fearKills + ".";
+      }
+      if (goal.id === "westfields.stealth" && !done && c.fields.alerts) detail += " The noise you made drew " + (c.fields.alerts === 1 ? "one group" : c.fields.alerts + " groups") + ".";
       const opens = !done && day < area.from ? area.from : null;
       return {id:goal.id, done, text, detail, opens};
     });
@@ -684,6 +692,11 @@ const Sim = (() => {
     if (goal.id === "pineridge.two-nights") return region === "ridge" ? null : region === Regions.home ? find("exit-ridge") : find("exit-" + Regions.home);
     if (goal.id === "ironworks.barricade") return region === "ironworks" ? find("iron-cage") : region === Regions.home ? find("exit-ironworks") : find("exit-" + Regions.home);
     if (goal.id === "eva.death" && s.campaign.eva === "gone") return region === Regions.home ? find("eva-diary") : find("exit-" + Regions.home);
+    if (goal.id === "fathill.bosses") {
+      if (region === "coast") return s.player.bag.some(i => i.id === "violin") ? null : find("fathill-case");
+      return region === Regions.home ? find("exit-coast") : find("exit-" + Regions.home);
+    }
+    if (goal.id === "westfields.stealth") return region === "fields" ? find("westfields-ledger") : region === Regions.home ? find("exit-fields") : find("exit-" + Regions.home);
     if (goal.id === "cindergrotto.battery") {
       if (region === Regions.cavern) return find(s.campaign.grotto === "reached" ? "exit-ridge" : "grotto-plate");
       return region === "ridge" ? find("exit-" + Regions.cavern) : region === Regions.home ? find("exit-ridge") : find("exit-" + Regions.home);
@@ -725,7 +738,7 @@ const Sim = (() => {
     ...(item.id === "housekey" ? {lock:item.lock, label:item.label, uid:item.uid} : {})});
 
   // Loose notes the player has not read yet: the Use button opens them first.
-  const noteActions = new Set(["field-note", "campaign-page", "eva-diary", "ironworks-terminal", "cinema-note", "grotto-plate"]);
+  const noteActions = new Set(["field-note", "campaign-page", "eva-diary", "ironworks-terminal", "cinema-note", "grotto-plate", "westfields-ledger"]);
 
   function readCinemaNote(s, note) {
     if (s.mode !== "play" || s.player.vehicle || note?.action !== "cinema-note" || !s.world.objects.includes(note) || !reachableObject(s,note)) return false;
@@ -889,6 +902,7 @@ const Sim = (() => {
     if (!item) return false;
     const data = Data.items[item.id];
     if (item.id === "flashlight") return toggleLight(s, item);
+    if (item.id === "violin") return playViolin(s);
     if (data.slot) {
       const worn = wornItem(s,data.slot) === item;
       p.gear[data.slot] = worn ? null : item.id;
@@ -1410,7 +1424,7 @@ const Sim = (() => {
   }
 
   // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
-  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:""});
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:"", fields:{alerts:0, at:-1e9}, fathill:{fear:0, coat:false, vest:false}});
   // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
   const isCampaign = s => s.difficulty === "campaign";
   const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
@@ -1426,7 +1440,11 @@ const Sim = (() => {
           !Number.isInteger(night.built) || night.built < 0)) throw new Error("Invalid campaign progress.");
     if (raw.eva !== undefined && !["", "left", "gone"].includes(raw.eva)) throw new Error("Invalid campaign progress.");
     if (raw.grotto !== undefined && !["", "reached"].includes(raw.grotto)) throw new Error("Invalid campaign progress.");
-    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "",
+    const fathill = raw.fathill ?? {fear:0, coat:false, vest:false};
+    if (!Number.isInteger(fathill.fear) || fathill.fear < 0 || fathill.fear > 999 || typeof fathill.coat !== "boolean" || typeof fathill.vest !== "boolean") throw new Error("Invalid campaign progress.");
+    const fields = raw.fields ?? {alerts:0, at:-1e9};
+    if (!Number.isInteger(fields.alerts) || fields.alerts < 0 || fields.alerts > 999 || !Number.isFinite(fields.at)) throw new Error("Invalid campaign progress.");
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "", fields:{alerts:fields.alerts, at:fields.at}, fathill:{fear:fathill.fear, coat:fathill.coat, vest:fathill.vest},
       ridge:{nights:ridge.nights, night:night && {start:night.start, fail:night.fail, built:night.built}}};
   }
   // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
@@ -1625,6 +1643,142 @@ const Sim = (() => {
     return true;
   }
 
+  // fathill.bosses (docs/HISTORIA.md sections 7 and 10): the woman on the pier and David. The woman's coat falls when the player kills
+  // enough infected in her sight (fear); David's vest comes off after heavy damage and a shove, and then a violin lures him in.
+  // Positions come from fixed scans of the map, with a separate seeded stream: no shared rng.
+  function placeFatHill(world, seed, rules) {
+    const rng = Level.seeded(seed ^ 0x7a3e51), used = [];
+    const near = (tx, ty) => {
+      let best = null;
+      for (let y = 8; y < world.height - 8; y++) for (let x = 8; x < world.width - 8; x++) {
+        const t = World.tileAt(world,x,y);
+        if (!t || t.building || !World.clear(world,x+.5,y+.5,.4) || used.some(u => Math.hypot(u.x - x, u.y - y) < 3)) continue;
+        const d = Math.hypot(x - tx, y - ty);
+        if ((!best || d < best.d) && World.route(world,world.start.x,world.start.y,x+.5,y+.5,0,true).length) best = {x, y, d};
+      }
+      if (best) used.push(best);
+      return best;
+    };
+    const woman = near(Math.round(world.width * .55), Math.round(world.height * .70));
+    const david = woman && near(woman.x + 3, woman.y + 3);
+    const make = (id, kind, spot) => {
+      const z = World.infected(world, id, spot.x + .5, spot.y + .5, rules.mix, rng, "boss");
+      Object.assign(z, {kind, stats:Data.infected[kind], hp:Data.infected[kind].hp, outfit:"plain", guard:true, guardDmg:0, guardBroken:false, docile:false, lured:0, dormant:false});
+      world.enemies.push(z);
+    };
+    if (woman) make("pier-woman", "pierwoman", woman);
+    if (david) make("pier-david", "david", david);
+    const shed = world.buildings.find(b => b.name === "Net shed");
+    if (shed) {
+      const tiles = [];
+      for (let y = shed.y + 1; y < shed.y + shed.h - 1; y++) for (let x = shed.x + 1; x < shed.x + shed.w - 1; x++) tiles.push(World.tileAt(world,x,y));
+      const tile = tiles.filter(t => t && t.building === shed.id && World.clear(world,t.x+.5,t.y+.5,.28) && !world.objects.some(o => Math.floor(o.x) === t.x && Math.floor(o.y) === t.y) &&
+        World.route(world,world.start.x,world.start.y,t.x+.5,t.y+.5,0,true).length).sort((a,c) => a.y - c.y || a.x - c.x)[0];
+      if (tile) world.objects.push({id:"fathill-case", x:tile.x+.5, y:tile.y+.5, building:shed.id, zone:tile.zone, tint:.6, kind:"crate", name:"Bandstand case",
+        action:"loot", active:true, solid:false, searched:false, loot:[{id:"violin", qty:1, condition:100}]});
+    }
+  }
+
+  // Damage that reaches a boss's hit points: nothing while guarded (it builds towards breaking the guard), double while lured.
+  function bossDamage(s, z, amount) {
+    if (!z.stats.boss) return amount;
+    if (z.guard) {
+      z.guardDmg = (z.guardDmg ?? 0) + amount;
+      if (!z.guardBroken && z.guardDmg >= Data.fatHill.guardDamage) {
+        z.guardBroken = true;
+        notify(s, z.kind === "david" ? Data.campaignText.fathillVestLoose : Data.campaignText.fathillCoatLoose, true);
+      }
+      return 0;
+    }
+    return z.lured > 0 ? amount * Data.fatHill.luredDamage : amount;
+  }
+
+  function removeGuard(s, z) {
+    z.guard = false; z.guardBroken = false;
+    const f = s.campaign?.fathill;
+    if (!f) return;
+    if (z.kind === "david") { f.vest = true; notify(s, Data.campaignText.fathillVest, true); }
+    else if (z.kind === "pierwoman") { f.coat = true; z.docile = true; z.moving = false; z.alert = 0; notify(s, Data.campaignText.fathillCoat, true); }
+  }
+
+  // Killing infected where the woman can see it frightens her; with enough fear her coat falls.
+  function fathillFear(s, killed) {
+    const c = s.campaign;
+    if (!c || s.world.region !== "coast" || killed.stats.boss || c.completed.includes("fathill.bosses")) return;
+    const woman = s.world.enemies.find(z => z.kind === "pierwoman" && z.hp > 0 && z.guard);
+    if (!woman || distance(woman, killed) > Data.fatHill.fearSight || !lineOfSight(s, woman, killed)) return;
+    if (c.fathill.fear === 0) notify(s, Data.campaignText.fathillWoman, true);
+    c.fathill.fear++;
+    if (c.fathill.fear >= Data.fatHill.fearKills) removeGuard(s, woman);
+  }
+
+  function fathillFinale(s, david) {
+    const c = s.campaign;
+    if (!c || c.completed.includes("fathill.bosses")) return;
+    const woman = s.world.enemies.find(z => z.kind === "pierwoman" && z.hp > 0);
+    if (woman) { woman.hp = 0; woman.docile = true; }
+    c.completed.push("fathill.bosses");
+    c.clues = Math.min(5, c.clues + 1);
+    CampaignHints.progress(c.hints, s.minutes);
+    notify(s, Data.campaignText.fathillDone, true);
+  }
+
+  function playViolin(s) {
+    const david = s.world.enemies.find(z => z.kind === "david" && z.hp > 0);
+    if (!s.campaign || s.world.region !== "coast" || !david || distance(david, s.player) > Data.fatHill.playRange) {
+      notify(s, Data.campaignText.violinNone, true);
+      return false;
+    }
+    if (david.guard) { notify(s, Data.campaignText.violinGuarded, true); return true; }
+    david.lured = Data.fatHill.lureSeconds; david.docile = false;
+    hear(s, "near", david);
+    notify(s, Data.campaignText.violinPlayed, true);
+    return true;
+  }
+
+  // westfields.stealth: the farmer's ledger sits in the Orchard farmhouse, at the far west of the farmland. Loud noise (fighting, shots,
+  // breaking in) calls a horde; infected that have noticed you will not let you read the ledger.
+  function placeFieldsLedger(world) {
+    const b = world.buildings.find(x => x.name === "Orchard farmhouse");
+    if (!b) return;
+    const tiles = [];
+    for (let y = b.y + 1; y < b.y + b.h - 1; y++) for (let x = b.x + 1; x < b.x + b.w - 1; x++) tiles.push(World.tileAt(world,x,y));
+    const centre = {x:b.x + b.w / 2, y:b.y + b.h / 2};
+    const tile = tiles.filter(t => t && t.building === b.id && World.clear(world,t.x+.5,t.y+.5,.28) &&
+      !world.objects.some(o => Math.floor(o.x) === t.x && Math.floor(o.y) === t.y) &&
+      World.route(world,world.start.x,world.start.y,t.x+.5,t.y+.5,0,true).length)
+      .sort((a,c) => distance({x:a.x+.5,y:a.y+.5},centre) - distance({x:c.x+.5,y:c.y+.5},centre) || a.y - c.y || a.x - c.x)[0];
+    if (tile) world.objects.push({id:"westfields-ledger", x:tile.x+.5, y:tile.y+.5, building:b.id, zone:tile.zone, tint:.54, kind:"record",
+      action:"westfields-ledger", name:"Farmer's ledger", read:false, active:true, solid:false});
+  }
+
+  const fieldsOpen = s => Boolean(s.campaign && s.world.region === "fields" && !s.campaign.completed.includes("westfields.stealth"));
+  // Called from noise(): a loud sound made by the player in the open fields calls a group (at most one every 60 s).
+  function fieldsAlarm(s) {
+    const f = s.campaign.fields;
+    if (s.elapsed - f.at < 60) return;
+    f.at = s.elapsed; f.alerts++;
+    s.atmosphere.nextWave = Math.min(s.atmosphere.nextWave, s.atmosphere.time);
+    notify(s, Data.campaignText.fieldsLoud, true);
+  }
+
+  function readFieldsLedger(s, ledger) {
+    if (!s.campaign || s.mode !== "play" || s.player.vehicle || ledger?.action !== "westfields-ledger" || !ledger.active ||
+        !s.world.objects.includes(ledger) || !reachableObject(s,ledger)) return false;
+    if (s.world.enemies.some(z => z.hp > 0 && !z.dormant && z.alert > 0 && distance(z, s.player) < 14)) {
+      notify(s, Data.campaignText.fieldsSeen, true);
+      return false;
+    }
+    ledger.read = true;
+    if (!s.campaign.completed.includes("westfields.stealth")) {
+      s.campaign.completed.push("westfields.stealth");
+      s.campaign.clues = Math.min(5, s.campaign.clues + 1);
+      CampaignHints.progress(s.campaign.hints, s.minutes);
+      notify(s, Data.campaignText.fieldsDone);
+    } else notify(s, Data.campaignText.fieldsAgain);
+    return true;
+  }
+
   // Back out on Pine Ridge with the plate read: the fifth coordinate is yours.
   function finishGrotto(s) {
     const c = s.campaign;
@@ -1808,6 +1962,7 @@ const Sim = (() => {
 
   // reach scales only how far the noise carries (footstep traits); the alert length still follows the noise itself.
   function noise(s, x, y, radius, reach = 1) {
+    if (radius >= 8 && fieldsOpen(s) && distance({x, y}, s.player) < 3) fieldsAlarm(s);
     const audible = radius * reach * (s.rules.hearing ?? 100) / 100;
     s.noiseRings = (s.noiseRings ?? []).filter(r => s.elapsed - r.t < 1.2);
     s.noiseRings.push({x, y, r: audible, t: s.elapsed});
@@ -2934,6 +3089,8 @@ const Sim = (() => {
   function defeat(s, enemy) {
     s.kills++;
     recordDaily(s,enemy.kind);
+    fathillFear(s, enemy);
+    if (enemy.kind === "david") fathillFinale(s, enemy);
     hearZombie(s,"death",enemy);
     const winner = enemy.origin === "cinema-winner";
     const item = winner ? "raffletrophy" : Data.outfits[enemy.outfit]?.item, supply = winner ? null : carriedSupply(s, enemy);
@@ -2953,6 +3110,7 @@ const Sim = (() => {
       if (s.target === z) endPursuit(s);
       return false;
     }
+    if (z.docile) { notify(s, Data.campaignText.fathillDocile, true); if (s.target === z) endPursuit(s); return false; }
     recordPlaytest(s, "fight");
     recordDaily(s,"attacks");
     faceTowards(p, z);
@@ -2970,17 +3128,18 @@ const Sim = (() => {
     hear(s,w.firearm ? "shot" : "strike",w.firearm ? p : z);
     const matchup = Data.combatStyles[w.combat].damage[z.kind] ?? 1;
     const amount = hit ? Math.round(w.damage * matchup * damageFactor(s) * (w.firearm ? 1 : 1 + level(s, "strength") * .03) * (item.condition < 20 ? .8 : 1)) : 0;
-    z.hp = Math.max(0, z.hp - amount);
+    const dealt = bossDamage(s, z, amount);
+    z.hp = Math.max(0, z.hp - dealt);
     if (hit) {
       if (z.hp > 0) hearZombie(s,"hit",z);
       z.flash = .2;
-      if (z.kind !== "brute" || matchup >= 1) {
+      if ((z.kind !== "brute" && !z.stats.boss) || matchup >= 1) {
         z.stagger = Math.max(z.stagger, z.kind === "runner" && w.combat === "reach" ? .48 : .28);
         z.swing = 0;
         endWindup(z);
       }
     }
-    s.effects.push({x: z.x, y: z.y, text: hit ? (matchup < 1 ? "RESISTED " : matchup > 1 ? "STRONG " : "") + "−" + amount : "MISS", color: hit ? "#efc785" : "#d2cfb6", life: .8});
+    s.effects.push({x: z.x, y: z.y, text: hit ? (matchup < 1 ? "RESISTED " : matchup > 1 ? "STRONG " : "") + (z.guard ? "GUARDED " : "") + "−" + dealt : "MISS", color: hit ? "#efc785" : "#d2cfb6", life: .8});
     addXp(s, "combat", hit ? 1.5 : .2);
     if (hit && family) addXp(s,family,1.5);
     if (w.wear > 0) addXp(s,"maintenance",.25);
@@ -3005,7 +3164,11 @@ const Sim = (() => {
     faceTowards(p, near);
     s.swingVisual = {weapon:"fists", dx:near.x - p.x, dy:near.y - p.y};
     p.stamina -= effort; p.cooldown = .7; p.swing = .18;
-    const brute = near.kind === "brute";
+    if (near.stats.boss && near.guard) {
+      if (near.guardBroken) removeGuard(s, near);
+      else notify(s, Data.campaignText.fathillBraced, true);
+    }
+    const brute = near.kind === "brute" || near.stats.boss;
     if (!brute || near.windup <= 0) {
       near.stagger = Math.max(near.stagger, brute ? .25 : 1.1);
       near.swing = 0;
@@ -3325,6 +3488,11 @@ const Sim = (() => {
           notify(s,"Something stirs by the furniture.",true);
         }
         continue;
+      }
+      if (z.docile) { z.moving = false; z.alert = 0; continue; }
+      if (z.lured > 0) {                                 // the violin: he walks up to the player and stands there, not attacking
+        z.lured = Math.max(0, z.lured - dt);
+        z.alert = Math.max(z.alert, 8); z.chaseX = p.x; z.chaseY = p.y; z.cooldown = Math.max(z.cooldown, .6);
       }
       z.cooldown -= dt; z.replan -= dt;
       z.flash = Math.max(0, z.flash - dt); z.stagger = Math.max(0, z.stagger - dt);
@@ -3749,7 +3917,7 @@ const Sim = (() => {
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
       campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}, buffUntil:s.campaign.buffUntil,
-        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva, grotto:s.campaign.grotto} : undefined,
+        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva, grotto:s.campaign.grotto, fields:{...s.campaign.fields}, fathill:{...s.campaign.fathill}} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
@@ -3944,7 +4112,7 @@ const Sim = (() => {
           return validPosition(o) && validKind && validMaterial && validStation(o, original) && validCar(o, original) && typeof o.active === "boolean" && typeof o.solid === "boolean" &&
             (o.action === "loot" ? validBag(o.loot) : !o.loot || validBag(o.loot)) && (o.action !== "door" || validOpening(o, original));
         }) || !s.world.objects.every(o => savedIds.has(o.id) || missingLegacyFixture(o))) throw new Error("Invalid world data.");
-    if (!data.enemies.every(z => validPosition(z) && Data.infected[z.kind] && Number.isFinite(z.hp) && z.hp >= 0 && z.hp <= 88)) throw new Error("Invalid infected data.");
+    if (!data.enemies.every(z => validPosition(z) && Data.infected[z.kind] && Number.isFinite(z.hp) && z.hp >= 0 && z.hp <= Math.max(88, Data.infected[z.kind].hp))) throw new Error("Invalid infected data.");
     for (const key of ["elapsed", "minutes", "kills", "serial", "nextEvent"]) if (!Number.isFinite(data[key]) || data[key] < 0) throw new Error("Invalid game time or progress.");
     const pending = data.fungalAlert;
     if (pending != null) {
@@ -4115,7 +4283,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, isCampaign, campaignGoals, campaignGoal, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, isCampaign, campaignGoals, campaignGoal, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

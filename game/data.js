@@ -82,6 +82,7 @@ const Data = (() => {
     part: {name:"Radio component", group:"Materials", weight:.2, icon:"radio"},
     battery: {name:"Battery", group:"Materials", weight:.06, icon:"battery", detail:"Powers a flashlight"},
     hammer: {name:"Hammer", group:"Equipment", weight:.7, icon:"build"},
+    violin: {name:"Violin", group:"Equipment", weight:.5, use:"violin", icon:"radio", detail:"Plays something old and sad. Someone on the coast may hear it"},
     flashlight: {name:"Flashlight", group:"Equipment", weight:.24, use:"flashlight", icon:"flashlight"},
     housekey: {name:"House key", group:"Equipment", weight:.02, icon:"key", individual:true, detail:"Opens one house. Read the tag to see which"},
     policekey: {name:"Police station key", group:"Equipment", weight:.02, icon:"key", detail:"Unlocks the front door"},
@@ -240,6 +241,21 @@ const Data = (() => {
     ironTools:"Each step needs a tool in good condition: ",
     ironWorn:"Your tools are too worn for this. Look for another in the Ironworks.",
     ironDone:"Inside the cage: the Foundry maul. Strong enough for the first friend.",
+    fathillWoman:"THE WOMAN ON THE PIER · She stands between you and the man at the end of the planks, clutching her coat. ‘Stop the slaughter. I know what you do to them.’ She is afraid for David.",
+    fathillCoatLoose:"Her coat hangs loose. A shove would take it off.",
+    fathillCoat:"The woman sinks to her knees and the coat falls open. She is not fighting any more. ‘Leave him. Please.’",
+    fathillVestLoose:"The life vest is worn through. A shove would take it off.",
+    fathillVest:"The life vest slides off David's shoulders. Something under the rot still hums. A violin would turn his head.",
+    fathillBraced:"It barely moves. It takes far more than that to wear its guard down.",
+    fathillDocile:"She is not fighting. Leave her.",
+    fathillDone:"David goes down at your feet. The woman folds over him, tears the coat lining open and presses the third coordinate into your hand before he takes her, gently. They stay that way.",
+    violinNone:"Nothing near enough to hear it.",
+    violinGuarded:"He hears it. The vest keeps him braced against the sound.",
+    violinPlayed:"You draw the bow. David lifts his head and comes to you, slow and soft, like a man crossing a dance floor.",
+    fieldsLoud:"The noise carries across the open fields. Something is coming.",
+    fieldsSeen:"Eyes on you. The ledger can wait until nothing in the fields has noticed you.",
+    fieldsDone:"FIELD LEDGER · Day 10, no names, just a column of numbers and one line underlined twice: the fourth coordinate. You slip it into your notes and leave the way you came.",
+    fieldsAgain:"The same column of numbers. You already have what you came for.",
     grottoDark:"A brass plate is bolted to the wall, but there is no light to read it by. You need a flashlight with charge.",
     grottoPlate:"SURVEY STATION 5 · The last coordinate is cut into the brass, with a line scratched under it: ‘If the batteries are dying, walk. Do not run the light for the way back.’ You copy it down.",
     grottoDone:"Daylight. The fifth coordinate is in your notes, and your hands are still shaking from the dark.",
@@ -277,9 +293,14 @@ const Data = (() => {
     {id:"pineridge.two-nights", area:"pineridge", text:"Survive two nights at Pine Ridge", detail:"From day 3. No barricades: bring a bedroll, wood and water. Stay warm."},
     {id:"eva.death", area:"eva", text:"Look after Eva", detail:"Until day 5. She keeps talking about the fortress rumour.", gone:"Read Eva's diary at the shelter"},
     {id:"ironworks.barricade", area:"ironworks", text:"Get the strong weapon", detail:"Ironworks machine shop, weekdays 08:00-18:00. The toolboard hammer and crowbar wear out: do not waste them."},
+    {id:"fathill.bosses", area:"fathill", text:"Face the woman on the pier and David", detail:"Bracken Coast, from day 8, on low-tide days (even days). She is afraid for him: the infected you kill where she can see frighten her. There is a violin in the net shed.",
+      coat:"Take David down", coatDetail:"Her coat has fallen and she no longer fights. Wear David's guard down, shove his vest off and play the violin near him.",
+      vest:"Play the violin near David", vestDetail:"His life vest is off. He will come to the violin and stand for it. Hit him while he does."},
+    {id:"westfields.stealth", area:"westfields", text:"Slip through Westfields without a sound", detail:"From day 10. The farmer's ledger is in the Orchard farmhouse at the far west. Noise calls hordes, and infected that have noticed you will not let you read it. Keep to cover and use your knife."},
     {id:"cindergrotto.battery", area:"cindergrotto", text:"Read the surveyor's plate in Cinder Grotto", detail:"From day 12, through the survey tunnel on Pine Ridge. Bring a flashlight and spare batteries: the plate is in the far survey room and cannot be read in the dark.",
       reached:"Climb out of Cinder Grotto", reachedDetail:"You have read the plate. Get back up to Pine Ridge before the light dies."}
   ];
+  const fatHill = {fearKills:10, fearSight:18, guardDamage:450, lureSeconds:22, luredDamage:2, playRange:22};
   const cinemaPatrol = [[13.5,8.5],[19.5,12.5],[14.5,17.5],[7.5,12.5],[12.5,10.5]];
   const cinemaTrap = {horde:50, tensionEvery:6, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
   const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],
@@ -460,7 +481,9 @@ const Data = (() => {
   const infected = {
     walker:{name:"Walker",speed:.9,hp:45,damage:11,color:"#8b8e6b"},
     runner:{name:"Runner",speed:1.55,hp:34,damage:9,color:"#a17a61"},
-    brute:{name:"Brute",speed:.68,hp:88,damage:19,color:"#777e68"}
+    brute:{name:"Brute",speed:.68,hp:88,damage:19,color:"#777e68"},
+    pierwoman:{name:"The woman on the pier",speed:.72,hp:100,damage:12,color:"#8a7d70",boss:true},
+    david:{name:"David",speed:.62,hp:130,damage:17,color:"#75806f",boss:true}
   };
   const outfits = {
     plain:{},
@@ -536,6 +559,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

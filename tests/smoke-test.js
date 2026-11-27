@@ -2013,7 +2013,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
 { // ui.campaign-goals (revisão, sugestão 1): objetivos da campanha no topo, no diário e na seta de direção
   const s = fresh("campaign");
   check("ui.campaign-goals começa com as 3 páginas, sem seta (encontrar as casas faz parte do desafio)",
-    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 6);
+    Sim.pinnedGoal(s) === "Find the three torn pages" && Sim.destination(s) === null && Sim.campaignGoals(s).length === 8);
   s.campaign.completed.push("coldvale.houses");
   check("ui.campaign-goals o cinema ainda fechado mostra quando abre e aponta para a saída",
     Sim.pinnedGoal(s) === "Take the golden idol · opens on day 2" && Sim.destination(s)?.id === "exit-cinema", Sim.pinnedGoal(s));
@@ -2027,7 +2027,11 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   c.campaign.completed.push("cinema.statue", "pineridge.two-nights"); Sim.testJump(c, 6, {}, {anyMode: true}); c.campaign.eva = "gone";
   check("ui.campaign-goals depois da Eva: ler o diário", Sim.pinnedGoal(c) === "Read Eva's diary at the shelter" && Sim.destination(c)?.id === "exit-coldvale");
   c.campaign.completed.push("eva.death", "ironworks.barricade");
-  check("ui.campaign-goals o objetivo seguinte mostra quando abre (dia 12, Cinder Grotto)", Sim.pinnedGoal(c) === "Read the surveyor's plate in Cinder Grotto · opens on day 12", Sim.pinnedGoal(c));
+  check("ui.campaign-goals o objetivo seguinte mostra quando abre (dia 8, FatHill)", Sim.pinnedGoal(c) === "Face the woman on the pier and David · opens on day 8", Sim.pinnedGoal(c));
+  c.campaign.completed.push("fathill.bosses");
+  check("ui.campaign-goals depois mostra Westfields (dia 10)", Sim.pinnedGoal(c) === "Slip through Westfields without a sound · opens on day 10", Sim.pinnedGoal(c));
+  c.campaign.completed.push("westfields.stealth");
+  check("ui.campaign-goals depois mostra a Cinder Grotto (dia 12)", Sim.pinnedGoal(c) === "Read the surveyor's plate in Cinder Grotto · opens on day 12", Sim.pinnedGoal(c));
   c.campaign.completed.push("cindergrotto.battery");
   check("ui.campaign-goals com tudo feito por agora o objetivo avisa que há mais a caminho", /on its way/.test(Sim.pinnedGoal(c)) && Sim.destination(c) === null);
   const plain = fresh("survival"); plain.pinStory = true;
@@ -2102,11 +2106,84 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("cindergrotto: sair para Pine Ridge dá a quinta pista (1ª neste teste) e conclui o desafio",
     out?.world.region === "ridge" && out.campaign.completed.includes("cindergrotto.battery") && out.campaign.clues === 1, out ? out.world.region + " " + out.campaign.clues : "sem viagem");
   const goals = fresh("campaign"); Sim.testJump(goals, 12, {}, {anyMode: true});
-  goals.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade");
+  goals.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth");
   check("cindergrotto: é o objetivo do dia 12 e há dicas para ele", Sim.campaignGoal(goals)?.id === "cindergrotto.battery" && context.CampaignHints.hints["cindergrotto.battery"].length === 3);
   const raw = JSON.parse(JSON.stringify(Sim.snapshot(goals))); delete raw.campaign.grotto;
   let bad = false; try { const broken = JSON.parse(JSON.stringify(Sim.snapshot(goals))); broken.campaign.grotto = "x"; Sim.restore(broken); } catch { bad = true; }
   check("cindergrotto: saves antigos sem 'grotto' carregam e valores inválidos são recusados", Sim.restore(raw).campaign.grotto === "" && bad);
+}
+
+{ // westfields.stealth: o livro da quinta; ruído alto chama uma horda; infetados que te viram impedem a leitura
+  const f = Sim.create(11, "campaign", "carer", 2, undefined, "fields");
+  Sim.testJump(f, 10, {}, {anyMode: true});
+  const ledger = f.world.objects.find(o => o.id === "westfields-ledger");
+  check("westfields: o livro do agricultor está na Orchard farmhouse", Boolean(ledger) && f.world.buildings.find(b => b.id === ledger.building)?.name === "Orchard farmhouse");
+  Object.assign(f.player, {x: ledger.x, y: ledger.y + .5});
+  const seen = f.world.enemies[0]; Object.assign(seen, {x: f.player.x + 3, y: f.player.y, hp: 40, dormant: false, alert: 10});
+  check("westfields: com um infetado que te viu não se lê", !Sim.readFieldsLedger(f, ledger) && !f.campaign.completed.includes("westfields.stealth"));
+  seen.alert = 0;
+  f.atmosphere.nextWave = f.atmosphere.time + 500;
+  Sim.noise(f, f.player.x, f.player.y, 5);
+  check("westfields: ruído baixo não chama a horda", f.campaign.fields.alerts === 0 && f.atmosphere.nextWave > f.atmosphere.time);
+  Sim.noise(f, f.player.x, f.player.y, 9);
+  check("westfields: ruído alto chama uma horda e fica registado", f.atmosphere.nextWave <= f.atmosphere.time && f.campaign.fields.alerts === 1);
+  f.atmosphere.nextWave = f.atmosphere.time + 500; Sim.noise(f, f.player.x, f.player.y, 9);
+  check("westfields: no máximo um alarme por minuto", f.campaign.fields.alerts === 1 && f.atmosphere.nextWave > f.atmosphere.time);
+  check("westfields: o estado guarda-se e carrega", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(f)))).campaign.fields.alerts === 1);
+  for (const e of f.world.enemies) e.alert = 0;
+  check("westfields: sem ninguém que te tenha visto, lê-se e dá a quarta pista",
+    Sim.readFieldsLedger(f, ledger) && f.campaign.completed.includes("westfields.stealth") && f.campaign.clues === 1);
+  const goals = fresh("campaign"); Sim.testJump(goals, 10, {}, {anyMode: true});
+  goals.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses");
+  check("westfields: é o objetivo do dia 10 e há dicas para ele", Sim.campaignGoal(goals)?.id === "westfields.stealth" && context.CampaignHints.hints["westfields.stealth"].length === 3);
+  const raw = JSON.parse(JSON.stringify(Sim.snapshot(goals))); delete raw.campaign.fields;
+  let bad = false; try { const broken = JSON.parse(JSON.stringify(Sim.snapshot(goals))); broken.campaign.fields = {alerts: -1, at: 0}; Sim.restore(broken); } catch { bad = true; }
+  check("westfields: saves antigos sem 'fields' carregam e valores inválidos são recusados", Sim.restore(raw).campaign.fields.alerts === 0 && bad);
+}
+
+{ // fathill.bosses: a mulher do pontão (medo) e o David (colete, violino)
+  const f = Sim.create(11, "campaign", "carer", 2, undefined, "coast");
+  Sim.testJump(f, 8, {}, {anyMode: true});
+  const woman = f.world.enemies.find(z => z.kind === "pierwoman"), david = f.world.enemies.find(z => z.kind === "david");
+  check("fathill: a mulher e o David existem no pontão, protegidos", Boolean(woman && david) && woman.guard && david.guard && woman.hp === 100 && david.hp === 130);
+  const kase = f.world.objects.find(o => o.id === "fathill-case");
+  check("fathill: o violino está na Net shed", Boolean(kase) && kase.loot[0].id === "violin" && f.world.buildings.find(b => b.id === kase.building)?.name === "Net shed");
+  const stand = (x, y) => Object.assign(f.player, {x, y, cooldown: 0, stamina: 100, hp: 100, flash: 0});
+  const kill = i => {
+    const z = World.infected(f.world, "fear-" + i, f.player.x + .8, f.player.y, "walkers", () => .5, "");
+    Object.assign(z, {hp: 1, dormant: false, alert: 0}); f.world.enemies.push(z);
+    f.player.cooldown = 0; f.player.stamina = 100;
+    return Sim.attack(f, z);
+  };
+  stand(woman.x - 2, woman.y);
+  let killed = 0; for (let i = 0; i < 10; i++) killed += kill(i) ? 1 : 0;
+  check("fathill: dez infetados mortos à vista dela enchem o medo e o casaco cai", killed === 10 && f.campaign.fathill.fear === 10 && !woman.guard && woman.docile && f.campaign.fathill.coat,
+    killed + " mortos, medo " + f.campaign.fathill.fear);
+  stand(woman.x - 1, woman.y); const before = woman.hp;
+  check("fathill: sem casaco a mulher já não luta e não se pode atacar", !Sim.attack(f, woman) && woman.hp === before);
+  stand(david.x - 1, david.y);
+  david.hp = 130; const hit = Sim.attack(f, david);
+  check("fathill: com colete o David não perde vida e acumula dano de proteção", hit && david.hp === 130 && david.guardDmg > 0);
+  david.guardDmg = Data.fatHill.guardDamage - 1; f.player.cooldown = 0; Sim.attack(f, david);
+  check("fathill: dano a bastante rompe a proteção, o empurrão tira o colete", david.guardBroken === true && david.guard === true);
+  f.player.cooldown = 0; f.player.stamina = 100; Sim.shove(f);
+  check("fathill: depois do empurrão o colete sai", !david.guard && f.campaign.fathill.vest);
+  f.player.bag.push({id: "violin", qty: 1, uid: "t-violin", condition: 100});
+  check("fathill: tocar o violino perto do David atrai-o", Sim.use(f, f.player.bag.length - 1) && david.lured > 0);
+  david.lured = 0; david.hp = 130; f.player.cooldown = 0; Sim.attack(f, david); const normal = 130 - david.hp;
+  david.lured = 10; david.hp = 130; f.player.cooldown = 0; Sim.attack(f, david); const doubled = 130 - david.hp;
+  check("fathill: atraído pelo violino o David leva o dobro do dano", normal > 0 && doubled === normal * Data.fatHill.luredDamage, normal + " vs " + doubled);
+  david.hp = 120;
+  const copy = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(f))));
+  check("fathill: o estado e os chefes (vida acima de 88) guardam-se e carregam", copy.campaign.fathill.fear === 10 && copy.world.enemies.some(z => z.kind === "david" && z.hp > 88 && z.guard === false));
+  david.hp = 1; f.player.cooldown = 0; Sim.attack(f, david);
+  check("fathill: derrotar o David conclui o desafio e dá a terceira pista", david.hp === 0 && f.campaign.completed.includes("fathill.bosses") && f.campaign.clues === 1 && woman.hp === 0);
+  const goals = fresh("campaign"); Sim.testJump(goals, 8, {}, {anyMode: true});
+  goals.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade");
+  check("fathill: é o objetivo do dia 8 e há dicas para ele", Sim.campaignGoal(goals)?.id === "fathill.bosses" && context.CampaignHints.hints["fathill.bosses"].length === 3);
+  const raw = JSON.parse(JSON.stringify(Sim.snapshot(goals))); delete raw.campaign.fathill;
+  let bad = false; try { const broken = JSON.parse(JSON.stringify(Sim.snapshot(goals))); broken.campaign.fathill = {fear: -1, coat: false, vest: false}; Sim.restore(broken); } catch { bad = true; }
+  check("fathill: saves antigos sem 'fathill' carregam e valores inválidos são recusados", Sim.restore(raw).campaign.fathill.fear === 0 && bad);
 }
 
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>

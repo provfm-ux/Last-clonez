@@ -2048,6 +2048,20 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     plain.campaign.hints.objective === null);
 }
 
+{ // atlas das personagens em 8 direções: index.json bate certo com os PNG em disco (ignorado se a pasta não existir)
+  const cdir = path.join(dir, "assets/characters"), indexFile = path.join(cdir, "index.json");
+  if (fs.existsSync(indexFile)) {
+    const idx = JSON.parse(fs.readFileSync(indexFile, "utf8")), bad = [];
+    const dims = f => { const b = fs.readFileSync(path.join(cdir, f)); return b.toString("latin1", 1, 4) === "PNG" ? [b.readUInt32BE(16), b.readUInt32BE(20)] : null; };
+    for (const c of idx.characters) for (const [t, v] of Object.entries(c.tiers)) {
+      const d = dims(v.file);
+      if (!d || d[0] !== v.cell[0] * 8 || d[1] !== v.cell[1] || v.anchor[0] >= v.cell[0] || v.anchor[1] > v.cell[1]) bad.push(c.id + "/" + t);
+    }
+    check("assets.characters 20 personagens x 3 tamanhos, 8 células iguais por PNG, âncora dentro da célula",
+      idx.characters.length === 20 && idx.order.join() === "N,NE,E,SE,S,SW,W,NW" && idx.default_tier in idx.tiers && !bad.length, bad.join(","));
+  }
+}
+
 if (args[1]) { // compatibilidade: gravação de uma versão antiga abre nesta? node smoke-test.js <pasta-nova> <pasta-antiga>
   const load = d => { const h = fs.readFileSync(path.join(d, "index.html"), "utf8"), fl = [...h.matchAll(/<script src="([a-z-]+)\.js/g)].map(m => m[1]).filter(f => f !== "view" && f !== "game");
     let src = ""; for (const f of fl) src += fs.readFileSync(path.join(d, f + ".js"), "utf8").replace(/^"use strict";/, "") + `\n;globalThis.${pascal(f)}=${pascal(f)};\n`;

@@ -1,0 +1,1107 @@
+{
+ "order": [
+  "N",
+  "NE",
+  "E",
+  "SE",
+  "S",
+  "SW",
+  "W",
+  "NW"
+ ],
+ "default_tier": "mini",
+ "tiers": {
+  "hd": {
+   "height": 160
+  },
+  "game": {
+   "height": 80
+  },
+  "mini": {
+   "height": 40
+  }
+ },
+ "layout": "one row of 8 cells (order above), every cell the same size, anchor = feet (crawler: body)",
+ "characters": [
+  {
+   "id": "woman",
+   "name": "Mulher do Pont\u00e3o",
+   "category": "boss",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "01_Mulher_do_Pontao_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "woman_hd.png",
+     "cell": [
+      77,
+      163
+     ],
+     "anchor": [
+      36,
+      162
+     ],
+     "scale": 0.40921
+    },
+    "game": {
+     "file": "woman_game.png",
+     "cell": [
+      38,
+      82
+     ],
+     "anchor": [
+      18,
+      81
+     ],
+     "scale": 0.2046
+    },
+    "mini": {
+     "file": "woman_mini.png",
+     "cell": [
+      19,
+      41
+     ],
+     "anchor": [
+      9,
+      40
+     ],
+     "scale": 0.1023
+    }
+   }
+  },
+  {
+   "id": "david",
+   "name": "David",
+   "category": "boss",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "02_David_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "david_hd.png",
+     "cell": [
+      103,
+      163
+     ],
+     "anchor": [
+      48,
+      162
+     ],
+     "scale": 0.40921
+    },
+    "game": {
+     "file": "david_game.png",
+     "cell": [
+      51,
+      82
+     ],
+     "anchor": [
+      24,
+      81
+     ],
+     "scale": 0.2046
+    },
+    "mini": {
+     "file": "david_mini.png",
+     "cell": [
+      26,
+      41
+     ],
+     "anchor": [
+      12,
+      40
+     ],
+     "scale": 0.1023
+    }
+   }
+  },
+  {
+   "id": "friend",
+   "name": "Amigo 1",
+   "category": "boss",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "03_Amigo_1_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "friend_hd.png",
+     "cell": [
+      67,
+      163
+     ],
+     "anchor": [
+      31,
+      162
+     ],
+     "scale": 0.41885
+    },
+    "game": {
+     "file": "friend_game.png",
+     "cell": [
+      33,
+      82
+     ],
+     "anchor": [
+      15,
+      81
+     ],
+     "scale": 0.20942
+    },
+    "mini": {
+     "file": "friend_mini.png",
+     "cell": [
+      17,
+      41
+     ],
+     "anchor": [
+      8,
+      40
+     ],
+     "scale": 0.10471
+    }
+   }
+  },
+  {
+   "id": "pip",
+   "name": "Pip",
+   "category": "boss",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "04_Pip_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "pip_hd.png",
+     "cell": [
+      103,
+      163
+     ],
+     "anchor": [
+      51,
+      162
+     ],
+     "scale": 0.41344
+    },
+    "game": {
+     "file": "pip_game.png",
+     "cell": [
+      51,
+      82
+     ],
+     "anchor": [
+      26,
+      81
+     ],
+     "scale": 0.20672
+    },
+    "mini": {
+     "file": "pip_mini.png",
+     "cell": [
+      26,
+      41
+     ],
+     "anchor": [
+      13,
+      40
+     ],
+     "scale": 0.10336
+    }
+   }
+  },
+  {
+   "id": "walker",
+   "name": "Walker",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "05_Walker_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "walker_hd.png",
+     "cell": [
+      70,
+      163
+     ],
+     "anchor": [
+      35,
+      162
+     ],
+     "scale": 0.41131
+    },
+    "game": {
+     "file": "walker_game.png",
+     "cell": [
+      35,
+      82
+     ],
+     "anchor": [
+      17,
+      81
+     ],
+     "scale": 0.20566
+    },
+    "mini": {
+     "file": "walker_mini.png",
+     "cell": [
+      17,
+      41
+     ],
+     "anchor": [
+      9,
+      40
+     ],
+     "scale": 0.10283
+    }
+   }
+  },
+  {
+   "id": "runner",
+   "name": "Runner",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "06_Runner_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "runner_hd.png",
+     "cell": [
+      115,
+      154
+     ],
+     "anchor": [
+      53,
+      152
+     ],
+     "scale": 0.39894
+    },
+    "game": {
+     "file": "runner_game.png",
+     "cell": [
+      58,
+      77
+     ],
+     "anchor": [
+      26,
+      76
+     ],
+     "scale": 0.19947
+    },
+    "mini": {
+     "file": "runner_mini.png",
+     "cell": [
+      29,
+      38
+     ],
+     "anchor": [
+      13,
+      38
+     ],
+     "scale": 0.09973
+    }
+   }
+  },
+  {
+   "id": "brute",
+   "name": "Brute",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "07_Brute_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "brute_hd.png",
+     "cell": [
+      189,
+      209
+     ],
+     "anchor": [
+      93,
+      207
+     ],
+     "scale": 0.53057
+    },
+    "game": {
+     "file": "brute_game.png",
+     "cell": [
+      95,
+      105
+     ],
+     "anchor": [
+      47,
+      103
+     ],
+     "scale": 0.26528
+    },
+    "mini": {
+     "file": "brute_mini.png",
+     "cell": [
+      47,
+      52
+     ],
+     "anchor": [
+      23,
+      52
+     ],
+     "scale": 0.13264
+    }
+   }
+  },
+  {
+   "id": "construction",
+   "name": "Infetado da constru\u00e7\u00e3o",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "08_Infetado_Construcao_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "construction_hd.png",
+     "cell": [
+      64,
+      163
+     ],
+     "anchor": [
+      31,
+      162
+     ],
+     "scale": 0.40712
+    },
+    "game": {
+     "file": "construction_game.png",
+     "cell": [
+      32,
+      82
+     ],
+     "anchor": [
+      15,
+      81
+     ],
+     "scale": 0.20356
+    },
+    "mini": {
+     "file": "construction_mini.png",
+     "cell": [
+      16,
+      41
+     ],
+     "anchor": [
+      8,
+      40
+     ],
+     "scale": 0.10178
+    }
+   }
+  },
+  {
+   "id": "paramedic",
+   "name": "Infetado param\u00e9dico",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "09_Infetado_Paramedico_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "paramedic_hd.png",
+     "cell": [
+      68,
+      163
+     ],
+     "anchor": [
+      34,
+      162
+     ],
+     "scale": 0.40921
+    },
+    "game": {
+     "file": "paramedic_game.png",
+     "cell": [
+      34,
+      82
+     ],
+     "anchor": [
+      17,
+      81
+     ],
+     "scale": 0.2046
+    },
+    "mini": {
+     "file": "paramedic_mini.png",
+     "cell": [
+      17,
+      41
+     ],
+     "anchor": [
+      8,
+      40
+     ],
+     "scale": 0.1023
+    }
+   }
+  },
+  {
+   "id": "hiker",
+   "name": "Infetado caminhante",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "10_Infetado_Caminhante_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "hiker_hd.png",
+     "cell": [
+      70,
+      163
+     ],
+     "anchor": [
+      36,
+      162
+     ],
+     "scale": 0.41885
+    },
+    "game": {
+     "file": "hiker_game.png",
+     "cell": [
+      35,
+      82
+     ],
+     "anchor": [
+      18,
+      81
+     ],
+     "scale": 0.20942
+    },
+    "mini": {
+     "file": "hiker_mini.png",
+     "cell": [
+      17,
+      41
+     ],
+     "anchor": [
+      9,
+      40
+     ],
+     "scale": 0.10471
+    }
+   }
+  },
+  {
+   "id": "police",
+   "name": "Infetado pol\u00edcia",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "11_Infetado_Policia_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "police_hd.png",
+     "cell": [
+      71,
+      163
+     ],
+     "anchor": [
+      36,
+      162
+     ],
+     "scale": 0.40816
+    },
+    "game": {
+     "file": "police_game.png",
+     "cell": [
+      35,
+      82
+     ],
+     "anchor": [
+      18,
+      81
+     ],
+     "scale": 0.20408
+    },
+    "mini": {
+     "file": "police_mini.png",
+     "cell": [
+      18,
+      41
+     ],
+     "anchor": [
+      9,
+      40
+     ],
+     "scale": 0.10204
+    }
+   }
+  },
+  {
+   "id": "survivor_male",
+   "name": "Sobrevivente masculino",
+   "category": "human",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "12_Sobrevivente_Homem_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "survivor_male_hd.png",
+     "cell": [
+      65,
+      163
+     ],
+     "anchor": [
+      35,
+      162
+     ],
+     "scale": 0.41775
+    },
+    "game": {
+     "file": "survivor_male_game.png",
+     "cell": [
+      33,
+      82
+     ],
+     "anchor": [
+      17,
+      81
+     ],
+     "scale": 0.20888
+    },
+    "mini": {
+     "file": "survivor_male_mini.png",
+     "cell": [
+      16,
+      41
+     ],
+     "anchor": [
+      9,
+      40
+     ],
+     "scale": 0.10444
+    }
+   }
+  },
+  {
+   "id": "survivor_female",
+   "name": "Sobrevivente feminina",
+   "category": "human",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "13_Sobrevivente_Mulher_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "survivor_female_hd.png",
+     "cell": [
+      62,
+      163
+     ],
+     "anchor": [
+      32,
+      162
+     ],
+     "scale": 0.41667
+    },
+    "game": {
+     "file": "survivor_female_game.png",
+     "cell": [
+      31,
+      82
+     ],
+     "anchor": [
+      16,
+      81
+     ],
+     "scale": 0.20833
+    },
+    "mini": {
+     "file": "survivor_female_mini.png",
+     "cell": [
+      16,
+      41
+     ],
+     "anchor": [
+      8,
+      40
+     ],
+     "scale": 0.10417
+    }
+   }
+  },
+  {
+   "id": "eva",
+   "name": "Eva",
+   "category": "human",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "14_Eva_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "eva_hd.png",
+     "cell": [
+      71,
+      163
+     ],
+     "anchor": [
+      34,
+      162
+     ],
+     "scale": 0.42553
+    },
+    "game": {
+     "file": "eva_game.png",
+     "cell": [
+      36,
+      82
+     ],
+     "anchor": [
+      17,
+      81
+     ],
+     "scale": 0.21277
+    },
+    "mini": {
+     "file": "eva_mini.png",
+     "cell": [
+      18,
+      41
+     ],
+     "anchor": [
+      8,
+      40
+     ],
+     "scale": 0.10638
+    }
+   }
+  },
+  {
+   "id": "protagonist",
+   "name": "Protagonista",
+   "category": "human",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "15_Protagonista_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "protagonist_hd.png",
+     "cell": [
+      75,
+      163
+     ],
+     "anchor": [
+      38,
+      162
+     ],
+     "scale": 0.41885
+    },
+    "game": {
+     "file": "protagonist_game.png",
+     "cell": [
+      37,
+      82
+     ],
+     "anchor": [
+      19,
+      81
+     ],
+     "scale": 0.20942
+    },
+    "mini": {
+     "file": "protagonist_mini.png",
+     "cell": [
+      19,
+      41
+     ],
+     "anchor": [
+      10,
+      40
+     ],
+     "scale": 0.10471
+    }
+   }
+  },
+  {
+   "id": "missing_left_arm",
+   "name": "Zombie sem um bra\u00e7o",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "16_Zombie_Sem_Um_Braco_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "missing_left_arm_hd.png",
+     "cell": [
+      66,
+      163
+     ],
+     "anchor": [
+      33,
+      162
+     ],
+     "scale": 0.40712
+    },
+    "game": {
+     "file": "missing_left_arm_game.png",
+     "cell": [
+      33,
+      82
+     ],
+     "anchor": [
+      17,
+      81
+     ],
+     "scale": 0.20356
+    },
+    "mini": {
+     "file": "missing_left_arm_mini.png",
+     "cell": [
+      17,
+      41
+     ],
+     "anchor": [
+      8,
+      40
+     ],
+     "scale": 0.10178
+    }
+   }
+  },
+  {
+   "id": "missing_right_forearm",
+   "name": "Infetada com membros em falta",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "17_Infetada_Com_Membros_Em_Falta_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "missing_right_forearm_hd.png",
+     "cell": [
+      68,
+      163
+     ],
+     "anchor": [
+      34,
+      162
+     ],
+     "scale": 0.41237
+    },
+    "game": {
+     "file": "missing_right_forearm_game.png",
+     "cell": [
+      34,
+      82
+     ],
+     "anchor": [
+      17,
+      81
+     ],
+     "scale": 0.20619
+    },
+    "mini": {
+     "file": "missing_right_forearm_mini.png",
+     "cell": [
+      17,
+      41
+     ],
+     "anchor": [
+      9,
+      40
+     ],
+     "scale": 0.10309
+    }
+   }
+  },
+  {
+   "id": "limping",
+   "name": "Zombie coxo",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "18_Zombie_Coxo_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "limping_hd.png",
+     "cell": [
+      95,
+      163
+     ],
+     "anchor": [
+      46,
+      162
+     ],
+     "scale": 0.40921
+    },
+    "game": {
+     "file": "limping_game.png",
+     "cell": [
+      47,
+      82
+     ],
+     "anchor": [
+      23,
+      81
+     ],
+     "scale": 0.2046
+    },
+    "mini": {
+     "file": "limping_mini.png",
+     "cell": [
+      24,
+      41
+     ],
+     "anchor": [
+      11,
+      40
+     ],
+     "scale": 0.1023
+    }
+   }
+  },
+  {
+   "id": "crawler",
+   "name": "Zombie rastejante",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "19_Zombie_Rastejante_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "crawler_hd.png",
+     "cell": [
+      167,
+      130
+     ],
+     "anchor": [
+      83,
+      129
+     ],
+     "scale": 0.41558
+    },
+    "game": {
+     "file": "crawler_game.png",
+     "cell": [
+      84,
+      65
+     ],
+     "anchor": [
+      41,
+      64
+     ],
+     "scale": 0.20779
+    },
+    "mini": {
+     "file": "crawler_mini.png",
+     "cell": [
+      42,
+      33
+     ],
+     "anchor": [
+      21,
+      32
+     ],
+     "scale": 0.1039
+    }
+   }
+  },
+  {
+   "id": "elderly_female",
+   "name": "Infetada idosa",
+   "category": "infected",
+   "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+   ],
+   "source": "20_Infetada_Idosa_8_Direcoes.png",
+   "tiers": {
+    "hd": {
+     "file": "elderly_female_hd.png",
+     "cell": [
+      111,
+      163
+     ],
+     "anchor": [
+      47,
+      162
+     ],
+     "scale": 0.40816
+    },
+    "game": {
+     "file": "elderly_female_game.png",
+     "cell": [
+      55,
+      82
+     ],
+     "anchor": [
+      23,
+      81
+     ],
+     "scale": 0.20408
+    },
+    "mini": {
+     "file": "elderly_female_mini.png",
+     "cell": [
+      28,
+      41
+     ],
+     "anchor": [
+      12,
+      40
+     ],
+     "scale": 0.10204
+    }
+   }
+  }
+ ]
+}

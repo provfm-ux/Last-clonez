@@ -120,5 +120,7 @@ def build(package_dir, out_dir, only=None):
         json.dump(entry, open(os.path.join(out_dir, f"{ch['id']}.json"), "w"), indent=1)
         result.append(entry)
         print(ch["id"].ljust(14), {k: v["cell"] for k, v in entry["tiers"].items()})
-    json.dump({"order": DIRS, "characters": result}, open(os.path.join(out_dir, "index.json"), "w"), indent=1)
+    json.dump({"order": DIRS, "default_tier": "mini", "tiers": {k: {"height": v[0]} for k, v in TIERS.items()},
+               "layout": "one row of 8 cells (order above), every cell the same size, anchor = feet (crawler: body)",
+               "characters": result}, open(os.path.join(out_dir, "index.json"), "w"), indent=1)
     return result

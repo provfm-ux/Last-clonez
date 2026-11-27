@@ -43,6 +43,11 @@ def main(argv=None):
     m.add_argument("--keep-bg", action="store_true", help="do not remove background")
     m.add_argument("--dirs", action="store_true", help="also write direction sheet (S,SE,E,SW,W)")
     m.add_argument("--scale", type=int, default=8)
+    d = sub.add_parser("model", help="render a built-in 3D box model in 8 true directions")
+    d.add_argument("name", help="model name (see pixelforge/models)")
+    d.add_argument("-o", "--out", default="out/model")
+    d.add_argument("--ppu", type=int, default=2, help="pixels per model unit (size)")
+    d.add_argument("--colors", type=int, default=20)
     a = p.parse_args(argv)
 
     if a.cmd == "styles":
@@ -52,6 +57,18 @@ def main(argv=None):
     if a.cmd == "fetch":
         for u in a.urls:
             print(fetch(u))
+        return
+    if a.cmd == "model":
+        from .models import MODELS
+        from .voxel import render_sheet, sheet_image
+        if a.name not in MODELS:
+            sys.exit(f"unknown model; have: {', '.join(MODELS)}")
+        sp = render_sheet(MODELS[a.name], a.ppu, colors=a.colors)
+        os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
+        for k, im in sp.items():
+            im.save(f"{a.out}_{k}.png")
+        sheet_image(sp).save(f"{a.out}_sheet.png")
+        print(f"{a.out}_sheet.png  8 dirs, sprite size {next(iter(sp.values())).size}")
         return
     img = load_source(a.source, a.prompt)
     art, warns, cfg = make(

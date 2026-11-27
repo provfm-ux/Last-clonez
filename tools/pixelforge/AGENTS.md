@@ -12,6 +12,10 @@ Never hand-draw pixels in chat. Run the CLI.
 4. Look at `out/<name>_x8.png`. Wrong colors/size? Change ONE flag and rerun. Do not rewrite code.
 5. Report `WARN:` lines to the user (e.g. busy background not removed -> need cleaner reference).
 
+No reference found / need true 8 directions: `python3 -m pixelforge model <name> -o out/<name>` renders a 3D box model
+from 8 camera angles (models in `pixelforge/models/*.py`, ~20 boxes each; add a new file + register in `models/__init__.py`).
+Built: `police`. Author a model once, reuse forever.
+
 Limits: one photo gives one view. `--dirs` makes S,SE,E,SW,W by squashing; N-facing needs a back view.
 Web images may be copyrighted: keep refs/*.json (source URL), do not commit refs/ or out/.
-Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py` (healthy = `Tudo OK` twice).
+Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py && python3 tests/test_voxel.py` (healthy = `Tudo OK` x3).

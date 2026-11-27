@@ -943,7 +943,7 @@
       const pinned = state.player.pinned.includes(item.id);
       const useLabel = item.id === "flashlight" ? item === Sim.activeLight(state) ? "Switch off" : "Switch on" :
         d.damage ? equipped ? "Unequip" : "Equip" : d.slot ? worn ? "Remove" : "Equip" :
-        ({book:state.player.readBooks?.includes(item.id) ? "Studied" : "Read", food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take"}[d.use] || "");
+        ({book:state.player.readBooks?.includes(item.id) ? "Studied" : "Read", food:"Eat", water:"Drink", bandage:"Bandage", disinfectant:"Disinfect", backpack:"Equip pack", painkiller:"Take", violin:"Play"}[d.use] || "");
       return '<div class="item-row bag-item ' + (equipped || worn ? "equipped-item" : "") + '"><div><div class="item-top">' +
         itemIcon(item.id) + "<b>" + esc(Sim.itemName(state,item.id)) + " ×" + item.qty + '</b></div><div class="item-meta">' + itemDescription(item) + '</div></div><div class="item-actions">' +
         (useLabel ? button(useLabel, (equipped ? "unequip-" : "use-") + index, (d.use === "food" && Sim.isSpoiled(state,item)) || (d.use === "book" && state.player.readBooks?.includes(item.id)), "primary") : "") +

@@ -9,6 +9,7 @@ const CampaignHints = (() => {
   const hints = {
     "coldvale.houses":["Prepper notes tend to hide in ordinary homes, not shops.", "Three houses in Cold Vale each hold a torn page.",
       "Search inside the family houses around the shelter for torn pages."],
+    "fathill.bosses":["The coast opens on day 8, on even days, at low tide.", "Infected killed where she can see make the woman afraid. She is protecting someone. There is a violin in the net shed.", "Stop the slaughter once her coat falls. Wear David's guard down, shove the vest off, then play the violin near him."],
     "westfields.stealth":["The farmland opens on day 10, and the farmhouse at the far west is the place.", "Loud noise calls a group. Keep your knife for the ones that block the way.", "Read the ledger in the Orchard farmhouse. Nothing may have noticed you."],
     "cindergrotto.battery":["The survey tunnel on Pine Ridge only opens from day 12.", "The plate is deep, in the survey room. It needs a lit flashlight to read.", "Bring spare batteries and plan the way back out before the light dies."],
     "amigo1.lockdown-chat":["It still listens to prompts.", "It is mid-lockdown. Words may work where blows did not.", "Ask it to stand down."],

@@ -1766,6 +1766,127 @@ const View = (() => {
     return true;
   }
 
+  // 8-direction character atlases (game/assets/characters, one row of 8 cells per character, order N NE E SE S SW W NW).
+  // Idle is one static pose per direction; walking uses a baked 8-frame cycle (legs and forearms rotated about their joints),
+  // and strike / recoil stay procedural (lunge, recoil). Until the atlas has loaded, or when it cannot
+  // (single.html has no asset folder), the old zombie atlas / procedural sprites are drawn instead. Debug: ?chars=off|mini|game|hd.
+  const charTiers = {mini: 1, game: .5, hd: .25};      // world-size multiplier: the mini tier is the 40 px reference
+  const charVectors = [[0, -1], [.7, -.7], [1, 0], [.7, .7], [0, 1], [-.7, .7], [-1, 0], [-.7, -.7]];
+  const charImages = new Map(), charEntries = new Map();
+  let charTier = "mini", charState = 0;              // 0 not started, 1 loading, 2 ready, -1 unavailable
+  try {
+    const wanted = /[?&]chars=(off|mini|game|hd)\b/.exec(location.search)?.[1];
+    if (wanted) charTier = wanted;
+  } catch {}
+  // Mix of plain infected, as [character, weight]. The two cut-off-arm variants show up "sometimes" (2 of 9 here): edit the weights.
+  const plainInfected = [["walker", 4], ["limping", 2], ["elderly_female", 1], ["missing_left_arm", 1], ["missing_right_forearm", 1]];
+  const plainTotal = plainInfected.reduce((sum, [, weight]) => sum + weight, 0);
+  function pickPlainInfected(phase) {
+    let t = phase * plainTotal;
+    for (const [id, weight] of plainInfected) { if (t < weight) return id; t -= weight; }
+    return plainInfected[0][0];
+  }
+  const infectedByOutfit = {worker: "construction", medic: "paramedic", patrol: "police", hiker: "hiker"};
+
+  // Player customisation on top of the sprites: skin, hair and jacket are recoloured from region masks when the atlas loads
+  // (target colour x source brightness, so the shading survives). Masks and reference colours come from index.json (recolor).
+  const recoloured = new Map();
+  const hexRgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  const mixRgb = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  // returns the recoloured canvas, undefined while the mask is still loading, null if it cannot be done (use the plain atlas)
+  function recolouredAtlas(img, maskFile, refs, colours) {
+    const key = maskFile + "|" + colours.join("|");
+    if (recoloured.has(key)) return recoloured.get(key);
+    const mask = charImage(maskFile);
+    if (mask.naturalWidth !== img.naturalWidth || mask.naturalHeight !== img.naturalHeight) return undefined;
+    let out = null;
+    try {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const canvas = document.createElement("canvas"), side = document.createElement("canvas");
+      canvas.width = side.width = w; canvas.height = side.height = h;
+      const c = canvas.getContext("2d"), m = side.getContext("2d");
+      c.drawImage(img, 0, 0); m.drawImage(mask, 0, 0);
+      const pix = c.getImageData(0, 0, w, h), regions = ["skin", "hair", "jacket"];
+      const md = m.getImageData(0, 0, w, h).data, d = pix.data;
+      const lum = (r, g, b) => .299 * r + .587 * g + .114 * b;
+      for (let i = 0; i < d.length; i += 4) {
+        const region = Math.round(md[i] / 85);
+        if (!region || d[i + 3] === 0) continue;
+        const target = colours[region - 1], ref = refs[regions[region - 1]];
+        const ratio = Math.min(1.7, Math.max(.35, lum(d[i], d[i + 1], d[i + 2]) / lum(ref[0], ref[1], ref[2])));
+        d[i] = Math.min(255, target[0] * ratio); d[i + 1] = Math.min(255, target[1] * ratio); d[i + 2] = Math.min(255, target[2] * ratio);
+      }
+      c.putImageData(pix, 0, 0);
+      out = canvas;
+    } catch {}
+    recoloured.set(key, out);
+    return out;
+  }
+
+  function characterFor(a, isPlayer) {
+    if (isPlayer) return a.appearance === "female" ? "survivor_female" : "protagonist";
+    if (a.stats) {                                    // infected: kind, then outfit, then a stable pick from the spawn phase
+      if (a.kind === "brute" || a.kind === "runner") return a.kind;
+      const phase = Number.isFinite(a.phase) ? a.phase : 0;
+      return infectedByOutfit[a.outfit] ?? pickPlainInfected(phase % 1);
+    }
+    return a.id === "eva" ? "eva" : null;
+  }
+
+  function charImage(file) {
+    let img = charImages.get(file);
+    if (!img) { img = new Image(); img.src = "assets/characters/" + file; charImages.set(file, img); }
+    return img;
+  }
+
+  function drawCharacter(a, isPlayer, x, y, scale, direction, stride, clock) {
+    if (charState < 0 || charTier === "off" || typeof Image !== "function" || typeof fetch !== "function") return false;
+    if (charState === 0) {
+      charState = 1;
+      try {
+        fetch("assets/characters/index.json").then(r => r.json()).then(index => {
+          for (const c of index.characters) charEntries.set(c.id, c);
+          charState = 2;
+        }).catch(() => { charState = -1; });
+      } catch { charState = -1; }
+      return false;
+    }
+    if (charState !== 2) return false;
+    const entry = charEntries.get(characterFor(a, isPlayer)), t = entry?.tiers[charTier];
+    if (!t) return false;
+    const walk = a.moving ? entry.walk?.[charTier] : null;       // baked walk cycle: rows = 8 frames, columns = 8 directions
+    const walkImg = walk && charImage(walk.file);
+    const baked = Boolean(walkImg && walkImg.naturalWidth === walk.cell[0] * 8 && walkImg.naturalHeight === walk.cell[1] * walk.frames);
+    const src = baked ? walk : t, img = baked ? walkImg : charImage(t.file);
+    if (img.naturalWidth !== src.cell[0] * 8 || img.naturalHeight !== src.cell[1] * (baked ? walk.frames : 1)) return false;   // not decoded yet
+    const index = direction & 4 ? (direction & 2 ? 0 : 4) : direction & 8 ? (direction & 1 ? 6 : 2) :
+      direction & 2 ? (direction & 1 ? 7 : 1) : (direction & 1 ? 5 : 3);
+    const kindScale = a.kind === "brute" ? 1.28 : a.kind === "runner" ? .94 : 1;   // already baked into those atlases
+    const z = scale / kindScale * charTiers[charTier], vec = charVectors[index];
+    let sheet = img;                                   // the player's skin, hair and jacket follow the character settings
+    const rc = isPlayer && entry.recolor?.[charTier], maskFile = rc && (baked ? rc.walkMask : rc.mask);
+    if (maskFile) {
+      const pal = survivorPalette(a);
+      const hair = pal.cut === "shaved" ? mixRgb(hexRgb(pal.skin), [40, 30, 28], .45) : hexRgb(pal.hair);
+      const jacket = hexRgb(a.gear?.body === "raincoat" ? "#9b8652" : pal.jacket);
+      sheet = recolouredAtlas(img, maskFile, rc.refs, [hexRgb(pal.skin), hair, jacket]);
+      if (sheet === undefined) return false;           // mask still loading: draw the procedural sprite meanwhile
+      sheet ||= img;
+    }
+    const frame = baked ? Math.floor(stride * walk.frames) % walk.frames : 0;
+    let dx = 0, dy = 0;
+    if (a.moving && !baked) {                          // no baked cycle for this size: step bob + sway on the stride phase
+      const wave = Math.sin(stride * Math.PI * 2);
+      dy = -Math.abs(wave) * 1.5 * scale; dx = wave * .6 * scale;
+    }
+    const lunge = a.swing > 0 ? 2.5 : a.windup > 0 ? -1.2 : a.flash > 0 ? -1.5 : 0;   // strike, wind-up, recoil
+    dx += vec[0] * lunge * scale; dy += vec[1] * lunge * scale * .5;
+    ctx.drawImage(sheet, index * src.cell[0], frame * src.cell[1], src.cell[0], src.cell[1],
+      Math.round(x - src.anchor[0] * z + dx), Math.round(y - src.anchor[1] * z + dy),
+      Math.round(src.cell[0] * z), Math.round(src.cell[1] * z));
+    return true;
+  }
+
   function microActor(a, isPlayer, state, alive, x, y, scale, clock = 0) {
     const moving = alive && a.moving;
     const running = moving && (isPlayer ? state.running : a.kind === "runner" && a.alert > 0);
@@ -1794,8 +1915,9 @@ const View = (() => {
     const profile = !axial && screenY <= screenX * .414;
     const direction = Number(across < 0) + 2 * Number(depth < 0 && !profile) +
       4 * Number(axial) + 8 * Number(profile);
-    const imported = alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, direction, stride.phase, clock);
-    if (!imported) {
+    const chars = alive && drawCharacter(a, isPlayer, x, y, scale, direction, stride.phase, clock);
+    const imported = chars || alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, direction, stride.phase, clock);
+    if (!imported || chars && isPlayer) {
       const palette = isPlayer ? survivorPalette(a) : null;
       const shirt = isPlayer ? (a.gear.body === "raincoat" ? "#9b8652" : palette.jacket) :
         Data.outfits[a.outfit]?.shirt || a.stats?.color || "#73705f";
@@ -1804,9 +1926,9 @@ const View = (() => {
         palette?.hair ?? "#413e35", direction, pose, step, lift,
         a.outfit === "hiker" || Boolean(isPlayer && a.backpack), gesture, palette?.cut);
       const left = Math.round(x - spriteWidth * scale / 2), top = Math.round(y - spriteGround * scale);
-      ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
+      if (!chars) ctx.drawImage(frame.canvas, frame.left, frame.top, spriteWidth, spriteHeight, left, top,
         Math.round(spriteWidth * scale), Math.round(spriteHeight * scale));
-      if (isPlayer && frame.grip) {
+      if (isPlayer && frame.grip) {            // the held weapon keeps the grip point of the procedural pose
         const phase = swing ? (heldId === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
           a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : pose === "ready" ? (heldId === "pistol" ? 4 : 0) : 6;
         drawHeldWeapon(heldId, left + Math.round(frame.grip[0] * scale), top + Math.round(frame.grip[1] * scale), dx < dy ? -1 : 1, phase);

@@ -532,6 +532,35 @@ const scenarios = {
     await page.screenshot({path: path.join(out, "reach-poses.png"), clip: {x: 240, y: 190, width: 400, height: 330}});
     return {pass: n >= 3, notes: n + " infected winding up around the player (see reach-poses.png)"};
   },
+  async "visual-checks"(page) { // seated behind a sofa, a mushroom patch, an overhead axe chop: screenshots to look at
+    await startCampaign(page);
+    const shots = [];
+    const snap = async (name, clip = {x: 290, y: 240, width: 300, height: 220}) => { await page.waitForTimeout(350); const f = "visual-" + name + ".png"; await page.screenshot({path: path.join(out, f), clip}); shots.push(f); };
+    const sat = await page.evaluate(() => { const s = pt.s(); pt.calm(); s.world.enemies = []; s.zoom = 3; s.player.fatigue = 50;
+      const seats = s.world.objects.filter(o => ["sofa", "armchair", "chair"].includes(o.kind) && o.active);
+      for (const o of seats) for (const [dx, dy] of [[-.8, -.2], [-.2, -.8], [.8, .2], [.2, .8]]) {          // stand on the far side first
+        Object.assign(s.player, {x: o.x + dx, y: o.y + dy, path: []});
+        if (World.clear(s.world, s.player.x, s.player.y, .18) && Sim.reachableObject(s, o) && Sim.restOnSeat(s, o)) return o.kind;
+      }
+      return null; });
+    await snap("seated");
+    const shroom = await page.evaluate(() => { const s = pt.s(); s.player.resting = false;
+      let m = s.world.objects.find(o => o.action === "mushroom" && !o.harvested);
+      if (!m) { m = {id:"qa-mushroom", kind:"mushroom", action:"mushroom", species:"pantrycap", colony:"normal", harvested:false, x:s.player.x + 1.5, y:s.player.y + .5, active:true, solid:false, name:"Pantrycaps"}; s.world.objects.push(m); }
+      else Object.assign(s.player, {x: m.x - 1, y: m.y - .5});
+      return m.id; });
+    await snap("mushrooms");
+    const chop = await page.evaluate(() => { const s = pt.s(), p = s.player; s.world.objects = s.world.objects.filter(o => o.id !== "qa-mushroom");
+      for (let r = 2; r < 30; r++) { let done = false; for (let a = 0; a < 24 && !done; a++) { const x = p.x + Math.cos(a * Math.PI / 12) * r, y = p.y + Math.sin(a * Math.PI / 12) * r;
+        if (World.clear(s.world, x, y, .3) && !s.world.objects.some(o => o.active && Math.hypot(o.x - x, o.y - y) < 3.2)) { Object.assign(p, {x, y, path: []}); done = true; } } if (done) break; }
+      p.bag.push({id:"axe", qty:1, condition:100, born:0, uid:"qa-axe"});
+      Sim.use(s, p.bag.findIndex(i => i.id === "axe")); return Sim.weapon(s).id; });
+    for (const t of [.24, .13, .04]) { await page.evaluate(t => { const s = pt.s(); s.player.swing = t; s.swingVisual = {weapon:"axe", dx:1, dy:0}; window.__freeze = t; }, t);
+      await page.evaluate(() => { const tick = Sim.tick; Sim.tick = (s, ...r) => { window.__state = s; if (window.__freeze) s.player.swing = window.__freeze; return tick(s, ...r); }; });
+      await snap("chop-" + t, {x: 380, y: 230, width: 130, height: 130}); }
+    await page.evaluate(() => { window.__freeze = 0; });
+    return {pass: Boolean(sat) && Boolean(shroom) && chop === "axe", notes: "seated on " + sat + " from behind, mushroom patch, axe chop. Screenshots: " + shots.join(", ")};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

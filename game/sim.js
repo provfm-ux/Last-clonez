@@ -3622,7 +3622,8 @@ const Sim = (() => {
     faceTowards(p, z);
     s.swingVisual = {weapon:item.id, dx:z.x - p.x, dy:z.y - p.y};
     const family = Data.weaponSkills[item.id];
-    p.cooldown = w.delay * (family ? 1 - .025 * level(s,family) : 1); p.staminaDelay = .7; p.swing = .18;
+    p.cooldown = w.delay * (family ? 1 - .025 * level(s,family) : 1); p.staminaDelay = .7;
+    p.swing = ["axe", "hatchet", "foundrymaul"].includes(item.id) ? .26 : .18;   // a chop is drawn raised, mid and down
     p.stamina = Math.max(0, p.stamina - w.effort * staminaCost(s));
     if (w.firearm) remove(p.bag, "ammo", 1);
     const conditionBefore = item.condition;

@@ -885,7 +885,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   };
   const batWalker = strike("bat","walker"), batBrute = strike("bat","brute"), axeBrute = strike("axe","brute");
   check("combate: taco forte contra walker, mas o brute resiste e mantém o ataque",
-    batWalker.hit && batWalker.z.hp === 17 && batBrute.hit && batBrute.z.hp === 68 && batBrute.z.windup === .4);
+    batWalker.hit && batWalker.z.hp === Data.infected.walker.hp - 28 && batBrute.hit && batBrute.z.hp === 68 && batBrute.z.windup === .4);
   check("combate: machado forte contra brute e interrompe o ataque",
     axeBrute.hit && axeBrute.z.hp === 39 && axeBrute.z.windup === 0);
   const spear = strike("spear","runner",1.65), knife = strike("knife","runner",1.65);
@@ -2558,6 +2558,27 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   const boss = Sim.create(11, "campaign", "carer", 2, undefined, "fortress"), pip = boss.world.enemies.find(e => e.kind === "pip");
   boss.world.rng = () => 0; Object.assign(pip, {x: boss.player.x + .7, y: boss.player.y});
   check("agarrões: chefes não agarram", (() => { Object.assign(pip, {windup: .01, windupTarget: "player"}); Sim.tick(boss, .033, idle); return !(boss.player.grabbed > 0); })());
+}
+
+{ // grupo: um infetado é fácil, dois ou três tornam-se perigosos (quem agarra segura, os outros mordem)
+  const pin = () => {
+    const s = fresh("survival"), p = s.player; s.world.enemies = [];
+    const mk = (id, dx) => { const z = World.infected(s.world, id, p.x + dx, p.y + .3, "walkers", context.Level.seeded(5)); Object.assign(z, {alert: 30, dormant: false}); s.world.enemies.push(z); return z; };
+    const a = mk("holder", .7), b = mk("biter", -.7);
+    p.grabbed = Data.grab.hold; s.grab = {id: a.id, t: 0};
+    return {s, p, a, b};
+  };
+  const g = pin(), hp = g.p.hp; g.p.flash = .6;
+  Object.assign(g.b, {windup: .01, windupTarget: "player"}); Sim.tick(g.s, .033, idle);
+  check("grupo: agarrado por um, o outro morde mesmo durante a proteção do último golpe", g.p.hp < hp - Data.infected.walker.damage, (hp - g.p.hp).toFixed(1));
+  const solo = pin(); solo.s.world.enemies = solo.s.world.enemies.filter(z => z.id === "holder");
+  let t1 = 0; while (solo.p.grabbed > 0 && t1 < 5) { Sim.tick(solo.s, .033, {x: -1, y: 0}); t1 += .033; }
+  const crowd = pin(); let t2 = 0; crowd.b.cooldown = 99; crowd.b.x = crowd.p.x - .6;
+  while (crowd.p.grabbed > 0 && t2 < 5) { Sim.tick(crowd.s, .033, {x: -1, y: 0}); t2 += .033; crowd.b.cooldown = 99; }
+  const warn = fresh("survival"); warn.world.enemies.slice(0, 2).forEach(z => Object.assign(z, {x: warn.player.x + 3, y: warn.player.y + 1, alert: 20, dormant: false}));
+  Sim.tick(warn, .033, idle);
+  check("grupo: na primeira vez que vem um grupo há um aviso (uma só vez)", warn.flags.packWarned && warn.messages.some(m => /More than one is coming/.test(m.text)));
+  check("grupo: com outro infetado encostado, soltar-se a puxar demora mais", t2 > t1, t1.toFixed(2) + " s vs " + t2.toFixed(2) + " s");
 }
 
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio

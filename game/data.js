@@ -445,7 +445,7 @@ const Data = (() => {
   // Grabs: an infected that lands a hit may hold on. Break free before biteAt (seconds) by shoving, by attacking (each swing
   // struggles `struggle` seconds off the hold) or by pulling away (moving struggles at `pull` x time); a freed infected is
   // staggered and open to a counter (x counterMult damage for `counter` s). Held too long, it bites (x biteDamage, bite wound likelier).
-  const grab = {pushThrough:.45, chance:{walker:.32, runner:.15, brute:.4}, hold:2.6, assistHold:1.3, biteAt:1.9, struggle:.6, pull:.6, counter:1.6, counterMult:1.5,
+  const grab = {packFlash:.3, pinnedWindup:.6, pinnedDamage:1.3, crowdDrag:.6, pushThrough:.45, chance:{walker:.32, runner:.15, brute:.4}, hold:2.6, assistHold:1.3, biteAt:1.9, struggle:.6, pull:.6, counter:1.6, counterMult:1.5,
     biteDamage:1.4, biteWound:3, stagger:1.1, cool:3};
   // Shelter radio repair (external QA): what it needs, why, and where to look. Same amounts as the radio action in sim.js.
   const radioNeeds = [
@@ -637,7 +637,7 @@ const Data = (() => {
     };
   }
   const infected = {
-    walker:{name:"Walker",speed:.9,hp:45,damage:11,color:"#8b8e6b"},
+    walker:{name:"Walker",speed:.9,hp:60,damage:11,color:"#8b8e6b"},
     runner:{name:"Runner",speed:1.55,hp:34,damage:9,color:"#a17a61"},
     brute:{name:"Brute",speed:.68,hp:88,damage:19,color:"#777e68"},
     pierwoman:{name:"The woman on the pier",speed:.72,hp:100,damage:12,color:"#8a7d70",boss:true},

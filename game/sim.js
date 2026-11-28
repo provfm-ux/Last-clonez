@@ -4282,6 +4282,7 @@ const Sim = (() => {
     }
     p.sleeping = false; p.resting = false;
     const gear = s.sleepGear; s.sleepGear = null;
+    if (s.mode === "play" && s.minutes - start >= 30) s.wakePose = {gear: gear ?? "bed", x: p.x, y: p.y, until: s.elapsed + 2.5};
     if (gear === "bag" && s.mode === "play" && s.minutes - start >= 60) {
       p.pain = Math.min(100, (p.pain ?? 0) + Data.camping.stiffPain);
       const bag = p.bag.find(i => i.id === "sleepingbag");

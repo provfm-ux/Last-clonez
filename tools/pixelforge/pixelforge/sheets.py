@@ -194,7 +194,11 @@ def build(package_dir, out_dir, only=None, rig_path=None):
         byid = {c["id"]: c for c in json.load(open(idx))["characters"]}
         byid.update({c["id"]: c for c in result})
         result = [byid[c["id"]] for c in [*man["characters"], *extras] if c["id"] in byid]
-    json.dump({"order": DIRS, "default_tier": "mini", "tiers": {k: {"height": v[0]} for k, v in TIERS.items()},
-               "layout": "one row of 8 cells (order above), every cell the same size, anchor = feet (crawler: body)",
-               "characters": result}, open(os.path.join(out_dir, "index.json"), "w"), indent=1)
+    keep = json.load(open(idx)).get("poses") if os.path.exists(idx) else None    # rest poses come from `poses`
+    index = {"order": DIRS, "default_tier": "mini", "tiers": {k: {"height": v[0]} for k, v in TIERS.items()},
+             "layout": "one row of 8 cells (order above), every cell the same size, anchor = feet (crawler: body)",
+             "characters": result}
+    if keep:
+        index["poses"] = keep
+    json.dump(index, open(os.path.join(out_dir, "index.json"), "w"), indent=1)
     return result

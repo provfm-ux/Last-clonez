@@ -407,6 +407,22 @@ const scenarios = {
     await page.screenshot({path: path.join(out, "camp-tent.png")});
     return {pass: r.sewn && r.built && r.tent, notes: "sleeping bag sewn: " + r.sewn + ", camp tent built outdoors: " + r.built};
   },
+  async "rest-poses"(page) { // sitting, lying on a bed, head out of a sleeping bag: each must be drawn (Pixel Lab poses)
+    await startCampaign(page);
+    const shots = [];
+    const snap = async (name) => { await page.waitForTimeout(500); const file = "pose-" + name + ".png"; await page.screenshot({path: path.join(out, file), clip: {x: 270, y: 260, width: 340, height: 230}}); shots.push(file); };
+    const seat = await page.evaluate(() => { const s = pt.s(); pt.calm(); s.world.enemies = []; s.zoom = 3; s.player.fatigue = 50;
+      const o = s.world.objects.find(o => ["sofa", "armchair", "chair"].includes(o.kind) && o.active && pt.beside(o)); return o && Sim.restOnSeat(s, o); });
+    await snap("sit");
+    const drawnSit = await page.evaluate(() => pt.s().player.resting);
+    const bed = await page.evaluate(() => { const s = pt.s(); s.player.resting = false; s.player.fatigue = 30;
+      const o = s.world.objects.find(o => o.action === "bed" && o.active && pt.beside(o)); if (!o) return false; s.player.resting = true; return true; });
+    await snap("bed");
+    const bag = await page.evaluate(() => { const s = pt.s(); s.player.resting = false; s.player.x += 2.5;
+      s.wakePose = {gear: "bag", x: s.player.x, y: s.player.y, until: s.elapsed + 30}; return true; });
+    await snap("bag");
+    return {pass: seat && drawnSit && bed && bag, notes: "seat rest: " + seat + ", bed rest: " + bed + ", sleeping bag wake-up shown. Screenshots: " + shots.join(", ")};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

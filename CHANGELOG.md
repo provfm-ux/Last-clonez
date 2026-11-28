@@ -1,6 +1,7 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Rest poses you can see: the survivor sits on sofas, armchairs and chairs, lies on the bed while resting, and shows in the sleeping bag (or in front of the tent) for a moment after waking. The placed camp tent has its own sprite. Sprites come from one Pixel Lab sheet (`tools/pixelforge` `poses`), recoloured to the survivor's skin, hair and jacket.
 - Camping: a sleeping bag (sew it from 4 cloth and 2 tape, or find one in the Pine Ridge ranger station) lets you sleep anywhere, at 65% of a bed's rest, with a stiff back in the morning, wear on the bag and no cover from rain. A camp tent (2 wood, 4 cloth, 1 tape, outdoors) keeps the rain off and rests at 85%. New book: Camping and Bushcraft (workshop).
 - Campaign tips suggest the sleeping bag or tent when you are tired far from a bed, and suggest an unread skill book with where to find it and what it teaches. Pine Ridge no longer asks for a bedroll that did not exist.
 - Sit and rest on sofas, armchairs and chairs (rest without sleeping; moving or danger ends it). Sleep still needs a bed.

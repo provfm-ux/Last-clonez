@@ -1,0 +1,5 @@
+{
+ "generator": "pixellab create-image-pixflux, 400x400, seed 21, init_image_strength 180, view low top-down, highly detailed, single color black outline",
+ "init_image": "a rough 3x3 layout built from the protagonist and survivor_female hd sprites (sitting on a chair, rotated to lie down, head out of a green bag) and flat props",
+ "prompt": "pixel art game sprite sheet, 3x3 grid of separate items on a plain light grey background, low top-down view. Row 1: a dark-haired man in a grey jacket sitting on a wooden chair; the same man lying asleep on his back on the ground, seen from above at an angle, arms by his sides, relaxed; the same man asleep inside a green sleeping bag, only his head out. Row 2: a woman in a dark jacket sitting on a wooden chair; the same woman lying asleep on her back, seen from above at an angle, arms by his sides, relaxed; the same woman asleep inside a green sleeping bag, only her head out. Row 3: a flat unrolled green quilted sleeping bag with a pillow; a rolled-up green sleeping bag; a small olive-green dome camp tent with shading and an open flap."
+}

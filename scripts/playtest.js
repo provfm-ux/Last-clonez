@@ -516,6 +516,22 @@ const scenarios = {
     const r = await page.evaluate(id => { const o = pt.s().world.objects.find(x => x.id === id); return {name: o.name, story: o.storyRead, msg: pt.s().messages.slice(-3).map(m => m.text).join(" | ")}; }, id);
     return {pass: Boolean(take) && r.story, notes: r.name + ": " + r.msg.slice(0, 180)};
   },
+  async "reach-poses"(page) { // infected winding up show outstretched arms, in every direction around the player
+    await startCampaign(page);
+    const n = await page.evaluate(() => { const s = pt.s(); pt.calm(); s.world.enemies = []; s.zoom = 2.2; s.player.grabCool = 99;
+      let k = 0;
+      for (const [dx, dy] of [[1.1, 0], [-1.1, 0], [0, 1.1], [0, -1.1]]) {
+        const x = s.player.x + dx, y = s.player.y + dy;
+        if (!World.clear(s.world, x, y, .2)) continue;
+        const z = World.infected(s.world, "qa-reach-" + k++, x, y, "walkers", Level.seeded(k)); Object.assign(z, {alert: 30, dormant: false, cooldown: 99, windup: 99, windupTarget: "player"});
+        s.world.enemies.push(z);
+      }
+      s.player.hp = 100; return s.world.enemies.length; });
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { for (const z of pt.s().world.enemies) z.windup = 99; });
+    await page.screenshot({path: path.join(out, "reach-poses.png"), clip: {x: 240, y: 190, width: 400, height: 330}});
+    return {pass: n >= 3, notes: n + " infected winding up around the player (see reach-poses.png)"};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

@@ -56,6 +56,9 @@ def main(argv=None):
     r = sub.add_parser("poses", help="rest poses and camping props from the Pixel Lab sheet")
     r.add_argument("sheet", nargs="?", default=os.path.join(os.path.dirname(__file__), "..", "sources", "rest_poses_sheet.png"))
     r.add_argument("-o", "--out", default="out/chars")
+    rc = sub.add_parser("reach", help="reaching poses (arms forward) for the infected, from the game-tier atlases")
+    rc.add_argument("-o", "--out", default="out/chars")
+    rc.add_argument("--only", nargs="*")
     a = p.parse_args(argv)
 
     if a.cmd == "styles":
@@ -65,6 +68,10 @@ def main(argv=None):
     if a.cmd == "fetch":
         for u in a.urls:
             print(fetch(u))
+        return
+    if a.cmd == "reach":
+        from .reach import build as build_reach
+        build_reach(a.out, a.only)
         return
     if a.cmd == "poses":
         from .poses import build, write_index

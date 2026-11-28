@@ -46,3 +46,10 @@ Weapon hand: for the customisable characters (`recolor.IDS`) `sheets` also write
 Limits: one photo gives one view. `--dirs` makes S,SE,E,SW,W by squashing; N-facing needs a back view.
 Web images may be copyrighted: keep refs/*.json (source URL), do not commit refs/ or out/.
 Tests: `python3 tests/test_core.py && python3 tests/test_pipeline.py && python3 tests/test_voxel.py && python3 tests/test_organic.py` (healthy = `Tudo OK` x4).
+
+Reaching poses (infected and bosses): `python3 -m pixelforge reach -o ../../game/assets/characters` writes `<id>_reach_game.png`
+and `<id>_reach_mini.png` (one row of 8 cells, cell padded so outstretched arms fit) and adds `reach` to each entry in
+`index.json`. It works from the finished game-tier atlas, so run it again after every `sheets` run (sheets rewrites the
+entries). Front/diagonal arm strips are moved, side views reuse the front-diagonal arm turned horizontal; S and N stay as
+idle and the game shows the diagonal towards the victim. Only `missing_*` characters keep a missing arm.
+Rest poses: `python3 -m pixelforge poses -o ../../game/assets/characters` (sheet in sources/rest_poses_sheet.png).

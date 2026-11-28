@@ -1,6 +1,7 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Infected stretch their arms out while they wind up an attack, swing and hold you (every infected and boss sprite, 8 directions; facing straight on they turn to the diagonal towards you). Baked by `tools/pixelforge` `reach` from the existing sprites.
 - Combat: groups are the danger, as in the films. While one infected holds you, the others bite (no grace frames, x1.3 damage, bite wound likely) and wind up 40% faster; every other infected pressing in makes struggling free slower; grace frames after a hit drop to 0.3 s when two or more surround you; with company, infected push through after the second quick hit. Walkers have 60 hp (three bat hits instead of two). A one-time warning the first time a group comes for you says to run, sneak or split them up.
 - Combat: grabs are their own attack now. An infected that lands an attack may grab instead of hitting (walkers 32%, runners 15%, brutes 40%, bosses never): no damage yet, but it bites after 1.9 s (heavier damage, likelier bite wound). Break free by shoving, by attacking (each swing struggles 0.6 s off the hold) or by pulling away; a freed infected is staggered and open to a counter (x1.5 damage) for 1.6 s. On screen: "Break free!" countdown, "Counter!" over the infected, object labels hidden while held. The "Shorter grabs" assist still shortens the hold below the bite.
 - Combat: no stun-lock. From the third quick hit in a row an infected may push through (45%) and finish its attack.

@@ -1914,6 +1914,32 @@ const Sim = (() => {
     notify(s, Data.campaignText.tideSwept, true);
   }
 
+  // The woman on the pier controls the infected with her violin: while her coat is on and she sees the player, she calls a small group
+  // every 45 s (at most 8 called infected alive). Their deaths in her sight are what frighten her. The timer is transient.
+  function updateViolinCall(s, dt) {
+    const c = s.campaign, F = Data.fatHill;
+    if (s.world.region !== "coast" || s.mode !== "play" || c.completed.includes("fathill.bosses")) return;
+    const woman = s.world.enemies.find(z => z.kind === "pierwoman" && z.hp > 0 && z.guard && !z.docile);
+    if (!woman || distance(woman, s.player) > F.callRange || !lineOfSight(s, woman, s.player)) return;
+    s.violinCall = (s.violinCall ?? F.callEvery * .5) - dt;
+    if (s.violinCall > 0) return;
+    s.violinCall = F.callEvery;
+    const alive = s.world.enemies.filter(z => z.hp > 0 && z.origin === "violin").length;
+    const want = Math.min(F.callSize, F.callCap - alive);
+    if (want <= 0) return;
+    const rng = Level.seeded((s.atmosphere.serial * 7919) ^ 0x51a7), spots = [];
+    for (let r = 2; r <= 6 && spots.length < want; r++) for (let k = 0; k < 12 && spots.length < want; k++) {
+      const a = k / 12 * Math.PI * 2 + r, point = {x:woman.x + Math.cos(a) * r, y:woman.y + Math.sin(a) * r};
+      if (World.clear(s.world, point.x, point.y, .35) && !World.tileAt(s.world, point.x, point.y)?.building && distance(point, s.player) > 4 &&
+          !s.world.enemies.some(z => z.hp > 0 && distance(z, point) < .9) && !spots.some(q => distance(q, point) < .9)) spots.push(point);
+    }
+    for (const point of spots) {
+      const z = newInfected(s, point, "violin", rng);
+      Object.assign(z, {alert:30, chaseX:s.player.x, chaseY:s.player.y, replan:0});
+    }
+    if (spots.length) { hear(s, "near", woman); notify(s, Data.campaignText.violinCall, true); }
+  }
+
   // The first optional area open today whose cache has not been emptied yet.
   const optionalToday = s => {
     const day = runDay(s.minutes), hour = Math.floor(s.minutes % 1440 / 60);
@@ -4030,7 +4056,7 @@ const Sim = (() => {
     updateOutdoor(s, minutes, raining);
     if (s.longHaul && s.player.hp > 0) updateLongHaul(s);
     if (s.campaign) { updateCinemaTrap(s); updateCinemaBuff(s); }
-    if (isCampaign(s)) { updatePineRidge(s); updateEva(s); updateOptional(s); updateTide(s); }
+    if (isCampaign(s)) { updatePineRidge(s); updateEva(s); updateOptional(s); updateTide(s); updateViolinCall(s, dt); }
     if (isCampaign(s) && s.campaign.hints.objective) {
       const hint = CampaignHints.next(s.campaign.hints, s.minutes);
       if (hint) notify(s, "Hint: " + hint);

@@ -2365,6 +2365,22 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("escola: tirar o saque faz barulho e chama a horda", Sim.collect(town, box, 0) > 0 && town.atmosphere.nextWave <= town.atmosphere.time);
 }
 
+{ // a mulher do pontão chama infetados com o violino enquanto tem o casaco e te vê
+  const f = Sim.create(11, "campaign", "carer", 2, undefined, "coast"); Sim.testJump(f, 8, {}, {anyMode: true});
+  f.minutes = 7 * 1440 + 10 * 60;
+  const woman = f.world.enemies.find(z => z.kind === "pierwoman");
+  f.world.enemies = f.world.enemies.filter(z => z.stats.boss);
+  const spot = (() => { for (let r = 3; r < 9; r++) for (let a = 0; a < 6.28; a += .4) { const p = {x: woman.x + Math.cos(a) * r, y: woman.y + Math.sin(a) * r}; if (World.clear(f.world, p.x, p.y, .3)) return p; } })();
+  Object.assign(f.player, spot);
+  f.violinCall = 0; Sim.tick(f, .033, idle);
+  const called = f.world.enemies.filter(z => z.origin === "violin");
+  check("violino: à vista da mulher, ela chama um grupo de infetados que vem ter contigo", called.length > 0 && called.length <= Data.fatHill.callSize && called.every(z => z.alert > 0), String(called.length));
+  for (let i = 0; i < 5; i++) { f.violinCall = 0; Sim.tick(f, .033, idle); }
+  check("violino: nunca há mais de 8 chamados vivos", f.world.enemies.filter(z => z.origin === "violin" && z.hp > 0).length <= Data.fatHill.callCap);
+  woman.guard = false; woman.docile = true; const n = f.world.enemies.length; f.violinCall = 0; Sim.tick(f, .033, idle);
+  check("violino: com o casaco caído ela deixa de chamar", f.world.enemies.length === n);
+}
+
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
   const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"];
   let empty = 0, total = 0, sample = "";

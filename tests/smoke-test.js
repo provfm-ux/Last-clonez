@@ -2340,6 +2340,14 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   town.world.enemies = [];
   check("opcional: tirar o saque regista a área como feita", Sim.collect(town, box, 0) > 0 && town.campaign.opt.includes("opt.clinic"));
   check("opcional: a dica menciona o que se pode vasculhar hoje", /raid/.test(Sim.campaignTip(town)) || town.campaign.opt.length > 0);
+  const d21 = fresh("campaign"); Sim.testJump(d21, 21, {}, {anyMode: true}); d21.minutes = 20 * 1440 + 10 * 60;
+  d21.campaign.opt.push("opt.fuel", "opt.clinic", "opt.market", "opt.farm");
+  const story = Data.campaignGoals.map(g => g.id).filter(id => id !== "fortress.last-boss");
+  d21.campaign.completed.push(...story);
+  const d22 = fresh("campaign"); Sim.testJump(d22, 22, {}, {anyMode: true}); d22.minutes = 21 * 1440 + 10 * 60;
+  d22.campaign.opt.push("opt.fuel", "opt.clinic", "opt.market", "opt.farm"); d22.campaign.completed.push(...story);
+  check("opcional: a dica não manda à marina com a maré alta (dia 21) e manda no dia 22", !/net shed/.test(Sim.campaignTip(d21)) && /net shed|school/.test(Sim.campaignTip(d22)),
+    Sim.campaignTip(d21).slice(-80) + " | " + Sim.campaignTip(d22).slice(-80));
   const back = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(town))));
   check("opcional: o registo guarda-se e carrega", back.campaign.opt.includes("opt.clinic"));
   const old = JSON.parse(JSON.stringify(Sim.snapshot(town))); delete old.campaign.opt;
@@ -2356,15 +2364,23 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   c.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade");
   Sim.tick(c, .033, idle);
   check("tide: às 17:00 há aviso e a dica fala da maré", c.campaign.tide.warned === 8 && /18:00/.test(Sim.campaignTip(c)), Sim.campaignTip(c));
-  const pier = {x: c.player.x, y: c.player.y}, hp = c.player.hp;
-  c.minutes = 7 * 1440 + 18 * 60 + 1; Sim.tick(c, .033, idle);
   const exit = c.world.objects.find(o => o.id === "exit-coldvale");
+  const far = o => { const w = o.world, e = w.objects.find(x => x.id === "exit-coldvale"); for (let y = 6; y < w.height - 6; y++) for (let x = 6; x < w.width - 6; x++)
+    if (Math.hypot(x - e.x, y - e.y) > 25 && World.clear(w, x + .5, y + .5, .3)) return {x: x + .5, y: y + .5}; };
+  Object.assign(c.player, far(c)); const hp = c.player.hp;
+  c.minutes = 7 * 1440 + 18 * 60 + 1; Sim.tick(c, .033, idle);
   check("tide: às 18:00 sem barco a maré arrasta o jogador para a estrada, molhado e magoado",
     c.campaign.tide.day === 8 && c.player.hp < hp && c.player.wetness >= 90 && Math.hypot(c.player.x - exit.x, c.player.y - exit.y) < 5, c.player.x + "," + c.player.y);
+  check("tide: com a maré cheia a dica diz quando voltar", /tide is in/.test(Sim.campaignTip(c)) && /day 10/.test(Sim.campaignTip(c)), Sim.campaignTip(c));
+  const hp2 = c.player.hp; Object.assign(c.player, far(c)); c.elapsed += 5; Sim.tick(c, .033, idle);
+  check("tide: voltar ao pontão com a maré cheia empurra outra vez para a estrada, sem mais dano",
+    Math.hypot(c.player.x - exit.x, c.player.y - exit.y) < 5 && c.player.hp >= hp2 - .5);
   const b = Sim.create(11, "campaign", "carer", 2, undefined, "coast"); Sim.testJump(b, 8, {}, {anyMode: true}); b.world.enemies = [];
-  b.player.bag.push({id:"rowboat", qty:1, condition:100, born:0}); const at = {x: b.player.x, y: b.player.y};
+  b.player.bag.push({id:"rowboat", qty:1, condition:100, born:0}); Object.assign(b.player, far(b)); const at = {x: b.player.x, y: b.player.y};
   b.minutes = 7 * 1440 + 18 * 60 + 1; Sim.tick(b, .033, idle);
   check("tide: com o barco fica no sítio e o barco gasta-se", b.player.x === at.x && Sim.quantity(b.player.bag, "rowboat") === 0);
+  b.elapsed += 5; Sim.tick(b, .033, idle);
+  check("tide: com o barco fica o resto da noite sem ser empurrado", b.player.x === at.x && b.campaign.tide.boat === 8);
   check("tide: o estado da maré guarda-se e carrega", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(b)))).campaign.tide.day === 8);
   const coast = Sim.create(11, "campaign", "carer", 2, undefined, "coast");
   check("tide: o barco está na marina", coast.world.objects.find(o => o.id === "opt-marina")?.loot.some(i => i.id === "rowboat"));
@@ -2412,7 +2428,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   fh.campaign.fathill.coat = true; const coat = Sim.campaignTip(fh); fh.campaign.fathill.vest = true;
   check("ui.campaign-tip acompanha os passos do chefe (casaco, colete)", /guard down/.test(coat) && /Play the violin/.test(Sim.campaignTip(fh)), coat + " | " + Sim.campaignTip(fh));
   const done = fresh("campaign"); Sim.testJump(done, 12, {}, {anyMode: true}); done.campaign.completed.push(...goalsOrder);
-  check("ui.campaign-tip com tudo feito por agora mantém uma dica", /next story step/.test(Sim.campaignTip(done)), Sim.campaignTip(done));
+  check("ui.campaign-tip depois do fim fala da fortaleza", /fortress is yours/.test(Sim.campaignTip(done)), Sim.campaignTip(done));
   check("ui.campaign-tip fora da campanha não aparece", Sim.campaignTip(fresh("survival")) === "");
 }
 

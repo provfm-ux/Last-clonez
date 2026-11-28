@@ -731,6 +731,7 @@ const Sim = (() => {
     const T = Data.campaignTips, c = s.campaign, region = s.world.region, day = runDay(s.minutes), hour = Math.floor(s.minutes % 1440 / 60);
     const goal = campaignGoal(s);
     const extra = (() => { const id = optionalToday(s); return id ? T.optional.replace("{place}", Data.optionalAreas[id].place) : ""; })();
+    if (!goal && c.completed.includes("fortress.last-boss")) return T.goals["fortress.last-boss"].done + extra;
     if (!goal) return T.idle + extra;
     if (goal.opens) return T.waiting.replace("{day}", goal.opens) + extra;
     const area = Data.campaignGoals.find(g => g.id === goal.id).area, closed = Campaign.closedReason(area, day, hour);
@@ -747,6 +748,7 @@ const Sim = (() => {
       case "ironworks.barricade": return region !== "ironworks" ? closed || text.go : text.cage;
       case "fathill.bosses":
         if (region !== "coast") return closed || text.go;
+        if (tideIn(s) && c.tide.boat !== day) return text.tideIn.replace("{day}", Campaign.lowTide(day) && hour < 6 ? day : day + (Campaign.lowTide(day + 1) ? 1 : 2));
         if (hour >= Data.fatHill.tideWarn && hour < Data.fatHill.tideHour) return text.tide + (f.vest ? text.violin : f.coat ? text.david : "");
         if (f.vest) return text.violin;
         if (f.coat) return text.david;
@@ -1494,7 +1496,7 @@ const Sim = (() => {
   }
 
   // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
-  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:"", fields:{alerts:0, at:-1e9}, fathill:{fear:0, coat:false, vest:false}, chat:{used:0, until:0, done:false, log:[]}, opt:[], tide:{day:0, warned:0}, epilogue:""});
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:"", fields:{alerts:0, at:-1e9}, fathill:{fear:0, coat:false, vest:false}, chat:{used:0, until:0, done:false, log:[]}, opt:[], tide:{day:0, warned:0, boat:0}, epilogue:""});
   // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
   const isCampaign = s => s.difficulty === "campaign";
   const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
@@ -1515,14 +1517,15 @@ const Sim = (() => {
     const fields = raw.fields ?? {alerts:0, at:-1e9};
     if (raw.epilogue !== undefined && !["", "pending", "seen"].includes(raw.epilogue)) throw new Error("Invalid campaign progress.");
     const tide = raw.tide ?? {day:0, warned:0};
-    if (!tide || !Number.isInteger(tide.day) || tide.day < 0 || !Number.isInteger(tide.warned) || tide.warned < 0) throw new Error("Invalid campaign progress.");
+    if (!tide || !Number.isInteger(tide.day) || tide.day < 0 || !Number.isInteger(tide.warned) || tide.warned < 0 ||
+        tide.boat !== undefined && (!Number.isInteger(tide.boat) || tide.boat < 0)) throw new Error("Invalid campaign progress.");
     const opt = raw.opt ?? [];
     if (!Array.isArray(opt) || opt.length > 8 || opt.some((id,i) => !Object.hasOwn(Data.optionalAreas, id) || opt.indexOf(id) !== i)) throw new Error("Invalid campaign progress.");
     const chat = raw.chat ?? {used:0, until:0, done:false, log:[]};
     if (!Number.isInteger(chat.used) || chat.used < 0 || chat.used > Data.aiChat.prompts || !Number.isFinite(chat.until) || chat.until < 0 || typeof chat.done !== "boolean" ||
         !Array.isArray(chat.log) || chat.log.length > Data.aiChat.maxLog || chat.log.some(l => !l || !["you","ai"].includes(l.who) || typeof l.text !== "string" || l.text.length > 400)) throw new Error("Invalid campaign progress.");
     if (!Number.isInteger(fields.alerts) || fields.alerts < 0 || fields.alerts > 999 || !Number.isFinite(fields.at)) throw new Error("Invalid campaign progress.");
-    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "", fields:{alerts:fields.alerts, at:fields.at}, fathill:{fear:fathill.fear, coat:fathill.coat, vest:fathill.vest}, chat:{used:chat.used, until:chat.until, done:chat.done, log:chat.log.map(l => ({who:l.who, text:l.text}))}, opt:[...opt], tide:{day:tide.day, warned:tide.warned}, epilogue:raw.epilogue ?? "",
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "", fields:{alerts:fields.alerts, at:fields.at}, fathill:{fear:fathill.fear, coat:fathill.coat, vest:fathill.vest}, chat:{used:chat.used, until:chat.until, done:chat.done, log:chat.log.map(l => ({who:l.who, text:l.text}))}, opt:[...opt], tide:{day:tide.day, warned:tide.warned, boat:tide.boat ?? 0}, epilogue:raw.epilogue ?? "",
       ridge:{nights:ridge.nights, night:night && {start:night.start, fail:night.fail, built:night.built}}};
   }
   // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
@@ -1911,20 +1914,22 @@ const Sim = (() => {
   }
 
   // fathill.tide: on the coast the tide comes in at 18:00. Without the marina's rowboat it drags the player back to the shore road.
+  // While the tide is in (outside 06:00-18:00 or on a high-tide day) the beach beyond the shore road is cut off: the player is pushed back.
+  const tideIn = s => !Campaign.isOpen("fathill", runDay(s.minutes), Math.floor(s.minutes % 1440 / 60)) && runDay(s.minutes) >= Campaign.areas.fathill.from;
   function updateTide(s) {
     if (s.world.region !== "coast" || s.mode !== "play") return;
     const t = s.campaign.tide, F = Data.fatHill, day = runDay(s.minutes), hour = s.minutes % 1440 / 60;
-    if (hour >= F.tideWarn && hour < F.tideHour && t.warned !== day) { t.warned = day; notify(s, Data.campaignText.tideTurning, true); }
-    if (hour < F.tideHour || t.day === day) return;
-    t.day = day;
-    const p = s.player;
-    if (p.bag.some(i => i.id === "rowboat")) { remove(p.bag, "rowboat", 1); notify(s, Data.campaignText.tideBoat, true); return; }
-    if (p.vehicle) return;
-    const back = s.world.objects.find(o => o.id === "exit-" + Regions.home) ?? s.world.start;
+    if (hour >= F.tideWarn && hour < F.tideHour && t.warned !== day && Campaign.lowTide(day)) { t.warned = day; notify(s, Data.campaignText.tideTurning, true); }
+    if (!tideIn(s) || t.boat === day || s.campaign.completed.includes("fathill.bosses")) return;
+    const p = s.player, back = s.world.objects.find(o => o.id === "exit-" + Regions.home) ?? s.world.start;
+    if (p.vehicle || distance(p, back) <= F.tideReach || (s.tideAt ?? -1e9) > s.elapsed - F.tideAgain) return;
+    const first = t.day !== day;
+    if (first && p.bag.some(i => i.id === "rowboat")) { remove(p.bag, "rowboat", 1); t.boat = day; t.day = day; notify(s, Data.campaignText.tideBoat, true); return; }
+    t.day = day; s.tideAt = s.elapsed;
     const spot = arrivalPosition(s, {x:back.x, y:back.y + (back.y < s.world.height / 2 ? 2 : -2)}, true) ?? s.world.start;
-    Object.assign(p, {x:spot.x, y:spot.y, path:[], moving:false, hp:Math.max(1, p.hp - F.tideHurt), wetness:Math.max(p.wetness, 90)});
+    Object.assign(p, {x:spot.x, y:spot.y, path:[], moving:false, hp:first ? Math.max(1, p.hp - F.tideHurt) : p.hp, wetness:Math.max(p.wetness, 90)});
     s.target = null; s.interaction = null;
-    notify(s, Data.campaignText.tideSwept, true);
+    notify(s, first ? Data.campaignText.tideSwept : Data.campaignText.tideBack, true);
   }
 
   // The woman on the pier controls the infected with her violin: while her coat is on and she sees the player, she calls a small group
@@ -1956,7 +1961,8 @@ const Sim = (() => {
   // The first optional area open today whose cache has not been emptied yet.
   const optionalToday = s => {
     const day = runDay(s.minutes), hour = Math.floor(s.minutes % 1440 / 60);
-    return Object.keys(Data.optionalAreas).find(id => !s.campaign.opt.includes(id) && Campaign.isOpen(id, day, hour)) ?? null;
+    const reachable = id => { const host = Campaign.regions[Data.optionalAreas[id].region]; return !host || Campaign.isOpen(host, day, hour); };
+    return Object.keys(Data.optionalAreas).find(id => !s.campaign.opt.includes(id) && Campaign.isOpen(id, day, hour) && reachable(id)) ?? null;
   };
 
   // fortress.last-boss: Pip, the mutated first infected, inside the compound with an escort. Fire (stone rings, built campfires) hurts the mutation.

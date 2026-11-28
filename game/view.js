@@ -446,7 +446,7 @@ const View = (() => {
   }
 
   const furnitureSprites = new Map();
-  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug", "crate", "generator", "barrel", "radio", "bench", "chair", "cart"]);
+  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug", "crate", "generator", "barrel", "radio", "bench", "chair", "cart", "tent"]);
 
   function paintFurniture(kind, variant, powered) {
     const oak = ["#947859", "#735943", "#514035"];
@@ -604,6 +604,16 @@ const View = (() => {
         mark([.312, .11, 11], "#bf9169", 2, 2);
         for (const x of [-.25, .02]) mark([x, .307, 13], "#c5baa1");
         break;
+      case "tent": {
+        const canvas = ["#8a8f5e", "#6c7448", "#525a37"];
+        box(-.44, -.46, 0, .88, .92, 2, ["#5c5a4a", "#4a4a3c", "#3c3d33"]);
+        box(-.36, -.42, 2, .72, .84, 6, canvas);
+        box(-.26, -.42, 8, .52, .84, 6, canvas);
+        box(-.15, -.42, 14, .30, .84, 5, canvas);
+        box(-.05, -.42, 19, .10, .84, 3, canvas);
+        box(-.10, .40, 2, .20, .04, 10, ["#2d3323", "#262b1e", "#20241a"]);
+        break;
+      }
       case "bed": {
         for (const side of [-.32, .26]) for (const end of [-.43, .38]) box(side, end, 0, .07, .07, 9, oak);
         box(-.37, -.51, 7, .74, 1.02, 3, oak);

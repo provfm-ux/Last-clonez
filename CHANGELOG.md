@@ -1,6 +1,8 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Camping: a sleeping bag (sew it from 4 cloth and 2 tape, or find one in the Pine Ridge ranger station) lets you sleep anywhere, at 65% of a bed's rest, with a stiff back in the morning, wear on the bag and no cover from rain. A camp tent (2 wood, 4 cloth, 1 tape, outdoors) keeps the rain off and rests at 85%. New book: Camping and Bushcraft (workshop).
+- Campaign tips suggest the sleeping bag or tent when you are tired far from a bed, and suggest an unread skill book with where to find it and what it teaches. Pine Ridge no longer asks for a bedroll that did not exist.
 - Sit and rest on sofas, armchairs and chairs (rest without sleeping; moving or danger ends it). Sleep still needs a bed.
 - Campaign: when the next step is days away or the place is closed, the tip suggests one concrete thing to do, from the player's own needs first (bandage, drink, eat, sleep, sit and rest), then preparing fire for the fortress, then a rotating list (garden, fishing, barricades, searching houses, repairs, skill books, water).
 - Fix (playtest): Use now picks the campaign story object first (assistant terminal, diaries, plate, ledger) instead of a nearby world note.

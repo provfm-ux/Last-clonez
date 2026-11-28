@@ -386,6 +386,27 @@ const scenarios = {
     const r = await page.evaluate(() => ({resting: pt.s().player.resting, fatigue: pt.s().player.fatigue, last: pt.s().messages.at(-1)?.text ?? "", tip: Sim.campaignTip(pt.s())}));
     return {pass: Boolean(sit) && r.resting && r.fatigue < 50, notes: "Sit and rest button: " + Boolean(sit) + ", resting: " + r.resting + ", fatigue 50 > " + r.fatigue.toFixed(1) + " (" + r.last.slice(0, 60) + ")", shot: true};
   },
+  async "camp-tent"(page) {
+    await startCampaign(page);
+    const r = await page.evaluate(() => {
+      const s = pt.s(); pt.calm(); s.world.enemies = [];
+      for (const [id, n] of [["wood",2],["cloth",8],["tape",3]]) s.player.bag.push({id, qty:n, condition:100, born:0});
+      let out = null;
+      for (let r = 2; r < 20 && !out; r++) for (let a = 0; a < 24 && !out; a++) { const x = Math.floor(s.player.x + Math.cos(a * Math.PI / 12) * r) + .5, y = Math.floor(s.player.y + Math.sin(a * Math.PI / 12) * r) + .5;
+        const ok = d => { const t = World.tileAt(s.world, x + d, y); return t && !t.building && !t.solid; };
+        if (ok(0) && ok(2) && World.clear(s.world, x, y, .3) && World.clear(s.world, x + 2, y, .3)) out = {x, y}; }
+      Object.assign(s.player, out, {path: []});
+      const sewn = Sim.craft(s, "sleepingbag");
+      Sim.craft(s, "tent");
+      let built = false;
+      for (let dy = -3; dy <= 3 && !built; dy++) for (let dx = -3; dx <= 3 && !built; dx++) if (Math.hypot(dx, dy) >= 1.2) built = Sim.place(s, s.player.x + dx, s.player.y + dy);
+      return {sewn, built, tent: s.world.objects.some(o => o.kind === "tent" && o.action === "bed")};
+    });
+    await page.evaluate(() => document.querySelector("dialog[open]")?.close());
+    await page.waitForTimeout(400);
+    await page.screenshot({path: path.join(out, "camp-tent.png")});
+    return {pass: r.sewn && r.built && r.tent, notes: "sleeping bag sewn: " + r.sewn + ", camp tent built outdoors: " + r.built};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

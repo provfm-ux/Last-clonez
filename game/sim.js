@@ -732,9 +732,19 @@ const Sim = (() => {
     if (p.wounds?.some(w => !w.bandaged)) return T.wounds;
     if (p.hydration < 45) return T.drink;
     if (p.hunger < 45) return T.eat;
-    if (p.fatigue >= 60 || night && p.fatigue >= 25) return T.sleep;
+    if (p.fatigue >= 60 || night && p.fatigue >= 25) {
+      const bed = s.world.objects.some(o => o.active && o.action === "bed" && o.kind !== "tent");
+      if (bed) return T.sleep;
+      return has("sleepingbag") || s.world.objects.some(o => o.active && o.kind === "tent") ? T.camp : T.campMake;
+    }
     if (p.fatigue >= 35) return T.rest;
     if (day >= 20 && !s.campaign.completed.includes("fortress.last-boss") && !has("torch") && !has("molotov")) return T.fire;
+    const unread = Object.entries(Data.skillBooks).filter(([id]) => !(p.readBooks ?? []).includes(id));
+    if (unread.length && (day + hour) % 3 === 0) {
+      const [id, book] = unread[(day * 7 + hour) % unread.length];
+      const where = {base:"your shelter", clinic:"the clinic", home:"a family house", market:"the market", police:"the police station", workshop:"the workshop"}[book.site] ?? "town";
+      return T.book.replace("{book}", book.title).replace("{site}", where).replace("{skill}", Data.skills[book.skill].name.toLowerCase());
+    }
     const rotate = T.spare;
     return rotate[(day * 24 + hour) % rotate.length];
   }
@@ -989,6 +999,12 @@ const Sim = (() => {
     if (item.id === "flashlight") return toggleLight(s, item);
     if (item.id === "violin") return playViolin(s);
     if (item.id === "molotov") return throwMolotov(s, index);
+    if (item.id === "sleepingbag") {
+      if (!startSleep(s)) return false;
+      s.sleepGear = "bag"; s.sleepPending = true; p.path = [];
+      notify(s, "You unroll the sleeping bag.");
+      return true;
+    }
     if (data.slot) {
       const worn = wornItem(s,data.slot) === item;
       p.gear[data.slot] = worn ? null : item.id;
@@ -1202,7 +1218,7 @@ const Sim = (() => {
     if (problem) { notify(s,problem,true); return false; }
     if (!consume(s, recipe.inputs)) return false;
     const structure = {id: "built" + s.serial++, x, y, kind: recipe.build, name: recipe.name,
-      active: true, solid: !barrier, action: barrier ? "door" : recipe.build === "crate" ? "loot" : recipe.build,
+      active: true, solid: !barrier, action: barrier ? "door" : recipe.build === "crate" ? "loot" : recipe.build === "tent" ? "bed" : recipe.build,
       storage: recipe.build === "crate", searched: true, loot: []};
     if (barrier) {
       const horizontal = s.world.objects.some(o => o.active && isBarrier(o) && Math.abs(o.x - x) === 1 && o.y === y);
@@ -3341,6 +3357,7 @@ const Sim = (() => {
       if (threats(s).length) { notify(s, "Infected are nearby. Find a safer place to rest.", true); return false; }
       if (!p.resting && p.fatigue >= 35) {
         if (!startSleep(s)) return false;
+        s.sleepGear = o.kind === "tent" ? "tent" : "bed";
         s.sleepPending = true; p.path = [];
       } else {
         p.resting = !p.resting; p.path = [];
@@ -4033,13 +4050,15 @@ const Sim = (() => {
     }
   }
 
+  const sleepRest = s => s.sleepGear === "bag" ? Data.camping.bagRest : s.sleepGear === "tent" ? Data.camping.tentRest : 1;
   function updateExposure(s, dt) {
     if (s.rules.exposure === "off") return;
-    const p = s.player, shelter = p.vehicle || World.tileAt(s.world, p.x, p.y)?.building;
+    const p = s.player, tent = p.sleeping && s.sleepGear === "tent", shelter = p.vehicle || World.tileAt(s.world, p.x, p.y)?.building || tent;
     const rain = !shelter && s.weather === "Rain", jacket = p.gear.body === "raincoat" ? wearableCondition(wornItem(s,"body")) : 0;
     const wetRate = rain ? (2.1 - 1.55*jacket) : shelter ? -1.4 : -.45;
     p.wetness = clamp(p.wetness + dt * wetRate, 0, 100);
-    const target = shelter ? 37 - p.wetness * .007 : 36.6 - (p.wetness * .016 + Number(isNight(s)) * .7 + (Regions.definitions[s.world.region].cold || 0)) * trait(s,"warmth") +
+    const bag = p.sleeping && s.sleepGear === "bag" ? Data.camping.bagWarmth : 0;
+    const target = tent ? 36.6 - p.wetness * .007 + Data.camping.tentWarmth * .2 : shelter ? 37 - p.wetness * .007 : bag + 36.6 - (p.wetness * .016 + Number(isNight(s)) * .7 + (Regions.definitions[s.world.region].cold || 0)) * trait(s,"warmth") +
       clothingWarmth(s) + (s.running ? .35 : 0) - season(s).chill;
     p.temperature = clamp(p.temperature + (target - p.temperature) * Math.min(1, dt * .025), 33, 37.3);
     if (p.temperature < 34.5) { p.hp -= dt * .16; s.harm = "hypothermia"; }
@@ -4054,7 +4073,7 @@ const Sim = (() => {
     const floor = Data.modes[s.difficulty]?.noStarve ? 8 : 0;
     p.hunger = Math.max(floor, p.hunger - dt * .07 * rate * trait(s,"hunger") * (p.sleeping ? .5 : 1));
     p.hydration = Math.max(floor, p.hydration - dt * (s.running ? .15 : .1) * rate * trait(s,"thirst") * (p.sleeping ? .5 : 1));
-    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 * pace : p.resting ? -1.6 * pace : (s.running ? .075 : .04) * rate * trait(s,"fatigue")), 0, 100);
+    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 * pace * sleepRest(s) : p.resting ? -1.6 * pace : (s.running ? .075 : .04) * rate * trait(s,"fatigue")), 0, 100);
     if (p.resting) {
       if (inDanger) { p.resting = false; notify(s, "Danger interrupted your rest.", true); }
       else if (p.hunger > 25 && p.hydration > 25 && (!gradual || !p.wounds.some(w => !w.bandaged))) {
@@ -4262,6 +4281,16 @@ const Sim = (() => {
       if (p.fatigue <= 4 || s.minutes - start >= 600) break;
     }
     p.sleeping = false; p.resting = false;
+    const gear = s.sleepGear; s.sleepGear = null;
+    if (gear === "bag" && s.mode === "play" && s.minutes - start >= 60) {
+      p.pain = Math.min(100, (p.pain ?? 0) + Data.camping.stiffPain);
+      const bag = p.bag.find(i => i.id === "sleepingbag");
+      if (bag) {
+        bag.condition = Math.max(0, (bag.condition ?? 100) - Data.camping.bagWear);
+        if (bag.condition <= 0) { remove(p.bag, "sleepingbag", 1); notify(s, "The sleeping bag has worn through.", true); }
+      }
+      notify(s, "You wake up stiff from the hard ground.");
+    }
     if (s.guideStep !== undefined && s.mode === "play" && s.minutes - start >= 60) s.firstSleep = true;
     if (s.mode === "play") { const h = Math.round((s.minutes - start) / 6) / 10; notify(s, cause + "You slept " + h + (h === 1 ? " hour." : " hours.")); }
   }
@@ -4432,7 +4461,7 @@ const Sim = (() => {
         new Set(pins.map(pin => pin.id)).size !== pins.length) throw new Error("Invalid map pins.");
     s.mapPins = pins.map(({id,x,y,name,kind}) => ({id,x,y,name,kind}));
     const originalObjects = new Map(s.world.objects.map(o => [o.id, o]));
-    const addedKinds = new Set(["crate", "barrel", "campfire", "garden", "drop", "fence", "gate"]);
+    const addedKinds = new Set(["crate", "barrel", "campfire", "garden", "drop", "fence", "gate", "tent"]);
     const missingLegacyFixture = o => {
       const entry = Chronicle.entries[o.record];
       const ledgerVersion = data.ledgerRevision ?? 0;

@@ -395,7 +395,7 @@ const Regions = (() => {
       road([[48,51],[34,50],[27,47],[22,47]],1.2,"trail","trail");
       road([[54,28],[43,21],[30,20],[24,25]],1.25,"trail","trail");
       const ranger = building(37,57,12,10,"Ranger station","ranger","wood");
-      ranger.stash(2,2,"locker","Trail equipment",{raincoat:1,axe:1,emptybottle:2,food:1});
+      ranger.stash(2,2,"locker","Trail equipment",{raincoat:1,axe:1,emptybottle:2,food:1,sleepingbag:1});
       ranger.stash(9,2,"crate","Ranger supplies",{wood:3,cloth:2,bandage:2},{storage:true});
       ranger.bed(9,6); ranger.bench(2,6);
       const lookout = building(56,15,12,10,"Firewatch cabin","ranger","wood");

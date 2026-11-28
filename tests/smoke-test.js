@@ -2438,6 +2438,47 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("livre: perto da fortaleza, sem fogo, a ideia é fazer tochas e molotovs", /torches/.test(Sim.campaignTip(w)), Sim.campaignTip(w));
 }
 
+{ // campismo: saco-cama e tenda deixam dormir fora de uma cama, com desvantagens; livro que ensina
+  const sleepWith = (gear) => {
+    const s = Sim.create(11, "survival", "carer", 2, undefined, "ridge"); s.world.enemies = [];
+    Sim.testJump(s, 3, {}, {anyMode: true}); s.minutes = 2 * 1440 + 22 * 60;
+    Object.assign(s.player, {fatigue: 80, hunger: 90, hydration: 90, pain: 0, wounds: []});
+    if (gear === "bag") {
+      s.player.bag.push({id:"sleepingbag", qty:1, condition:100, born:0});
+      if (!Sim.use(s, s.player.bag.findIndex(i => i.id === "sleepingbag"))) return null;
+    } else {
+      const bed = s.world.objects.find(o => o.action === "bed" && o.active);
+      Object.assign(s.player, {x: bed.x, y: bed.y + .9});
+      if (gear === "tent") bed.kind = "tent";
+      if (!Sim.contextual(s, bed)) return null;
+    }
+    const m0 = s.minutes; Sim.tick(s, .033, idle);
+    return {s, hours: (s.minutes - m0) / 60, fatigue: s.player.fatigue, pain: s.player.pain, bag: s.player.bag.find(i => i.id === "sleepingbag")};
+  };
+  check("campismo: as receitas do saco-cama e da tenda existem", Data.recipes.some(r => r.id === "sleepingbag") && Data.recipes.some(r => r.id === "tent" && r.build === "tent"));
+  const bed = sleepWith("bed"), bag = sleepWith("bag"), tent = sleepWith("tent");
+  check("campismo: o saco-cama deixa dormir sem cama", bag && bag.hours >= 1, bag && bag.hours.toFixed(1));
+  const per = r => (80 - r.fatigue) / r.hours;
+  check("campismo: descansa-se menos por hora no saco do que na tenda, e na tenda menos do que numa cama",
+    bed && bag && tent && per(bag) < per(tent) && per(tent) < per(bed), [bed, tent, bag].map(r => r && per(r).toFixed(2)).join(" / "));
+  check("campismo: o saco-cama deixa dores nas costas e gasta-se", bag.pain > 0 && bag.bag.condition < 100, bag.pain + " / " + bag.bag?.condition);
+  check("campismo: a tenda não deixa dores", tent.pain === 0);
+  check("campismo: o Ranger station de Pine Ridge tem um saco-cama", Sim.create(11, "survival", "carer", 2, undefined, "ridge").world.objects.some(o => o.name === "Trail equipment" && o.loot.some(i => i.id === "sleepingbag")));
+  check("campismo: há um livro de campismo e bushcraft na vila", Boolean(Data.skillBooks.campguide) && fresh("survival").world.objects.some(o => o.loot?.some(i => i.id === "campguide")));
+  const far = Sim.create(11, "campaign", "carer", 2, undefined, "cavern"); Sim.testJump(far, 13, {}, {anyMode: true});
+  far.campaign.completed.push(...Data.campaignGoals.map(g => g.id).filter(id => !["amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"].includes(id)));
+  Object.assign(far.player, {fatigue: 70, hunger: 90, hydration: 90, wounds: []});
+  check("campismo: cansado e sem camas à volta, a dica sugere coser um saco-cama ou montar tenda", /Sew a sleeping bag/.test(Sim.campaignTip(far)), Sim.campaignTip(far));
+  far.player.bag.push({id:"sleepingbag", qty:1, condition:100, born:0});
+  check("campismo: com saco-cama, a dica sugere usá-lo e diz as desvantagens", /Sleep in your sleeping bag/.test(Sim.campaignTip(far)) && /stiff/.test(Sim.campaignTip(far)));
+  const reader = fresh("campaign"); Sim.testJump(reader, 13, {}, {anyMode: true});
+  reader.campaign.completed.push(...Data.campaignGoals.map(g => g.id).filter(id => !["amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"].includes(id)));
+  Object.assign(reader.player, {fatigue: 10, hunger: 90, hydration: 90, wounds: []});
+  let bookTip = "";
+  for (let h = 0; h < 24 && !bookTip; h++) { reader.minutes = 12 * 1440 + h * 60; const tip = Sim.campaignTip(reader); if (/It teaches you/.test(tip)) bookTip = tip; }
+  check("campismo: as dicas também sugerem um livro, onde se encontra e o que ensina", /You can find one in/.test(bookTip), bookTip);
+}
+
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
   const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"];
   let empty = 0, total = 0, sample = "";

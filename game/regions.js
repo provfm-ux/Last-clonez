@@ -573,6 +573,13 @@ const Regions = (() => {
           treeType:region === "ridge" ? "pine" : orchard ? "orchard" : null});
       }
     }
+    // The fortress's two controlled entrances (docs/HISTORIA.md section 11): plank gates across both wall gaps, open at first.
+    // Added last with fixed ids and no rng, so nothing generated before them changes.
+    if (region === "fortress") for (const [side, gx, name] of [["w", 14, "West gate"], ["e", 58, "East gate"]]) for (let i = 0; i < 5; i++) {
+      const tile = at(gx, 30 + i);
+      objects.push({id:"fortress-gate-" + side + "-" + i, x:gx + .5, y:30.5 + i, kind:"gate", name, zone:tile.zone, building:null, tint:.5,
+        active:true, solid:false, action:"door", open:true, boards:0, hp:160, axis:"y"});
+    }
     return {region,seed,generator,width,height,rng,tiles,objects,buildings,zones,start,hotspots,base:null,
       npc:{id:"eva",name:"Eva",...start,hp:0,mode:"away",path:[],moving:false}};
   }

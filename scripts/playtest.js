@@ -461,6 +461,37 @@ const scenarios = {
     const inside = await page.evaluate(() => Boolean(World.tileAt(pt.s().world, pt.s().player.x, pt.s().player.y)?.building));
     return {pass: Boolean(climb) && inside, notes: "Climb through button: " + Boolean(climb) + ", inside after climbing: " + inside};
   },
+  async "radio-checklist"(page) { // QA: the shelter radio lists what it needs, why, carried and stored; the list can be pinned to the HUD
+    await page.evaluate(helpers);
+    await page.evaluate(() => { window.confirm = () => true; document.getElementById("start-btn").click(); });
+    await page.waitForFunction(() => window.__state?.mode === "play");
+    const id = await page.evaluate(() => { pt.calm(); pt.s().world.enemies = []; const r = pt.s().world.objects.find(o => o.action === "radio"); return r && pt.beside(r) ? r.id : null; });
+    if (!id) return {pass: false, notes: "No reachable shelter radio"};
+    for (let i = 0; i < 3; i++) {                     // an unread clue next to the radio opens first; a second Use lists the choices
+      await use(page, id); await page.waitForTimeout(300);
+      if (await page.$("dialog[open] .radio-needs")) break;
+      await page.evaluate(() => document.querySelector("dialog[open]")?.close()); await page.waitForTimeout(200);
+    }
+    const table = await page.evaluate(() => [...document.querySelectorAll("dialog[open] .radio-needs tbody tr")].map(r => r.innerText.replace(/\s+/g, " ")).join(" | "));
+    await page.screenshot({path: path.join(out, "radio-checklist.png")});
+    const pin = await page.$('[data-action^="radiopin-"]');
+    if (pin) await pin.click();
+    await page.evaluate(() => document.querySelector("dialog[open]")?.close());
+    await page.waitForTimeout(900);
+    const hud = await page.evaluate(() => document.getElementById("guide-hint").textContent);
+    return {pass: /Radio component/.test(table) && /Fuel/.test(table) && Boolean(pin) && /Radio: still need/.test(hud), notes: "rows: " + table.slice(0, 160) + " | HUD: " + hud.slice(0, 120)};
+  },
+  async "xray-outline"(page) { // QA: a wall in front of the player does not hide them
+    await startCampaign(page);
+    const ok = await page.evaluate(() => { const s = pt.s(); pt.calm(); s.world.enemies = []; s.zoom = 2.5;
+      for (const t of s.world.tiles) { if (t.solid || t.building === null) continue;
+        const front = World.tileAt(s.world, t.x + 1, t.y + 1);
+        if (front && front.kind === "wall" && World.clear(s.world, t.x + .5, t.y + .5, .2)) { Object.assign(s.player, {x: t.x + .5, y: t.y + .5, path: []}); return true; } }
+      return false; });
+    await page.waitForTimeout(500);
+    await page.screenshot({path: path.join(out, "xray-outline.png"), clip: {x: 270, y: 240, width: 340, height: 240}});
+    return {pass: ok, notes: "player placed behind a wall: " + ok + " (see xray-outline.png)"};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

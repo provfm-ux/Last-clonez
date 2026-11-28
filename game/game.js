@@ -718,7 +718,8 @@
     const inRun = active() && !lesson;
     const goal = inRun ? state.longHaul ? state.longHaul.days + "/30 days" + (state.longHaul.complete ? " · complete" : "") : Sim.pinnedGoal(state) ?? "" : "";
     const tip = inRun && !state.longHaul ? Sim.campaignTip(state) : "";   // campaign: always a next step, whatever the guide toggle says
-    const hint = tip || (inRun && $("guide-enabled").checked ? state.longHaul ? Sim.longHaulHint(state) : guideHints[state.guideStep] ?? "" : "");
+    const radio = inRun ? Sim.radioChecklist(state) : "";
+    const hint = [tip || (inRun && $("guide-enabled").checked ? state.longHaul ? Sim.longHaulHint(state) : guideHints[state.guideStep] ?? "" : ""), radio].filter(Boolean).join(" · ");
     $("onboarding").hidden = !goal && !hint;
     if ($("pinned-goal").textContent !== goal) $("pinned-goal").textContent = goal;
     if ($("guide-hint").textContent !== hint) $("guide-hint").textContent = hint;
@@ -1904,11 +1905,19 @@
       return;
     }
     if (o.action === "radio") {
+      const rows = Sim.radioNeeds(state), ready = rows.every(r => Sim.available(state, r.id) >= r.qty);   // the repair also takes from crates in reach
+      const list = '<table class="radio-needs"><thead><tr><th>Needed</th><th>Why</th><th>Carried</th><th>In shelter</th></tr></thead><tbody>' +
+        rows.map(r => "<tr><td>" + (r.carried + r.stored >= r.qty ? "✓ " : "") + r.qty + " " + esc(Data.items[r.id].name) + "</td><td>" + esc(r.why) +
+          '</td><td class="num">' + r.carried + '</td><td class="num">' + r.stored + "</td></tr>").join("") + "</tbody></table>" +
+        (rows.some(r => r.missing) ? "<p>Where to look: " + rows.filter(r => r.missing).map(r => esc(Data.items[r.id].name) + ", " + esc(r.where)).join("; ") + ".</p>" : "") +
+        (!ready && rows.every(r => r.carried + r.stored >= r.qty) ? "<p>Everything is in the shelter. Carry it to the radio.</p>" : "");
       const detail = state.flags.radio ? "<p>The water tower relay is on 87.6 FM.</p>" :
-        "<p>The radio needs 2 radio components, 2 scrap and 1 fuel for the generator. Search the workshop and police station.</p><p>Broadcasting makes noise. Secure the shelter before switching it on.</p>";
+        "<p>Mara's relay is on 87.6. Getting the shelter radio working takes three things.</p>" + list +
+        "<p>Broadcasting makes noise. Secure the shelter before switching it on.</p>";
       const label = !state.flags.radio ? "Repair and broadcast" : state.supplyRun === "return" ? "Report cache recovered" :
         state.supplyRun === "complete" ? "Read check-in" : "Read reply";
-      show("Shelter radio", detail + button(label, "context-" + id, false, "primary"), "object-" + id);
+      show("Shelter radio", detail + button(label, "context-" + id, !state.flags.radio && !ready, "primary") +
+        (state.flags.radio ? "" : " " + button(state.flags.radioPin ? "Unpin checklist" : "Pin checklist", "radiopin-" + id)), "object-" + id);
       return;
     }
     Sim.contextual(state, o);
@@ -2340,6 +2349,10 @@
         if (kind === "light" ? Sim.use(state, index) : Sim.replaceBattery(state, state.player.bag[index])) save();
         gear();
         updateHud();
+        return;
+      }
+      if (kind === "radiopin" && dialogView === "object-" + index) {
+        state.flags.radioPin = !state.flags.radioPin; save(); objectPanel(o); updateHud();
         return;
       }
       if (kind === "climb" && dialogView === "object-" + index) {

@@ -1,6 +1,9 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Shelter radio (external QA): the panel lists what the repair needs, why, how many you carry and how many are in the shelter, and where to look. "Pin checklist" keeps what is still missing on the HUD until the radio works.
+- Readability (external QA): when a wall or tall furniture stands in front of the survivor, a faint copy is drawn on top (with the infected holding them, if any).
+- Fortress: the two controlled entrances are real plank gates now (west and east, open at first). Close them to choose when the infected come in; they can break them.
 - Campaign: two bandages in the Cold Vale workshop on the first route; when you bleed with no bandage, the tip says to tear cloth into bandages or take that kit.
 - Performance: optional caches are checked once per game minute instead of every tick; the 30-day tip test reuses one game (smoke test a few seconds faster).
 - Fix (external QA): an imported save opens paused with a summary (region, day, time, health, open wounds, infected close by, current goal); nothing moves until Resume.

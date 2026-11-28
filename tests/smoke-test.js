@@ -2508,6 +2508,28 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("qa: a sangrar sem ligaduras, a dica diz como fazer uma e onde há", /Tear a piece of cloth/.test(Sim.campaignTip(c)) && /workshop/.test(Sim.campaignTip(c)), Sim.campaignTip(c));
 }
 
+{ // QA: lista do rádio (o que falta, porquê, o que levas e o que está no abrigo) e lista afixada no HUD
+  const s = fresh("survival");
+  const rows = Sim.radioNeeds(s);
+  check("rádio: a lista tem peças, sucata e combustível com o porquê", rows.map(r => r.id).join() === "part,scrap,fuel" && rows.every(r => r.why && r.where && r.qty > 0));
+  check("rádio: sem afixar, o HUD não mostra a lista", Sim.radioChecklist(s) === "");
+  s.flags.radioPin = true; s.player.bag = s.player.bag.filter(i => !["part", "scrap", "fuel"].includes(i.id));
+  const line = Sim.radioChecklist(s);
+  check("rádio: afixada, mostra o que falta e onde procurar", /Radio: still need/.test(line) && /radio components/.test(line), line);
+  s.player.bag.push({id:"part", qty:2, condition:100, born:0}, {id:"scrap", qty:2, condition:100, born:0}, {id:"fuel", qty:1, condition:100, born:0});
+  check("rádio: com tudo, diz para ir reparar", /you have everything/.test(Sim.radioChecklist(s)));
+  check("rádio: a lista afixada guarda-se", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s)))).flags.radioPin === true);
+}
+
+{ // fortaleza: as duas entradas controladas são portões que fecham e que os infetados podem partir
+  const f = Sim.create(11, "campaign", "carer", 2, undefined, "fortress");
+  const gates = f.world.objects.filter(o => o.kind === "gate" && /^fortress-gate-/.test(o.id));
+  check("fortaleza: há portões nas duas aberturas da muralha (5 + 5), abertos de início", gates.length === 10 && gates.every(g => g.open && g.action === "door"));
+  const g0 = gates[0]; Object.assign(f.player, {x: g0.x + 1, y: g0.y}); f.world.enemies = [];
+  check("fortaleza: um portão fecha-se e passa a bloquear", Sim.door(f, g0) && !g0.open && !context.World.clear(f.world, g0.x, g0.y, .2));
+  check("fortaleza: portões fechados guardam-se e carregam", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(f)))).world.objects.find(o => o.id === g0.id).open === false);
+}
+
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
   const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"];
   let empty = 0, total = 0, sample = "";

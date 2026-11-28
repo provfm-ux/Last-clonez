@@ -752,6 +752,25 @@ const Sim = (() => {
     return rotate[(day * 24 + hour) % rotate.length];
   }
 
+  // Radio repair checklist: carried, stored in the shelter (home area only) and still missing, per material.
+  function radioNeeds(s) {
+    const zone = s.world.region === Regions.home ? s.world : s.regionStates[Regions.home];
+    const base = zone?.buildings?.find(b => b.id === (s.world.region === Regions.home ? s.world.base?.id : zone.base?.id)) ?? null;
+    const stores = (zone?.objects ?? []).filter(o => o.storage && base && o.building === base.id).map(o => o.loot ?? []);
+    return Data.radioNeeds.map(n => {
+      const carried = quantity(s.player.bag, n.id), stored = stores.reduce((sum, bag) => sum + quantity(bag, n.id), 0);
+      return {...n, carried, stored, missing: Math.max(0, n.qty - carried - stored)};
+    });
+  }
+  // The pinned checklist line for the HUD ("" when not pinned or the radio already works).
+  function radioChecklist(s) {
+    if (!s.flags.radioPin || s.flags.radio) return "";
+    const rows = radioNeeds(s), name = (id, n) => id === "part" && n > 1 ? "radio components" : Data.items[id].name.toLowerCase();
+    const missing = rows.filter(r => r.missing);
+    if (!missing.length) return "Radio: you have everything. Bring it to the shelter radio and repair it.";
+    return "Radio: still need " + missing.map(r => r.missing + " " + name(r.id, r.missing)).join(", ") + ". " + missing[0].where[0].toUpperCase() + missing[0].where.slice(1) + ".";
+  }
+
   // The campaign tip: always one concrete next step for the current objective, so the player never feels lost. Pure text from state.
   function campaignTip(s) {
     if (!isCampaign(s) || s.mode === "dead") return "";
@@ -1678,7 +1697,8 @@ const Sim = (() => {
   }
 
   // Campaign objects added after campaign saves already existed: older saves get them back on load.
-  const campaignFixtures = new Set(["cinema-statue", "campaign-page-0", "campaign-page-1", "campaign-page-2", "cinema-tap", "cinema-note", "eva-diary", "iron-cage", "iron-toolboard", "iron-terminal-0", "iron-terminal-1", "iron-terminal-2", "grotto-plate", "westfields-ledger", "fathill-case", "ai-terminal", "vic-diary", ...Object.keys(Data.optionalAreas).map(id => id.replace("opt.", "opt-"))]);
+  const campaignFixtures = new Set(["cinema-statue", "campaign-page-0", "campaign-page-1", "campaign-page-2", "cinema-tap", "cinema-note", "eva-diary", "iron-cage", "iron-toolboard", "iron-terminal-0", "iron-terminal-1", "iron-terminal-2", "grotto-plate", "westfields-ledger", "fathill-case", "ai-terminal", "vic-diary", ...Object.keys(Data.optionalAreas).map(id => id.replace("opt.", "opt-")),
+    ...["w", "e"].flatMap(side => [0, 1, 2, 3, 4].map(i => "fortress-gate-" + side + "-" + i))]);
 
   // ironworks.barricade: a barricaded weapon cage and a toolboard in the machine shop, and three line-computer terminals.
   function placeIronworks(world) {
@@ -3413,7 +3433,7 @@ const Sim = (() => {
         }
         return true;
       }
-      if (!consume(s, {part: 2, scrap: 2, fuel: 1})) {
+      if (!consume(s, Object.fromEntries(Data.radioNeeds.map(n => [n.id, n.qty])))) {
         notify(s, "The radio needs 2 radio components, 2 scrap and 1 fuel."); return false;
       }
       s.flags.radio = true;
@@ -4721,7 +4741,7 @@ const Sim = (() => {
     s.weather = localWeather(s);
     s.flags = {...s.flags, ...data.flags, gardenSeeded: data.flags?.gardenSeeded === true,
       harvested: data.flags?.harvested === true, gardenMeal: data.flags?.gardenMeal === true,
-      gardenHelp: data.flags?.gardenHelp === true};
+      gardenHelp: data.flags?.gardenHelp === true, radioPin: data.flags?.radioPin === true};
     if (!s.flags.gardenSeeded && s.world.base) stockGardenSeeds(s);
     if (s.flags.radio && ["return", "complete"].includes(data.supplyRun)) s.supplyRun = data.supplyRun;
     s.messages = Array.isArray(data.messages) ? data.messages.slice(-7) : [];
@@ -4753,7 +4773,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, climbThrough, isSeat, restOnSeat, aiSend, useAiTerminal, readVicDiary, seeEpilogue, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, radioNeeds, radioChecklist, climbThrough, isSeat, restOnSeat, aiSend, useAiTerminal, readVicDiary, seeEpilogue, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

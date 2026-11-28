@@ -791,3 +791,8 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 #longhaul-btn { margin:6px 0 8px; }
 
 #map-card-name { font:inherit; }
+
+.radio-needs { width:100%; border-collapse:collapse; margin:8px 0; font-size:13px; }
+.radio-needs th { text-align:left; font:650 11px var(--sans); color:#c5d1bc; padding:4px 6px; border-bottom:1px solid #4a5740; }
+.radio-needs td { padding:5px 6px; border-bottom:1px solid #2e372c; vertical-align:top; }
+.radio-needs td.num { text-align:right; font-variant-numeric:tabular-nums; }

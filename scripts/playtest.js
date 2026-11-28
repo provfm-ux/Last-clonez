@@ -423,6 +423,44 @@ const scenarios = {
     await snap("bag");
     return {pass: seat && drawnSit && bed && bag, notes: "seat rest: " + seat + ", bed rest: " + bed + ", sleeping bag wake-up shown. Screenshots: " + shots.join(", ")};
   },
+  async "import-paused"(page) { // QA: an imported save opens paused with a summary; nothing moves until Resume
+    await startCampaign(page);
+    const json = await page.evaluate(() => { const s = pt.s(); s.player.hp = 40; s.player.wounds.push({part:"arm", type:"cut", bleed:.18, bandaged:false, clean:false, infection:0, age:0});
+      const z = s.world.enemies.find(e => e.hp > 0); if (z) Object.assign(z, {x: s.player.x + 1.2, y: s.player.y, dormant: false, alert: 20});
+      return JSON.stringify(Sim.snapshot(s)); });
+    await page.setInputFiles("#import-input", {name: "qa-wounded.json", mimeType: "application/json", buffer: Buffer.from(json)});
+    await page.waitForFunction(() => /Save imported/.test(document.querySelector("dialog[open]")?.innerText ?? ""), null, {timeout: 5000}).catch(() => {});
+    const before = await page.evaluate(() => ({hp: pt.s().player.hp, minutes: pt.s().minutes, text: pt.dialog()}));
+    await page.waitForTimeout(1500);
+    const after = await page.evaluate(() => ({hp: pt.s().player.hp, minutes: pt.s().minutes}));
+    await page.screenshot({path: path.join(out, "import-paused.png")});
+    await page.click('dialog[open] [data-action="resume"]'); await page.waitForTimeout(1200);
+    const resumed = await page.evaluate(() => pt.s().minutes);
+    return {pass: /Save imported/.test(before.text) && /Health 40/.test(before.text) && /open wound/.test(before.text) && after.hp === before.hp && after.minutes === before.minutes && resumed > before.minutes,
+      notes: "summary: " + before.text.replace(/\s+/g, " ").slice(0, 140) + " | paused 1.5 s: hp " + before.hp + " to " + after.hp + ", clock " + before.minutes.toFixed(1) + " to " + after.minutes.toFixed(1) + ", runs after Resume: " + (resumed > before.minutes)};
+  },
+  async "continue-after-death"(page) { // QA: Continue says View summary when the saved survivor is dead
+    await startCampaign(page);
+    await page.evaluate(() => { const s = pt.s(); s.player.hp = 0; });
+    await page.waitForFunction(() => window.__state?.mode === "dead", null, {timeout: 5000}).catch(() => {});
+    await page.waitForTimeout(800);
+    await page.reload(); await page.waitForFunction(() => typeof Sim !== "undefined" && !document.getElementById("continue-btn").hidden).catch(() => {});
+    const label = await page.evaluate(() => document.getElementById("continue-btn").innerText.trim());
+    const newGame = await page.evaluate(() => !document.getElementById("story-btn").hidden);
+    return {pass: /View summary/.test(label) && newGame, notes: "Continue label after death: " + label + ", new game button visible: " + newGame};
+  },
+  async "window-climb"(page) { // QA: an open window offers Climb through
+    await startCampaign(page);
+    const id = await page.evaluate(() => { const s = pt.s(); pt.calm(); s.world.enemies = [];
+      const w = s.world.objects.find(o => o.kind === "window" && o.action === "door" && !o.boards && !o.locked && !o.latched && pt.beside(o) && !World.tileAt(s.world, s.player.x, s.player.y)?.building);
+      if (!w) return null; w.open = true; return w.id; });
+    if (!id) return {pass: false, notes: "No outside window to test"};
+    await use(page, id);
+    const climb = await page.$('[data-action^="climb-"]');
+    if (climb) { await climb.click(); await page.waitForTimeout(300); }
+    const inside = await page.evaluate(() => Boolean(World.tileAt(pt.s().world, pt.s().player.x, pt.s().player.y)?.building));
+    return {pass: Boolean(climb) && inside, notes: "Climb through button: " + Boolean(climb) + ", inside after climbing: " + inside};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

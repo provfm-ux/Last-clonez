@@ -1661,7 +1661,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   const far = pages.filter(o => Math.hypot(s.player.x - o.x, s.player.y - o.y) > 3);
   check("coldvale.houses ler de longe não conta", far.length > 0 && far.every(o => !Sim.readCampaignPage(s, o) && !o.read));
   for (const [i, page] of pages.slice(0, 2).entries()) { reach(page); Sim.readCampaignPage(s, page); }
-  check("coldvale.houses 2 de 3 páginas ainda não dão pista", s.campaign.clues === 0 && /2 of 3/.test(s.messages.at(-1).text), s.messages.at(-1).text);
+  check("coldvale.houses 2 de 3 páginas ainda não dão pista", s.campaign.clues === 0 && s.messages.slice(-2).some(m => /2 of 3/.test(m.text)), s.messages.slice(-2).map(m => m.text).join(" | "));
   const mid = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
   check("coldvale.houses páginas lidas ficam gravadas", mid.world.objects.filter(o => o.action === "campaign-page" && o.read).length === 2);
   reach(pages[2]);
@@ -2477,6 +2477,25 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   let bookTip = "";
   for (let h = 0; h < 24 && !bookTip; h++) { reader.minutes = 12 * 1440 + h * 60; const tip = Sim.campaignTip(reader); if (/It teaches you/.test(tip)) bookTip = tip; }
   check("campismo: as dicas também sugerem um livro, onde se encontra e o que ensina", /You can find one in/.test(bookTip), bookTip);
+}
+
+{ // QA ChatGPT: pista da página seguinte, atravessar janelas abertas
+  const s = fresh("campaign"); s.world.enemies = [];
+  const pages = s.world.objects.filter(o => o.action === "campaign-page");
+  const first = pages[0]; Object.assign(s.player, {x: first.x, y: first.y});
+  Sim.readCampaignPage(s, first);
+  const lead = s.messages.at(-1)?.text ?? "";
+  const names = pages.slice(1).map(o => s.world.buildings.find(b => b.id === o.building).name);
+  check("qa: a primeira página dá uma pista da casa seguinte e da direção", /another house/.test(lead) && names.some(n => lead.includes(n)) && /(north|south|east|west)/.test(lead), lead);
+  check("qa: a pista não muda o progresso das páginas", s.world.objects.filter(o => o.action === "campaign-page" && o.read).length === 1);
+  const w = fresh("survival"); w.world.enemies = [];
+  const win = w.world.objects.find(o => o.kind === "window" && o.action === "door" && !o.boards && !o.locked && !o.latched && (() => {
+    for (const r of [.7, .9]) for (let a = 0; a < 16; a++) { const p = {x: o.x + Math.cos(a * Math.PI / 8) * r, y: o.y + Math.sin(a * Math.PI / 8) * r};
+      if (World.clear(w.world, p.x, p.y, .18) && !World.tileAt(w.world, p.x, p.y)?.building) { Object.assign(w.player, p); if (Sim.reachableObject(w, o)) return true; } } return false; })());
+  check("qa: uma janela fechada não se atravessa", Boolean(win) && !Sim.climbThrough(w, win));
+  win.open = true; const outside = !World.tileAt(w.world, w.player.x, w.player.y)?.building;
+  check("qa: com a janela aberta, 'Climb through' passa para o outro lado", Sim.climbThrough(w, win) && outside && Boolean(World.tileAt(w.world, w.player.x, w.player.y)?.building),
+    w.player.x.toFixed(2) + "," + w.player.y.toFixed(2));
 }
 
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio

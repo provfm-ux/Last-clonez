@@ -3639,7 +3639,7 @@ const Sim = (() => {
     z.hp = Math.max(0, z.hp - dealt);
     if (counter) { z.exposed = 0; s.effects.push({x: z.x, y: z.y - .3, text: "COUNTER", color: "#f0d27a", life: .8, impact: .35}); }
     if (p.grabbed > 0) {                                  // every swing while held struggles against the grip
-      p.grabbed = Math.max(0, p.grabbed - Data.grab.struggle);
+      p.grabbed = Math.max(0, p.grabbed - Data.grab.struggle / crowd(s));
       if (!p.grabbed || z.hp <= 0) releaseGrab(s, true, z.hp <= 0 ? "" : "You fight your way free. Hit it again!");
     }
     if (hit && Data.items[item.id]?.fire && !z.stats.boss) z.burnUntil = s.elapsed + Data.fireRules.torchSeconds;
@@ -3648,7 +3648,8 @@ const Sim = (() => {
       z.flash = .2;
       // Rapid hits stop stunning: from the third hit in a row an infected may push through and finish its attack (no stun-lock).
       z.chain = (s.elapsed - (z.chainAt ?? -9) < 1.5 ? (z.chain ?? 0) : 0) + 1; z.chainAt = s.elapsed;
-      const shrug = z.chain >= 3 && !w.firearm && s.world.rng() < Data.grab.pushThrough;
+      const company = s.world.enemies.some(e => e !== z && e.hp > 0 && !e.dormant && distance(e, p) < 1.6);
+      const shrug = z.chain >= (company ? 2 : 3) && !w.firearm && s.world.rng() < Data.grab.pushThrough;
       if (shrug) s.effects.push({x: z.x, y: z.y - .4, text: "PUSHES ON", color: "#d9a35b", life: .6});
       if (!shrug && ((z.kind !== "brute" && !z.stats.boss) || matchup >= 1)) {
         z.stagger = Math.max(z.stagger, z.kind === "runner" && w.combat === "reach" ? .48 : .28);
@@ -3711,11 +3712,26 @@ const Sim = (() => {
     if (g.t >= G.biteAt) bite(s, z);
   }
   const assistHold = s => assist(s, "grabs");
+  // Other infected pressing in make struggling free slower (1 + crowdDrag per extra infected within reach).
+  const crowd = s => 1 + Data.grab.crowdDrag * s.world.enemies.filter(z => z.hp > 0 && !z.dormant && z.id !== s.grab?.id && distance(z, s.player) < 1.5).length;
+
+  // Held by one, bitten by another: no grace frames, heavier damage, and a bite wound is likely.
+  function pinnedBite(s, z) {
+    const p = s.player, G = Data.grab;
+    const amount = z.stats.damage * infectedDamage(s) * G.pinnedDamage;
+    p.hp = Math.max(0, p.hp - amount); p.flash = .4; p.resting = false;
+    const infected = s.world.rng() < Math.min(.9, (s.rules.bite ?? 6) / 100 * G.biteWound);
+    if (p.wounds.length < 6) p.wounds.push({part: "arm", type: infected ? "bite" : "cut", bleed: .2, bandaged: false, clean: false, infection: 0, age: 0});
+    if (!p.hp) s.deathCause = "infected that held you down";
+    s.effects.push({x: p.x, y: p.y, text: "PINNED −" + Math.round(amount), color: "#e07a6a", life: 1, impact: .6});
+    hearZombie(s, "attack", z);
+    notify(s, "Another one bites while you are held! Break free.", true);
+  }
 
   // Instead of a blow, an infected sometimes reaches out and grabs: no damage yet, but it bites if you do not break free.
   function tryGrab(s, z) {
     const p = s.player, G = Data.grab;
-    if (p.grabbed > 0 || p.grabCool > 0 || p.vehicle || z.stats.boss || p.flash > 0 || s.world.rng() >= (G.chance[z.kind] ?? G.chance.walker)) return false;
+    if (p.grabbed > 0 || p.grabCool > 0 || p.vehicle || z.stats.boss || s.world.rng() >= (G.chance[z.kind] ?? G.chance.walker)) return false;
     p.grabbed = assistHold(s) ? G.assistHold : G.hold;
     s.grab = {id: z.id, t: 0};
     p.resting = false; p.path = [];
@@ -3778,7 +3794,8 @@ const Sim = (() => {
     const shielded = p.sleeping && isNight(s) && cinemaBuff(s);
     const amount = z.stats.damage * infectedDamage(s) * (1 - guard) * (shielded ? Data.cinemaTrap.sleepDamage : 1);
     const absorbed = guard > 0 && s.world.rng() < guard * .9;
-    p.hp = Math.max(0, p.hp - amount); p.flash = .75; p.resting = false;
+    const pack = s.world.enemies.filter(e => e.hp > 0 && !e.dormant && distance(e, p) < 1.5).length;   // surrounded: less time to recover
+    p.hp = Math.max(0, p.hp - amount); p.flash = pack >= 2 ? Data.grab.packFlash : .75; p.resting = false;
     if (!p.hp) s.deathCause = "a " + z.stats.name.toLowerCase();
     if (absorbed) notify(s, "Your clothing absorbs the worst of it.", true);
     else {
@@ -3931,7 +3948,7 @@ const Sim = (() => {
     const travelled = Math.hypot(p.x-startX,p.y-startY);
     if (!p.path.length) s.dash = false;
     if (p.grabbed > 0 && p.moving) {                     // pulling away struggles the hold loose
-      p.grabbed = Math.max(0, p.grabbed - dt * Data.grab.pull);
+      p.grabbed = Math.max(0, p.grabbed - dt * Data.grab.pull / crowd(s));
       if (!p.grabbed) releaseGrab(s, true, "You twist free. Hit it now!");
     }
     if (!World.clear(s.world, p.x, p.y)) unstick(s, true);
@@ -4087,7 +4104,10 @@ const Sim = (() => {
           z.swing = .18;
           hearZombie(s,"attack",z);
           if ((pending === p || canTargetEva(npc)) && distance(z, pending) < 1.15 && lineOfSight(s, z, pending)) {
-            if (pending === p) { if (!tryGrab(s, z)) hurt(s, z); }
+            if (pending === p) {
+              if (p.grabbed > 0 && s.grab && s.grab.id !== z.id) pinnedBite(s, z);   // held by another: this one bites
+              else if (!tryGrab(s, z)) hurt(s, z);
+            }
             else {
               npc.hp = Math.max(0, npc.hp - z.stats.damage * infectedDamage(s));
               npc.flash = .5;
@@ -4100,7 +4120,8 @@ const Sim = (() => {
       if (distance(z, victim) < 1 && (seen || npcSeen)) {
         z.moving = false;
         if (z.cooldown <= 0) {
-          z.windup = windupTime + (z.kind === "brute" ? bruteWindup : 0) + (assist(s, "windup") && victim === p ? .35 : 0);
+          z.windup = (windupTime + (z.kind === "brute" ? bruteWindup : 0) + (assist(s, "windup") && victim === p ? .35 : 0)) *
+            (victim === p && p.grabbed > 0 ? Data.grab.pinnedWindup : 1);                     // a pinned survivor is an easy target
           z.windupTarget = victim === npc ? "eva" : "player";
           z.cooldown = 1.5;
           faceTowards(z, victim);
@@ -4261,6 +4282,10 @@ const Sim = (() => {
     updateDoorLure(s, dt);
     updateFungalAlert(s);
     updateEnemies(s, dt);
+    if (!s.flags.packWarned && s.mode === "play") {          // once per game: the first time a group comes for you
+      const p = s.player, pack = s.world.enemies.filter(z => z.hp > 0 && !z.dormant && z.alert > 0 && distance(z, p) < 7).length;
+      if (pack >= 2) { s.flags.packWarned = true; notify(s, "More than one is coming. A pair can hold you while the other bites: run, sneak round them, or fight them one at a time.", true); }
+    }
     updateFire(s, dt);
     updateNpc(s, dt);
     updateNeeds(s, dt);

@@ -1,6 +1,8 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Campaign: two bandages in the Cold Vale workshop on the first route; when you bleed with no bandage, the tip says to tear cloth into bandages or take that kit.
+- Performance: optional caches are checked once per game minute instead of every tick; the 30-day tip test reuses one game (smoke test a few seconds faster).
 - Fix (external QA): an imported save opens paused with a summary (region, day, time, health, open wounds, infected close by, current goal); nothing moves until Resume.
 - Fix (external QA): Continue says "View summary" when the saved survivor is dead, and "Continue" when alive; the new-game buttons stay below.
 - Story objects show "· Story" in their label (torn pages, diaries, plate, ledger, terminal), world notes keep "· Note". Reading a torn page names the next house and its direction.

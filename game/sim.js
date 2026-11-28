@@ -529,6 +529,9 @@ const Sim = (() => {
       placeOptional(world, region, rules);
       if (town) {
         placeEvaDiary(world);
+        // A small first-aid kit on the first route (external QA): two bandages in the workshop, campaign only.
+        const shop = world.buildings.find(b => b.type === "workshop"), kit = shop && world.objects.find(o => o.building === shop.id && o.action === "loot");
+        if (kit) add(kit.loot, "bandage", 2);
         CampaignHints.track(s.campaign.hints, "coldvale.houses", s.minutes);
       }
     }
@@ -729,7 +732,7 @@ const Sim = (() => {
   function idleIdea(s, day) {
     const p = s.player, T = Data.campaignTips.ideas, hour = Math.floor(s.minutes % 1440 / 60), night = hour >= 22 || hour < 6;
     const has = id => p.bag.some(i => i.id === id);
-    if (p.wounds?.some(w => !w.bandaged)) return T.wounds;
+    if (p.wounds?.some(w => !w.bandaged)) return has("bandage") ? T.wounds : T.woundsNone;
     if (p.hydration < 45) return T.drink;
     if (p.hunger < 45) return T.eat;
     if (p.fatigue >= 60 || night && p.fatigue >= 25) {
@@ -1935,6 +1938,9 @@ const Sim = (() => {
   }
 
   function updateOptional(s) {
+    const minute = Math.floor(s.minutes);                // caches only change on the hour: check once per game minute
+    if (s.optionalAt === minute && s.optionalWorld === s.world) return;
+    s.optionalAt = minute; s.optionalWorld = s.world;
     const day = runDay(s.minutes), hour = Math.floor(s.minutes % 1440 / 60);
     for (const o of s.world.objects) {
       if (!o.optional) continue;

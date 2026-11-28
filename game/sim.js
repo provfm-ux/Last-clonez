@@ -725,6 +725,30 @@ const Sim = (() => {
     return null;
   }
 
+  // A concrete idea for spare time (waiting for the next day, or the place is closed): from the player's own needs first.
+  function idleIdea(s, day) {
+    const p = s.player, T = Data.campaignTips.ideas, hour = Math.floor(s.minutes % 1440 / 60), night = hour >= 22 || hour < 6;
+    const has = id => p.bag.some(i => i.id === id);
+    if (p.wounds?.some(w => !w.bandaged)) return T.wounds;
+    if (p.hydration < 45) return T.drink;
+    if (p.hunger < 45) return T.eat;
+    if (p.fatigue >= 60 || night && p.fatigue >= 25) {
+      const bed = s.world.objects.some(o => o.active && o.action === "bed" && o.kind !== "tent");
+      if (bed) return T.sleep;
+      return has("sleepingbag") || s.world.objects.some(o => o.active && o.kind === "tent") ? T.camp : T.campMake;
+    }
+    if (p.fatigue >= 35) return T.rest;
+    if (day >= 20 && !s.campaign.completed.includes("fortress.last-boss") && !has("torch") && !has("molotov")) return T.fire;
+    const unread = Object.entries(Data.skillBooks).filter(([id]) => !(p.readBooks ?? []).includes(id));
+    if (unread.length && (day + hour) % 3 === 0) {
+      const [id, book] = unread[(day * 7 + hour) % unread.length];
+      const where = {base:"your shelter", clinic:"the clinic", home:"a family house", market:"the market", police:"the police station", workshop:"the workshop"}[book.site] ?? "town";
+      return T.book.replace("{book}", book.title).replace("{site}", where).replace("{skill}", Data.skills[book.skill].name.toLowerCase());
+    }
+    const rotate = T.spare;
+    return rotate[(day * 24 + hour) % rotate.length];
+  }
+
   // The campaign tip: always one concrete next step for the current objective, so the player never feels lost. Pure text from state.
   function campaignTip(s) {
     if (!isCampaign(s) || s.mode === "dead") return "";
@@ -733,40 +757,40 @@ const Sim = (() => {
     const extra = (() => { const id = optionalToday(s); return id ? T.optional.replace("{place}", Data.optionalAreas[id].place) : ""; })();
     if (!goal && c.completed.includes("fortress.last-boss")) return T.goals["fortress.last-boss"].done + extra;
     if (!goal) return T.idle + extra;
-    if (goal.opens) return T.waiting.replace("{day}", goal.opens) + extra;
+    if (goal.opens) return T.waiting.replace("{day}", goal.opens) + " " + idleIdea(s, day) + extra;
     const area = Data.campaignGoals.find(g => g.id === goal.id).area, closed = Campaign.closedReason(area, day, hour);
     const at = {coldvale:Regions.home, cinema:"cinema", pineridge:"ridge", ironworks:"ironworks", fathill:"coast", westfields:"fields", cindergrotto:Regions.cavern, viragem:"reservoir", amigo1:"reservoir", fortress:"fortress"}[area];
     const text = T.goals[goal.id], f = c.fathill, pages = s.world.objects.filter(o => o.action === "campaign-page" && o.read).length;
     switch (goal.id) {
       case "coldvale.houses": return region !== Regions.home ? T.back : text.replace("{n}", pages);
       case "cinema.statue": {
-        if (region !== "cinema") return closed || text.go;
+        if (region !== "cinema") return (closed ? closed + " " + idleIdea(s, day) : text.go);
         return s.world.objects.find(o => o.id === "cinema-statue")?.active ? text.take : text.escape;
       }
-      case "pineridge.two-nights": return region !== "ridge" ? closed || text.go : text.stay.replace("{n}", c.ridge.nights);
+      case "pineridge.two-nights": return region !== "ridge" ? (closed ? closed + " " + idleIdea(s, day) : text.go) : text.stay.replace("{n}", c.ridge.nights);
       case "eva.death": return region !== Regions.home && c.eva !== "" ? T.back : c.eva === "gone" ? text.diary : c.eva === "left" ? text.wait : text.follow;
-      case "ironworks.barricade": return region !== "ironworks" ? closed || text.go : text.cage;
+      case "ironworks.barricade": return region !== "ironworks" ? (closed ? closed + " " + idleIdea(s, day) : text.go) : text.cage;
       case "fathill.bosses":
-        if (region !== "coast") return closed || text.go;
+        if (region !== "coast") return (closed ? closed + " " + idleIdea(s, day) : text.go);
         if (tideIn(s) && c.tide.boat !== day) return text.tideIn.replace("{day}", Campaign.lowTide(day) && hour < 6 ? day : day + (Campaign.lowTide(day + 1) ? 1 : 2));
         if (hour >= Data.fatHill.tideWarn && hour < Data.fatHill.tideHour) return text.tide + (f.vest ? text.violin : f.coat ? text.david : "");
         if (f.vest) return text.violin;
         if (f.coat) return text.david;
         return text.fear.replace("{n}", Math.min(f.fear, Data.fatHill.fearKills)).replace("{max}", Data.fatHill.fearKills);
-      case "viragem.zero": return region !== "reservoir" ? closed || text.go : text.read;
+      case "viragem.zero": return region !== "reservoir" ? (closed ? closed + " " + idleIdea(s, day) : text.go) : text.read;
       case "amigo1.lockdown-chat":
-        if (region !== "reservoir") return closed || text.go;
+        if (region !== "reservoir") return (closed ? closed + " " + idleIdea(s, day) : text.go);
         if (c.chat.until > Date.now()) return text.wait;
         return s.world.enemies.some(z => z.kind === "vic" && z.hp > 0 && z.guard) || c.chat.log.length ? text.chat : text.hit;
       case "fortress.last-boss": {
-        if (region !== "fortress") return closed || text.go;
+        if (region !== "fortress") return (closed ? closed + " " + idleIdea(s, day) : text.go);
         const pip = s.world.enemies.find(z => z.kind === "pip" && z.hp > 0);
         return !pip ? text.done : pip.guard ? text.coat : text.fire;
       }
-      case "westfields.stealth": return region !== "fields" ? closed || text.go : c.fields.alerts ? text.noisy : text.sneak;
+      case "westfields.stealth": return region !== "fields" ? (closed ? closed + " " + idleIdea(s, day) : text.go) : c.fields.alerts ? text.noisy : text.sneak;
       case "cindergrotto.battery":
         if (region === Regions.cavern) return c.grotto === "reached" ? text.out : text.plate;
-        return closed || text.go;
+        return (closed ? closed + " " + idleIdea(s, day) : text.go);
     }
     return T.idle;
   }
@@ -975,6 +999,12 @@ const Sim = (() => {
     if (item.id === "flashlight") return toggleLight(s, item);
     if (item.id === "violin") return playViolin(s);
     if (item.id === "molotov") return throwMolotov(s, index);
+    if (item.id === "sleepingbag") {
+      if (!startSleep(s)) return false;
+      s.sleepGear = "bag"; s.sleepPending = true; p.path = [];
+      notify(s, "You unroll the sleeping bag.");
+      return true;
+    }
     if (data.slot) {
       const worn = wornItem(s,data.slot) === item;
       p.gear[data.slot] = worn ? null : item.id;
@@ -1188,7 +1218,7 @@ const Sim = (() => {
     if (problem) { notify(s,problem,true); return false; }
     if (!consume(s, recipe.inputs)) return false;
     const structure = {id: "built" + s.serial++, x, y, kind: recipe.build, name: recipe.name,
-      active: true, solid: !barrier, action: barrier ? "door" : recipe.build === "crate" ? "loot" : recipe.build,
+      active: true, solid: !barrier, action: barrier ? "door" : recipe.build === "crate" ? "loot" : recipe.build === "tent" ? "bed" : recipe.build,
       storage: recipe.build === "crate", searched: true, loot: []};
     if (barrier) {
       const horizontal = s.world.objects.some(o => o.active && isBarrier(o) && Math.abs(o.x - x) === 1 && o.y === y);
@@ -2208,7 +2238,18 @@ const Sim = (() => {
     note.read = true;
     notify(s, Data.campaignText.pages[note.page] ?? "The page is blank.");
     const read = s.world.objects.filter(o => o.action === "campaign-page" && o.read).length;
-    if (read < Data.campaignText.pages.length) { notify(s, "Torn pages found: " + read + " of " + Data.campaignText.pages.length + "."); return true; }
+    if (read < Data.campaignText.pages.length) {
+      notify(s, "Torn pages found: " + read + " of " + Data.campaignText.pages.length + ".");
+      // A geographic lead to the nearest unread page (the map points north, -y): which house, and roughly where.
+      const next = s.world.objects.filter(o => o.action === "campaign-page" && !o.read).sort((a,b) => distance(a, s.player) - distance(b, s.player))[0];
+      const house = next && s.world.buildings.find(b => b.id === next.building);
+      if (house) {
+        const dx = next.x - s.player.x, dy = next.y - s.player.y, a = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+        const dir = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][Math.round(a / 45) % 8];
+        notify(s, "The page mentions another house: " + house.name + ", to the " + dir + ".");
+      }
+      return true;
+    }
     if (!s.campaign.completed.includes("coldvale.houses")) {
       s.campaign.completed.push("coldvale.houses");
       s.campaign.clues = Math.min(5, s.campaign.clues + 1);
@@ -2731,6 +2772,25 @@ const Sim = (() => {
     const item = weapon(s), data = Data.items[item.id];
     return data?.damage && !data.firearm && item.condition > 0 ? item : null;
   };
+
+  // Climb through an open (or broken) window: step to the other side of the opening.
+  function climbThrough(s, o) {
+    const p = s.player;
+    if (s.mode !== "play" || p.vehicle || o?.action !== "door" || o.kind !== "window" || !o.open || o.boards || !reachableObject(s, o)) return false;
+    const len = Math.hypot(o.x - p.x, o.y - p.y) || 1;
+    const axis = o.axis === "x" ? [0, Math.sign(o.y - p.y) || 1] : o.axis === "y" ? [Math.sign(o.x - p.x) || 1, 0] : [(o.x - p.x) / len, (o.y - p.y) / len];
+    for (const step of [.85, 1, 1.2]) {
+      const to = {x: o.x + axis[0] * step, y: o.y + axis[1] * step};
+      if (World.clear(s.world, to.x, to.y, .18)) {
+        Object.assign(p, to, {path: []}); s.target = null; s.interaction = null;
+        noise(s, o.x, o.y, 4);
+        notify(s, "You climb through the window.");
+        return true;
+      }
+    }
+    notify(s, "The other side of the window is blocked.", true);
+    return false;
+  }
 
   function breachProblem(s, o, method) {
     if (s.player.vehicle || !reachableObject(s, o) || o.action !== "door" || o.open || o.boards || o.broken) return "The opening is blocked.";
@@ -3294,6 +3354,17 @@ const Sim = (() => {
     }
   }
 
+  // Seats (sofa, armchair, chair): sit and rest like on a bed (no sleep). Moving or danger ends it.
+  const seatKinds = new Set(["sofa", "armchair", "chair"]);
+  const isSeat = o => Boolean(o?.active && seatKinds.has(o.kind));
+  function restOnSeat(s, o) {
+    const p = s.player;
+    if (!isSeat(o) || p.vehicle || !reachableObject(s, o)) return false;
+    if (threats(s).length) { notify(s, "Infected are nearby. Find a safer place to rest.", true); return false; }
+    p.resting = true; p.path = []; s.target = null; s.interaction = null;
+    notify(s, "You sit down on the " + o.name.toLowerCase() + " and rest. Move to get up. Sleep needs a bed.");
+    return true;
+  }
   const isFurniture = o => Boolean(o && (o.action === "dismantle" ||
     (!o.action && ["armchair", "bench", "chair", "rug", "sofa", "table"].includes(o.kind))));
 
@@ -3316,6 +3387,7 @@ const Sim = (() => {
       if (threats(s).length) { notify(s, "Infected are nearby. Find a safer place to rest.", true); return false; }
       if (!p.resting && p.fatigue >= 35) {
         if (!startSleep(s)) return false;
+        s.sleepGear = o.kind === "tent" ? "tent" : "bed";
         s.sleepPending = true; p.path = [];
       } else {
         p.resting = !p.resting; p.path = [];
@@ -4008,13 +4080,15 @@ const Sim = (() => {
     }
   }
 
+  const sleepRest = s => s.sleepGear === "bag" ? Data.camping.bagRest : s.sleepGear === "tent" ? Data.camping.tentRest : 1;
   function updateExposure(s, dt) {
     if (s.rules.exposure === "off") return;
-    const p = s.player, shelter = p.vehicle || World.tileAt(s.world, p.x, p.y)?.building;
+    const p = s.player, tent = p.sleeping && s.sleepGear === "tent", shelter = p.vehicle || World.tileAt(s.world, p.x, p.y)?.building || tent;
     const rain = !shelter && s.weather === "Rain", jacket = p.gear.body === "raincoat" ? wearableCondition(wornItem(s,"body")) : 0;
     const wetRate = rain ? (2.1 - 1.55*jacket) : shelter ? -1.4 : -.45;
     p.wetness = clamp(p.wetness + dt * wetRate, 0, 100);
-    const target = shelter ? 37 - p.wetness * .007 : 36.6 - (p.wetness * .016 + Number(isNight(s)) * .7 + (Regions.definitions[s.world.region].cold || 0)) * trait(s,"warmth") +
+    const bag = p.sleeping && s.sleepGear === "bag" ? Data.camping.bagWarmth : 0;
+    const target = tent ? 36.6 - p.wetness * .007 + Data.camping.tentWarmth * .2 : shelter ? 37 - p.wetness * .007 : bag + 36.6 - (p.wetness * .016 + Number(isNight(s)) * .7 + (Regions.definitions[s.world.region].cold || 0)) * trait(s,"warmth") +
       clothingWarmth(s) + (s.running ? .35 : 0) - season(s).chill;
     p.temperature = clamp(p.temperature + (target - p.temperature) * Math.min(1, dt * .025), 33, 37.3);
     if (p.temperature < 34.5) { p.hp -= dt * .16; s.harm = "hypothermia"; }
@@ -4029,7 +4103,7 @@ const Sim = (() => {
     const floor = Data.modes[s.difficulty]?.noStarve ? 8 : 0;
     p.hunger = Math.max(floor, p.hunger - dt * .07 * rate * trait(s,"hunger") * (p.sleeping ? .5 : 1));
     p.hydration = Math.max(floor, p.hydration - dt * (s.running ? .15 : .1) * rate * trait(s,"thirst") * (p.sleeping ? .5 : 1));
-    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 * pace : p.resting ? -1.6 * pace : (s.running ? .075 : .04) * rate * trait(s,"fatigue")), 0, 100);
+    p.fatigue = clamp(p.fatigue + dt * (p.sleeping ? -.45 * pace * sleepRest(s) : p.resting ? -1.6 * pace : (s.running ? .075 : .04) * rate * trait(s,"fatigue")), 0, 100);
     if (p.resting) {
       if (inDanger) { p.resting = false; notify(s, "Danger interrupted your rest.", true); }
       else if (p.hunger > 25 && p.hydration > 25 && (!gradual || !p.wounds.some(w => !w.bandaged))) {
@@ -4237,6 +4311,17 @@ const Sim = (() => {
       if (p.fatigue <= 4 || s.minutes - start >= 600) break;
     }
     p.sleeping = false; p.resting = false;
+    const gear = s.sleepGear; s.sleepGear = null;
+    if (s.mode === "play" && s.minutes - start >= 30) s.wakePose = {gear: gear ?? "bed", x: p.x, y: p.y, until: s.elapsed + 2.5};
+    if (gear === "bag" && s.mode === "play" && s.minutes - start >= 60) {
+      p.pain = Math.min(100, (p.pain ?? 0) + Data.camping.stiffPain);
+      const bag = p.bag.find(i => i.id === "sleepingbag");
+      if (bag) {
+        bag.condition = Math.max(0, (bag.condition ?? 100) - Data.camping.bagWear);
+        if (bag.condition <= 0) { remove(p.bag, "sleepingbag", 1); notify(s, "The sleeping bag has worn through.", true); }
+      }
+      notify(s, "You wake up stiff from the hard ground.");
+    }
     if (s.guideStep !== undefined && s.mode === "play" && s.minutes - start >= 60) s.firstSleep = true;
     if (s.mode === "play") { const h = Math.round((s.minutes - start) / 6) / 10; notify(s, cause + "You slept " + h + (h === 1 ? " hour." : " hours.")); }
   }
@@ -4407,7 +4492,7 @@ const Sim = (() => {
         new Set(pins.map(pin => pin.id)).size !== pins.length) throw new Error("Invalid map pins.");
     s.mapPins = pins.map(({id,x,y,name,kind}) => ({id,x,y,name,kind}));
     const originalObjects = new Map(s.world.objects.map(o => [o.id, o]));
-    const addedKinds = new Set(["crate", "barrel", "campfire", "garden", "drop", "fence", "gate"]);
+    const addedKinds = new Set(["crate", "barrel", "campfire", "garden", "drop", "fence", "gate", "tent"]);
     const missingLegacyFixture = o => {
       const entry = Chronicle.entries[o.record];
       const ledgerVersion = data.ledgerRevision ?? 0;
@@ -4662,7 +4747,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, aiSend, useAiTerminal, readVicDiary, seeEpilogue, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, climbThrough, isSeat, restOnSeat, aiSend, useAiTerminal, readVicDiary, seeEpilogue, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

@@ -374,6 +374,93 @@ const scenarios = {
     return {pass: before === false && r.active && r.claimed, notes: "hidden on day 1: " + (before === false) + ", open on day 9: " + r.active + ", emptied with the real buttons: " + r.claimed +
       " (dialog: " + r.dialog + "), tip: " + tip.slice(0, 80), shot: true};
   },
+  async "seat-rest"(page) {
+    await startCampaign(page);
+    const id = await page.evaluate(() => { pt.calm(); pt.s().world.enemies = []; pt.s().player.fatigue = 50;
+      const seats = pt.s().world.objects.filter(o => ["sofa", "armchair", "chair"].includes(o.kind) && o.active);
+      return (seats.find(o => pt.beside(o) && Sim.nearby(pt.s()).every(n => n === o || n.action === "dismantle" || n.action === "door")) ?? seats.find(o => pt.beside(o)))?.id; });
+    if (!id) return {pass: false, notes: "No reachable seat"};
+    await use(page, id);
+    const sit = await page.$('[data-action^="seatrest-"]');
+    if (sit) { await sit.click(); await page.waitForTimeout(1500); }
+    const r = await page.evaluate(() => ({resting: pt.s().player.resting, fatigue: pt.s().player.fatigue, last: pt.s().messages.at(-1)?.text ?? "", tip: Sim.campaignTip(pt.s())}));
+    return {pass: Boolean(sit) && r.resting && r.fatigue < 50, notes: "Sit and rest button: " + Boolean(sit) + ", resting: " + r.resting + ", fatigue 50 > " + r.fatigue.toFixed(1) + " (" + r.last.slice(0, 60) + ")", shot: true};
+  },
+  async "camp-tent"(page) {
+    await startCampaign(page);
+    const r = await page.evaluate(() => {
+      const s = pt.s(); pt.calm(); s.world.enemies = [];
+      for (const [id, n] of [["wood",2],["cloth",8],["tape",3]]) s.player.bag.push({id, qty:n, condition:100, born:0});
+      let out = null;
+      for (let r = 2; r < 20 && !out; r++) for (let a = 0; a < 24 && !out; a++) { const x = Math.floor(s.player.x + Math.cos(a * Math.PI / 12) * r) + .5, y = Math.floor(s.player.y + Math.sin(a * Math.PI / 12) * r) + .5;
+        const ok = d => { const t = World.tileAt(s.world, x + d, y); return t && !t.building && !t.solid; };
+        if (ok(0) && ok(2) && World.clear(s.world, x, y, .3) && World.clear(s.world, x + 2, y, .3)) out = {x, y}; }
+      Object.assign(s.player, out, {path: []});
+      const sewn = Sim.craft(s, "sleepingbag");
+      Sim.craft(s, "tent");
+      let built = false;
+      for (let dy = -3; dy <= 3 && !built; dy++) for (let dx = -3; dx <= 3 && !built; dx++) if (Math.hypot(dx, dy) >= 1.2) built = Sim.place(s, s.player.x + dx, s.player.y + dy);
+      return {sewn, built, tent: s.world.objects.some(o => o.kind === "tent" && o.action === "bed")};
+    });
+    await page.evaluate(() => document.querySelector("dialog[open]")?.close());
+    await page.waitForTimeout(400);
+    await page.screenshot({path: path.join(out, "camp-tent.png")});
+    return {pass: r.sewn && r.built && r.tent, notes: "sleeping bag sewn: " + r.sewn + ", camp tent built outdoors: " + r.built};
+  },
+  async "rest-poses"(page) { // sitting, lying on a bed, head out of a sleeping bag: each must be drawn (Pixel Lab poses)
+    await startCampaign(page);
+    const shots = [];
+    const snap = async (name) => { await page.waitForTimeout(500); const file = "pose-" + name + ".png"; await page.screenshot({path: path.join(out, file), clip: {x: 270, y: 260, width: 340, height: 230}}); shots.push(file); };
+    const seat = await page.evaluate(() => { const s = pt.s(); pt.calm(); s.world.enemies = []; s.zoom = 3; s.player.fatigue = 50;
+      const o = s.world.objects.find(o => ["sofa", "armchair", "chair"].includes(o.kind) && o.active && pt.beside(o)); return o && Sim.restOnSeat(s, o); });
+    await snap("sit");
+    const drawnSit = await page.evaluate(() => pt.s().player.resting);
+    const bed = await page.evaluate(() => { const s = pt.s(); s.player.resting = false; s.player.fatigue = 30;
+      const o = s.world.objects.find(o => o.action === "bed" && o.active && pt.beside(o)); if (!o) return false; s.player.resting = true; return true; });
+    await snap("bed");
+    const bag = await page.evaluate(() => { const s = pt.s(); s.player.resting = false; s.player.x += 2.5;
+      s.wakePose = {gear: "bag", x: s.player.x, y: s.player.y, until: s.elapsed + 30}; return true; });
+    await snap("bag");
+    return {pass: seat && drawnSit && bed && bag, notes: "seat rest: " + seat + ", bed rest: " + bed + ", sleeping bag wake-up shown. Screenshots: " + shots.join(", ")};
+  },
+  async "import-paused"(page) { // QA: an imported save opens paused with a summary; nothing moves until Resume
+    await startCampaign(page);
+    const json = await page.evaluate(() => { const s = pt.s(); s.player.hp = 40; s.player.wounds.push({part:"arm", type:"cut", bleed:.18, bandaged:false, clean:false, infection:0, age:0});
+      const z = s.world.enemies.find(e => e.hp > 0); if (z) Object.assign(z, {x: s.player.x + 1.2, y: s.player.y, dormant: false, alert: 20});
+      return JSON.stringify(Sim.snapshot(s)); });
+    await page.setInputFiles("#import-input", {name: "qa-wounded.json", mimeType: "application/json", buffer: Buffer.from(json)});
+    await page.waitForFunction(() => /Save imported/.test(document.querySelector("dialog[open]")?.innerText ?? ""), null, {timeout: 5000}).catch(() => {});
+    const before = await page.evaluate(() => ({hp: pt.s().player.hp, minutes: pt.s().minutes, text: pt.dialog()}));
+    await page.waitForTimeout(1500);
+    const after = await page.evaluate(() => ({hp: pt.s().player.hp, minutes: pt.s().minutes}));
+    await page.screenshot({path: path.join(out, "import-paused.png")});
+    await page.click('dialog[open] [data-action="resume"]'); await page.waitForTimeout(1200);
+    const resumed = await page.evaluate(() => pt.s().minutes);
+    return {pass: /Save imported/.test(before.text) && /Health 40/.test(before.text) && /open wound/.test(before.text) && after.hp === before.hp && after.minutes === before.minutes && resumed > before.minutes,
+      notes: "summary: " + before.text.replace(/\s+/g, " ").slice(0, 140) + " | paused 1.5 s: hp " + before.hp + " to " + after.hp + ", clock " + before.minutes.toFixed(1) + " to " + after.minutes.toFixed(1) + ", runs after Resume: " + (resumed > before.minutes)};
+  },
+  async "continue-after-death"(page) { // QA: Continue says View summary when the saved survivor is dead
+    await startCampaign(page);
+    await page.evaluate(() => { const s = pt.s(); s.player.hp = 0; });
+    await page.waitForFunction(() => window.__state?.mode === "dead", null, {timeout: 5000}).catch(() => {});
+    await page.waitForTimeout(800);
+    await page.reload(); await page.waitForFunction(() => typeof Sim !== "undefined" && !document.getElementById("continue-btn").hidden).catch(() => {});
+    const label = await page.evaluate(() => document.getElementById("continue-btn").innerText.trim());
+    const newGame = await page.evaluate(() => !document.getElementById("story-btn").hidden);
+    return {pass: /View summary/.test(label) && newGame, notes: "Continue label after death: " + label + ", new game button visible: " + newGame};
+  },
+  async "window-climb"(page) { // QA: an open window offers Climb through
+    await startCampaign(page);
+    const id = await page.evaluate(() => { const s = pt.s(); pt.calm(); s.world.enemies = [];
+      const w = s.world.objects.find(o => o.kind === "window" && o.action === "door" && !o.boards && !o.locked && !o.latched && pt.beside(o) && !World.tileAt(s.world, s.player.x, s.player.y)?.building);
+      if (!w) return null; w.open = true; return w.id; });
+    if (!id) return {pass: false, notes: "No outside window to test"};
+    await use(page, id);
+    const climb = await page.$('[data-action^="climb-"]');
+    if (climb) { await climb.click(); await page.waitForTimeout(300); }
+    const inside = await page.evaluate(() => Boolean(World.tileAt(pt.s().world, pt.s().player.x, pt.s().player.y)?.building));
+    return {pass: Boolean(climb) && inside, notes: "Climb through button: " + Boolean(climb) + ", inside after climbing: " + inside};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

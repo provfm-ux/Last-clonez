@@ -1,6 +1,15 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Fix (external QA): an imported save opens paused with a summary (region, day, time, health, open wounds, infected close by, current goal); nothing moves until Resume.
+- Fix (external QA): Continue says "View summary" when the saved survivor is dead, and "Continue" when alive; the new-game buttons stay below.
+- Story objects show "· Story" in their label (torn pages, diaries, plate, ledger, terminal), world notes keep "· Note". Reading a torn page names the next house and its direction.
+- Open windows offer "Climb through". Pressing Use with nothing in reach but something a step away says "Move closer to …" instead of opening an empty Nearby list.
+- Rest poses you can see: the survivor sits on sofas, armchairs and chairs, lies on the bed while resting, and shows in the sleeping bag (or in front of the tent) for a moment after waking. The placed camp tent has its own sprite. Sprites come from one Pixel Lab sheet (`tools/pixelforge` `poses`), recoloured to the survivor's skin, hair and jacket.
+- Camping: a sleeping bag (sew it from 4 cloth and 2 tape, or find one in the Pine Ridge ranger station) lets you sleep anywhere, at 65% of a bed's rest, with a stiff back in the morning, wear on the bag and no cover from rain. A camp tent (2 wood, 4 cloth, 1 tape, outdoors) keeps the rain off and rests at 85%. New book: Camping and Bushcraft (workshop).
+- Campaign tips suggest the sleeping bag or tent when you are tired far from a bed, and suggest an unread skill book with where to find it and what it teaches. Pine Ridge no longer asks for a bedroll that did not exist.
+- Sit and rest on sofas, armchairs and chairs (rest without sleeping; moving or danger ends it). Sleep still needs a bed.
+- Campaign: when the next step is days away or the place is closed, the tip suggests one concrete thing to do, from the player's own needs first (bandage, drink, eat, sleep, sit and rest), then preparing fire for the fortress, then a rotating list (garden, fishing, barricades, searching houses, repairs, skill books, water).
 - Fix (playtest): Use now picks the campaign story object first (assistant terminal, diaries, plate, ledger) instead of a nearby world note.
 - Fix (playtest): after the 18:00 tide the FatHill pier stays cut off: walking back pushes the player to the shore road again (no extra damage); the rowboat protects for the rest of that night. The tip says when the next low tide is.
 - Fix (playtest): the tip no longer sends the player to an optional area whose region is closed that day (the marina on day 21, the Ironworks station at weekends).

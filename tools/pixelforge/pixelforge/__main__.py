@@ -53,6 +53,9 @@ def main(argv=None):
     c.add_argument("-o", "--out", default="out/chars")
     c.add_argument("--only", nargs="*", help="character ids")
     c.add_argument("--rig", help="rig settings JSON (default: tools/pixelforge/rigs.json)")
+    r = sub.add_parser("poses", help="rest poses and camping props from the Pixel Lab sheet")
+    r.add_argument("sheet", nargs="?", default=os.path.join(os.path.dirname(__file__), "..", "sources", "rest_poses_sheet.png"))
+    r.add_argument("-o", "--out", default="out/chars")
     a = p.parse_args(argv)
 
     if a.cmd == "styles":
@@ -62,6 +65,10 @@ def main(argv=None):
     if a.cmd == "fetch":
         for u in a.urls:
             print(fetch(u))
+        return
+    if a.cmd == "poses":
+        from .poses import build, write_index
+        write_index(a.out, build(a.sheet, a.out))
         return
     if a.cmd == "sheets":
         from .sheets import build

@@ -1661,7 +1661,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   const far = pages.filter(o => Math.hypot(s.player.x - o.x, s.player.y - o.y) > 3);
   check("coldvale.houses ler de longe não conta", far.length > 0 && far.every(o => !Sim.readCampaignPage(s, o) && !o.read));
   for (const [i, page] of pages.slice(0, 2).entries()) { reach(page); Sim.readCampaignPage(s, page); }
-  check("coldvale.houses 2 de 3 páginas ainda não dão pista", s.campaign.clues === 0 && /2 of 3/.test(s.messages.at(-1).text), s.messages.at(-1).text);
+  check("coldvale.houses 2 de 3 páginas ainda não dão pista", s.campaign.clues === 0 && s.messages.slice(-2).some(m => /2 of 3/.test(m.text)), s.messages.slice(-2).map(m => m.text).join(" | "));
   const mid = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(s))));
   check("coldvale.houses páginas lidas ficam gravadas", mid.world.objects.filter(o => o.action === "campaign-page" && o.read).length === 2);
   reach(pages[2]);
@@ -2406,6 +2406,96 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("violino: nunca há mais de 8 chamados vivos", f.world.enemies.filter(z => z.origin === "violin" && z.hp > 0).length <= Data.fatHill.callCap);
   woman.guard = false; woman.docile = true; const n = f.world.enemies.length; f.violinCall = 0; Sim.tick(f, .033, idle);
   check("violino: com o casaco caído ela deixa de chamar", f.world.enemies.length === n);
+}
+
+{ // tempo livre: descansar nas cadeiras e sugestões concretas enquanto se espera
+  const s = fresh("campaign"); s.world.enemies = [];
+  const seat = s.world.objects.find(o => ["sofa", "armchair", "chair"].includes(o.kind) && o.active);
+  check("livre: há sofás, cadeirões ou cadeiras em Cold Vale", Boolean(seat));
+  const spot = (() => { for (const r of [.7, .9, 1.2]) for (let a = 0; a < 16; a++) { const p = {x: seat.x + Math.cos(a * Math.PI / 8) * r, y: seat.y + Math.sin(a * Math.PI / 8) * r};
+    if (World.clear(s.world, p.x, p.y, .18)) { Object.assign(s.player, p); if (Sim.reachableObject(s, seat)) return true; } } return false; })();
+  s.player.fatigue = 50;
+  check("livre: sentar no sofá ou cadeira põe a descansar", spot && Sim.isSeat(seat) && Sim.restOnSeat(s, seat) && s.player.resting);
+  run(s, 300);
+  check("livre: a descansar sentado o cansaço desce", s.player.fatigue < 50, String(s.player.fatigue));
+  check("livre: uma mesa não é um assento", !Sim.isSeat(s.world.objects.find(o => o.kind === "table")));
+  const w = fresh("campaign"); Sim.testJump(w, 12, {}, {anyMode: true});
+  w.campaign.completed.push(...Data.campaignGoals.map(g => g.id).filter(id => !["amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"].includes(id)));
+  Object.assign(w.player, {hunger: 90, hydration: 90, fatigue: 10, wounds: []});
+  check("livre: à espera do dia seguinte a dica dá uma ideia concreta", /opens on day 14|until day 14/.test(Sim.campaignTip(w)) && /Meanwhile/.test(Sim.campaignTip(w)), Sim.campaignTip(w));
+  w.player.fatigue = 70;
+  check("livre: cansado, a ideia é dormir numa cama", /Sleep in a bed/.test(Sim.campaignTip(w)), Sim.campaignTip(w));
+  w.player.fatigue = 40;
+  check("livre: meio cansado, a ideia é sentar e descansar", /sofa, armchair or chair/.test(Sim.campaignTip(w)));
+  w.player.fatigue = 10; w.player.hunger = 30;
+  check("livre: com fome, a ideia é comer ou cozinhar", /Cook at a campfire/.test(Sim.campaignTip(w)));
+  const iron = fresh("campaign"); Sim.testJump(iron, 9, {}, {anyMode: true});
+  iron.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death");
+  Object.assign(iron.player, {hunger: 90, hydration: 90, fatigue: 10, wounds: []});
+  check("livre: com a área fechada (Ironworks ao fim de semana) também há ideia", /weekends/.test(Sim.campaignTip(iron)) && /Meanwhile/.test(Sim.campaignTip(iron)), Sim.campaignTip(iron));
+  w.player.hunger = 90; Sim.testJump(w, 22, {}, {anyMode: true}); Object.assign(w.player, {hunger: 90, hydration: 90, fatigue: 10});
+  w.campaign.completed.push("amigo1.lockdown-chat", "viragem.zero");
+  check("livre: perto da fortaleza, sem fogo, a ideia é fazer tochas e molotovs", /torches/.test(Sim.campaignTip(w)), Sim.campaignTip(w));
+}
+
+{ // campismo: saco-cama e tenda deixam dormir fora de uma cama, com desvantagens; livro que ensina
+  const sleepWith = (gear) => {
+    const s = Sim.create(11, "survival", "carer", 2, undefined, "ridge"); s.world.enemies = [];
+    Sim.testJump(s, 3, {}, {anyMode: true}); s.minutes = 2 * 1440 + 22 * 60;
+    Object.assign(s.player, {fatigue: 80, hunger: 90, hydration: 90, pain: 0, wounds: []});
+    if (gear === "bag") {
+      s.player.bag.push({id:"sleepingbag", qty:1, condition:100, born:0});
+      if (!Sim.use(s, s.player.bag.findIndex(i => i.id === "sleepingbag"))) return null;
+    } else {
+      const bed = s.world.objects.find(o => o.action === "bed" && o.active);
+      Object.assign(s.player, {x: bed.x, y: bed.y + .9});
+      if (gear === "tent") bed.kind = "tent";
+      if (!Sim.contextual(s, bed)) return null;
+    }
+    const m0 = s.minutes; Sim.tick(s, .033, idle);
+    return {s, hours: (s.minutes - m0) / 60, fatigue: s.player.fatigue, pain: s.player.pain, bag: s.player.bag.find(i => i.id === "sleepingbag")};
+  };
+  check("campismo: as receitas do saco-cama e da tenda existem", Data.recipes.some(r => r.id === "sleepingbag") && Data.recipes.some(r => r.id === "tent" && r.build === "tent"));
+  const bed = sleepWith("bed"), bag = sleepWith("bag"), tent = sleepWith("tent");
+  check("campismo: o saco-cama deixa dormir sem cama", bag && bag.hours >= 1, bag && bag.hours.toFixed(1));
+  const per = r => (80 - r.fatigue) / r.hours;
+  check("campismo: descansa-se menos por hora no saco do que na tenda, e na tenda menos do que numa cama",
+    bed && bag && tent && per(bag) < per(tent) && per(tent) < per(bed), [bed, tent, bag].map(r => r && per(r).toFixed(2)).join(" / "));
+  check("campismo: o saco-cama deixa dores nas costas e gasta-se", bag.pain > 0 && bag.bag.condition < 100, bag.pain + " / " + bag.bag?.condition);
+  check("campismo: a tenda não deixa dores", tent.pain === 0);
+  check("campismo: o Ranger station de Pine Ridge tem um saco-cama", Sim.create(11, "survival", "carer", 2, undefined, "ridge").world.objects.some(o => o.name === "Trail equipment" && o.loot.some(i => i.id === "sleepingbag")));
+  check("campismo: há um livro de campismo e bushcraft na vila", Boolean(Data.skillBooks.campguide) && fresh("survival").world.objects.some(o => o.loot?.some(i => i.id === "campguide")));
+  const far = Sim.create(11, "campaign", "carer", 2, undefined, "cavern"); Sim.testJump(far, 13, {}, {anyMode: true});
+  far.campaign.completed.push(...Data.campaignGoals.map(g => g.id).filter(id => !["amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"].includes(id)));
+  Object.assign(far.player, {fatigue: 70, hunger: 90, hydration: 90, wounds: []});
+  check("campismo: cansado e sem camas à volta, a dica sugere coser um saco-cama ou montar tenda", /Sew a sleeping bag/.test(Sim.campaignTip(far)), Sim.campaignTip(far));
+  far.player.bag.push({id:"sleepingbag", qty:1, condition:100, born:0});
+  check("campismo: com saco-cama, a dica sugere usá-lo e diz as desvantagens", /Sleep in your sleeping bag/.test(Sim.campaignTip(far)) && /stiff/.test(Sim.campaignTip(far)));
+  const reader = fresh("campaign"); Sim.testJump(reader, 13, {}, {anyMode: true});
+  reader.campaign.completed.push(...Data.campaignGoals.map(g => g.id).filter(id => !["amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"].includes(id)));
+  Object.assign(reader.player, {fatigue: 10, hunger: 90, hydration: 90, wounds: []});
+  let bookTip = "";
+  for (let h = 0; h < 24 && !bookTip; h++) { reader.minutes = 12 * 1440 + h * 60; const tip = Sim.campaignTip(reader); if (/It teaches you/.test(tip)) bookTip = tip; }
+  check("campismo: as dicas também sugerem um livro, onde se encontra e o que ensina", /You can find one in/.test(bookTip), bookTip);
+}
+
+{ // QA ChatGPT: pista da página seguinte, atravessar janelas abertas
+  const s = fresh("campaign"); s.world.enemies = [];
+  const pages = s.world.objects.filter(o => o.action === "campaign-page");
+  const first = pages[0]; Object.assign(s.player, {x: first.x, y: first.y});
+  Sim.readCampaignPage(s, first);
+  const lead = s.messages.at(-1)?.text ?? "";
+  const names = pages.slice(1).map(o => s.world.buildings.find(b => b.id === o.building).name);
+  check("qa: a primeira página dá uma pista da casa seguinte e da direção", /another house/.test(lead) && names.some(n => lead.includes(n)) && /(north|south|east|west)/.test(lead), lead);
+  check("qa: a pista não muda o progresso das páginas", s.world.objects.filter(o => o.action === "campaign-page" && o.read).length === 1);
+  const w = fresh("survival"); w.world.enemies = [];
+  const win = w.world.objects.find(o => o.kind === "window" && o.action === "door" && !o.boards && !o.locked && !o.latched && (() => {
+    for (const r of [.7, .9]) for (let a = 0; a < 16; a++) { const p = {x: o.x + Math.cos(a * Math.PI / 8) * r, y: o.y + Math.sin(a * Math.PI / 8) * r};
+      if (World.clear(w.world, p.x, p.y, .18) && !World.tileAt(w.world, p.x, p.y)?.building) { Object.assign(w.player, p); if (Sim.reachableObject(w, o)) return true; } } return false; })());
+  check("qa: uma janela fechada não se atravessa", Boolean(win) && !Sim.climbThrough(w, win));
+  win.open = true; const outside = !World.tileAt(w.world, w.player.x, w.player.y)?.building;
+  check("qa: com a janela aberta, 'Climb through' passa para o outro lado", Sim.climbThrough(w, win) && outside && Boolean(World.tileAt(w.world, w.player.x, w.player.y)?.building),
+    w.player.x.toFixed(2) + "," + w.player.y.toFixed(2));
 }
 
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio

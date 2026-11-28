@@ -14,6 +14,7 @@ const Data = (() => {
       detail:"Congratulations. You survived the raffle. The winner didn't."},
     bat: {combat:"blunt", name:"Wooden bat", group:"Weapons", weight:1.4, damage:25, range:1.4, delay:.55, effort:6, noise:3, wear:.6, icon:"bat"},
     torch: {combat:"blunt", name:"Torch", group:"Weapons", weight:.6, damage:13, range:1.4, delay:.6, effort:6, noise:1, wear:.9, icon:"bat", fire:true, detail:"Sets infected alight for a few seconds. Burns down with use"},
+    sleepingbag: {name:"Sleeping bag", group:"Equipment", weight:1.4, use:"sleepingbag", icon:"pack", detail:"Sleep anywhere. Rest is slower than in a bed, you wake up stiff, it wears out, and it keeps no rain or infected off you"},
     rowboat: {name:"Rowboat", group:"Equipment", weight:3.5, icon:"pack", detail:"Single use. Keeps you on the water when the FatHill tide comes in"},
     harpoon: {combat:"heavy", name:"Harpoon", group:"Weapons", weight:4.2, damage:55, range:2.7, delay:2.4, effort:16, noise:3, wear:.5, icon:"bat", detail:"Huge reach, very slow swing. Finishes Pip when he is below 100 hp"},
     molotov: {name:"Molotov cocktail", group:"Equipment", weight:.6, use:"molotov", icon:"bolt", detail:"Throw it where you face or at your target. The flames burn on the ground for a few seconds"},
@@ -118,7 +119,8 @@ const Data = (() => {
     combatguide:{title:"Defence Drills", skill:"combat", site:"police"},
     strengthguide:{title:"Strength at Home", skill:"strength", site:"workshop"},
     fitnessguide:{title:"Endurance Basics", skill:"fitness", site:"clinic"},
-    quietguide:{title:"Moving Quietly", skill:"sneaking", site:"home"}
+    quietguide:{title:"Moving Quietly", skill:"sneaking", site:"home"},
+    campguide:{title:"Camping and Bushcraft", skill:"foraging", site:"workshop"}
   };
   for (const [id, book] of Object.entries(skillBooks)) {
     items[id] = {name:book.title, group:"Books", weight:.25, use:"book", icon:"book"};
@@ -139,6 +141,8 @@ const Data = (() => {
     {id:"planks",name:"Reclaim planks",out:"wood",qty:2,inputs:{scrap:2},desc:"Turn salvaged material into planks."},
     {id:"rainbarrel",name:"Rain collector",build:"barrel",inputs:{wood:3,scrap:2,tape:1},desc:"Collects rainwater for boiling at a campfire."},
     {id:"crate",name:"Storage crate",build:"crate",inputs:{wood:2,nails:4},desc:"A container for storing supplies."},
+    {id:"sleepingbag",name:"Sew a sleeping bag",out:"sleepingbag",qty:1,inputs:{cloth:4,tape:2},desc:"Sleep anywhere. Slower rest than a bed, a stiff back in the morning, and it wears out."},
+    {id:"tent",name:"Camp tent",build:"tent",inputs:{wood:2,cloth:4,tape:1},desc:"Sleep outdoors under cover from the rain. Better rest than a sleeping bag, worse than a bed, and the infected can tear it open."},
     {id:"campfire",name:"Campfire",build:"campfire",inputs:{wood:2,cloth:1},desc:"Boil water, cook or dry food. The fire also restores stamina and makes noise."},
     {id:"gardenbed",name:"Garden bed",build:"garden",inputs:{wood:2,nails:4},desc:"Grow radishes or potatoes in a raised bed on outdoor grass."},
     {id:"fence",name:"Plank fence",build:"fence",inputs:{wood:2,nails:4},desc:"Place adjoining sections outdoors to block movement and sight. Infected can break them."},
@@ -318,7 +322,7 @@ const Data = (() => {
   const campaignGoals = [
     {id:"coldvale.houses", area:"coldvale", text:"Find the three torn pages", detail:"Search the family houses in Cold Vale. Read each page with Use."},
     {id:"cinema.statue", area:"cinema", text:"Take the golden idol", detail:"Oxford Night Reel cinema, from day 2. Then get out through a window."},
-    {id:"pineridge.two-nights", area:"pineridge", text:"Survive two nights at Pine Ridge", detail:"From day 3. No barricades: bring a bedroll, wood and water. Stay warm."},
+    {id:"pineridge.two-nights", area:"pineridge", text:"Survive two nights at Pine Ridge", detail:"From day 3. No barricades. Bring wood, water and a sleeping bag (one is in the ranger station), or sleep in the cabins. Stay warm."},
     {id:"eva.death", area:"eva", text:"Look after Eva", detail:"Until day 5. She keeps talking about the fortress rumour.", gone:"Read Eva's diary at the shelter"},
     {id:"ironworks.barricade", area:"ironworks", text:"Get the strong weapon", detail:"Ironworks machine shop, weekdays 08:00-18:00. The toolboard hammer and crowbar wear out: do not waste them."},
     {id:"fathill.bosses", area:"fathill", text:"Face the woman on the pier and David", detail:"Bracken Coast, from day 8, on low-tide days (even days), between 06:00 and 18:00: then the tide comes in. She is afraid for him: the infected you kill where she can see frighten her. There is a violin in the net shed.",
@@ -339,12 +343,33 @@ const Data = (() => {
   const campaignTips = {
     idle:"The next story step will show here. Keep food, water and rest up, and explore for supplies.",
     back:"Follow the arrow back to Cold Vale: the next step starts there.",
-    waiting:"Nothing new opens until day {day}. Until then gather food and water, build your defences and keep your gear in good shape.",
+    waiting:"Nothing new opens until day {day}.",
+    ideas:{
+      wounds:"Meanwhile: bandage your wounds, then rest while they heal.",
+      drink:"Meanwhile: drink. Fill bottles at a tap or a rain collector and boil the water at a campfire.",
+      eat:"Meanwhile: eat. Cook at a campfire: a cooked meal fills you more than cold food.",
+      sleep:"Meanwhile: you are tired. Sleep in a bed until morning, with the door shut.",
+      rest:"Meanwhile: sit on a sofa, armchair or chair and rest for a while. It also helps wounds heal.",
+      camp:"Meanwhile: you are tired and far from a bed. Sleep in your sleeping bag (slower rest, stiff in the morning) or build a camp tent (wood, cloth, tape) to keep the rain off.",
+      campMake:"Meanwhile: you are tired and far from a bed. Sew a sleeping bag (4 cloth, 2 tape) or build a camp tent (2 wood, 4 cloth, 1 tape). Both let you sleep out here, with drawbacks.",
+      book:"Meanwhile: read {book}. You can find one in {site}. It teaches you {skill}.",
+      fire:"Meanwhile: get ready for the fortress. Make torches (wood and cloth) and Molotov cocktails (bottle, cloth, fuel).",
+      spare:[
+        "Meanwhile: plant radishes or potatoes in a garden bed and water them.",
+        "Meanwhile: fish at a fishing spot and grill the catch at a campfire.",
+        "Meanwhile: board up the shelter windows and build a plank fence.",
+        "Meanwhile: search a house you have not opened yet for food, cloth and tools.",
+        "Meanwhile: repair your weapon and mend worn clothes at the workbench.",
+        "Meanwhile: read a skill book, or sit down and rest to save your strength.",
+        "Meanwhile: carry a sleeping bag or the cloth for a camp tent, so you can sleep where night finds you.",
+        "Meanwhile: set up a rain collector and a campfire so you never run out of water."
+      ]
+    },
     optional:" Today you can also raid {place} for supplies.",
     goals:{
       "coldvale.houses":"Search the family houses around your shelter: three of them hide a torn page. Use opens each page. Pages read: {n} of 3.",
       "cinema.statue":{go:"Follow the arrow to the Oxford Night Reel cinema. Bring a weapon and a way to break glass.", take:"Take the golden idol from the altar, then run for a window. A crowbar breaks glass faster.", escape:"Get out through a window before the horde catches you."},
-      "pineridge.two-nights":{go:"Follow the arrow to Pine Ridge. Bring a bedroll, wood and water: no barricades there.", stay:"Survive the night: keep a campfire lit and stay dry and warm. Nights done: {n} of 2."},
+      "pineridge.two-nights":{go:"Follow the arrow to Pine Ridge. Bring a sleeping bag (one is in the ranger station), wood and water: no barricades there.", stay:"Survive the night: keep a campfire lit and stay dry and warm. Nights done: {n} of 2."},
       "eva.death":{follow:"Stay close to Eva and look after her until day 5.", wait:"Eva has gone out. Wait at the shelter: her diary turns up in the morning.", diary:"Read Eva's diary under the pillow at the shelter."},
       "ironworks.barricade":{go:"Follow the arrow to the Ironworks. It is open on weekdays, 08:00 to 18:00.", cage:"Take the weapon cage apart in the machine shop with the toolboard hammer and crowbar. They wear out: do not waste them."},
       "fortress.last-boss":{go:"You have all five coordinates. Follow the arrow through Pine Ridge to the fortress road. Find the harpoon in the keep armoury: it finishes Pip below 100 hp. Bring fire: a torch, Molotov cocktails or a campfire, and a good weapon.", coat:"Beat Pip down until his coat comes apart. Hit hard and keep your distance from the escort.", fire:"His coat is off. Fire hurts him and keeps burning: hit him with a torch, throw a Molotov at his feet, or lead him to a fire.", done:"The fortress is yours. Garden, cook, collect water and kill at your pace."},
@@ -398,6 +423,8 @@ const Data = (() => {
     "opt.station":{region:"ironworks", place:"the freight depot at the Ironworks", cache:"Wagon toolbox", building:"Freight depot", loot:{battery:5, flashlight:1}, guards:2},
     "opt.harvest":{region:"fields", place:"the hay barn in Westfields", cache:"Harvest sacks", building:"Hay barn", loot:{fresh:6, potato:4, radish:4, food:3}, guards:0}
   };
+  // Camping (sleeping bag, camp tent): sleep away from beds, with drawbacks. rest = share of a bed's recovery.
+  const camping = {bagRest:.65, tentRest:.85, bagWear:12, stiffPain:8, bagWarmth:1.1, tentWarmth:.7};
   // Fire (torch, Molotov, flames on the ground): burn damage per second, how long a lit infected keeps burning, ground flames.
   const fireRules = {range:5, radius:1.9, seconds:12, burnPerSecond:9, torchSeconds:3, noise:7};
   const pipFight = {finishBelow:100, guardDamage:120, fireRange:2.6, fireMult:2.5, burnPerSecond:7, escort:8};
@@ -662,6 +689,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {epilogue,optionalAreas,fireRules,pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {camping,epilogue,optionalAreas,fireRules,pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

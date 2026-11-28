@@ -446,7 +446,7 @@ const View = (() => {
   }
 
   const furnitureSprites = new Map();
-  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug", "crate", "generator", "barrel", "radio", "bench", "chair", "cart"]);
+  const furnitureKinds = new Set(["bed", "fridge", "sink", "washstand", "cupboard", "wardrobe", "sideboard", "shelf", "table", "sofa", "armchair", "rug", "crate", "generator", "barrel", "radio", "bench", "chair", "cart", "tent"]);
 
   function paintFurniture(kind, variant, powered) {
     const oak = ["#947859", "#735943", "#514035"];
@@ -604,6 +604,16 @@ const View = (() => {
         mark([.312, .11, 11], "#bf9169", 2, 2);
         for (const x of [-.25, .02]) mark([x, .307, 13], "#c5baa1");
         break;
+      case "tent": {
+        const canvas = ["#8a8f5e", "#6c7448", "#525a37"];
+        box(-.44, -.46, 0, .88, .92, 2, ["#5c5a4a", "#4a4a3c", "#3c3d33"]);
+        box(-.36, -.42, 2, .72, .84, 6, canvas);
+        box(-.26, -.42, 8, .52, .84, 6, canvas);
+        box(-.15, -.42, 14, .30, .84, 5, canvas);
+        box(-.05, -.42, 19, .10, .84, 3, canvas);
+        box(-.10, .40, 2, .20, .04, 10, ["#2d3323", "#262b1e", "#20241a"]);
+        break;
+      }
       case "bed": {
         for (const side of [-.32, .26]) for (const end of [-.43, .38]) box(side, end, 0, .07, .07, 9, oak);
         box(-.37, -.51, 7, .74, 1.02, 3, oak);
@@ -761,6 +771,7 @@ const View = (() => {
     const {x, y, kind, tint: tone} = o;
     if (darkLook) {
       const furniture = kind === "locker" && !o.opened && World.tileAt(state.world, x, y)?.room === "Bedroom" ? "cupboard" : kind;
+      if (kind === "tent" && drawPropSprite("tent", x, y)) return;
       if (furnitureKinds.has(furniture)) {
         const variant = Number.isFinite(tone) ? clamp(Math.floor(tone * 3), 0, 2) : 0;
         const powered = kind === "generator" ? Boolean(o.running) :
@@ -1851,6 +1862,61 @@ const View = (() => {
     return img;
   }
 
+  // Rest poses (Pixel Lab sheet, tools/pixelforge poses): sitting on a seat, lying on a bed, head out of a sleeping bag.
+  let restPoses = null;
+  const seatKinds = new Set(["sofa", "armchair", "chair"]);
+  function restPoseFor(state, a) {
+    const near = kinds => state.world.objects.filter(o => o.active && kinds(o) && Math.hypot(o.x - a.x, o.y - a.y) < 1.6)
+      .sort((m, n) => Math.hypot(m.x - a.x, m.y - a.y) - Math.hypot(n.x - a.x, n.y - a.y))[0];
+    const wake = state.wakePose && state.elapsed < state.wakePose.until && !a.moving ? state.wakePose : null;
+    if (!a.resting && !wake) return null;
+    const gear = wake?.gear;
+    if (gear === "bag") return {pose: "bag", x: wake.x, y: wake.y, lift: 0};
+    const bed = near(o => o.action === "bed");
+    if (bed?.kind === "tent") return {pose: "bag", x: bed.x + .35, y: bed.y + .55, lift: 0};
+    if (bed && (a.resting || gear)) return {pose: "lie", x: bed.x - .08, y: bed.y, lift: 11, fit: .82};
+    const seat = a.resting && near(o => seatKinds.has(o.kind));
+    if (seat) return {pose: "sit", x: seat.x, y: seat.y, lift: 9};
+    return null;
+  }
+
+  function drawPropSprite(name, x, y) {
+    const set = restPoses?.props, sprite = set?.sprites[name];
+    if (!sprite) return false;
+    const img = charImage(set.file);
+    if (!img.naturalWidth) return false;
+    const size = {tent: 1.7}[name] ?? 1;            // the sheet drew the tent at figure scale; a two-person tent is bigger
+    const z = charTiers.hd * restPoses.scale * size, [sx, sy] = p(x, y), [rx, ry, w, h] = sprite.rect;
+    ctx.drawImage(img, rx, ry, w, h, Math.round(sx - sprite.anchor[0] * z), Math.round(sy - sprite.anchor[1] * z), Math.round(w * z), Math.round(h * z));
+    return true;
+  }
+
+  function drawRestPose(a, rest, scale) {
+    const set = restPoses?.[a.appearance === "female" ? "f" : "m"], sprite = set?.sprites[rest.pose];
+    if (!sprite) return false;
+    const img = charImage(set.file);
+    if (!img.naturalWidth) return false;
+    let sheet = img;
+    const pal = survivorPalette(a);
+    const hair = pal.cut === "shaved" ? mixRgb(hexRgb(pal.skin), [40, 30, 28], .45) : hexRgb(pal.hair);
+    const jacket = hexRgb(a.gear?.body === "raincoat" ? "#9b8652" : pal.jacket);
+    const tinted = recolouredAtlas(img, set.mask, set.refs, [hexRgb(pal.skin), hair, jacket]);
+    if (tinted === undefined) return false;
+    sheet = tinted || img;
+    const z = scale * charTiers.hd * restPoses.scale * (rest.fit ?? 1), [sx, sy] = p(rest.x, rest.y, rest.lift);
+    const [rx, ry, w, h] = sprite.rect;
+    if (rest.pose === "sit") {
+      ctx.drawImage(sheet, rx, ry, w, h, Math.round(sx - sprite.anchor[0] * z), Math.round(sy - sprite.anchor[1] * z), Math.round(w * z), Math.round(h * z));
+      return true;
+    }
+    ctx.save();                                       // lying figures follow the floor grid (the world x axis on screen)
+    ctx.translate(Math.round(sx), Math.round(sy));
+    ctx.rotate(Math.atan2(halfH, halfW));
+    ctx.drawImage(sheet, rx, ry, w, h, -Math.round(sprite.anchor[0] * z), -Math.round(sprite.anchor[1] * z), Math.round(w * z), Math.round(h * z));
+    ctx.restore();
+    return true;
+  }
+
   function drawCharacter(a, isPlayer, x, y, scale, direction, stride, clock) {
     charHand = null;
     if (charState < 0 || charTier === "off" || typeof Image !== "function" || typeof fetch !== "function") return false;
@@ -1859,6 +1925,7 @@ const View = (() => {
       try {
         fetch("assets/characters/index.json").then(r => r.json()).then(index => {
           for (const c of index.characters) charEntries.set(c.id, c);
+          restPoses = index.poses ?? null;
           charState = 2;
         }).catch(() => { charState = -1; });
       } catch { charState = -1; }
@@ -1903,6 +1970,10 @@ const View = (() => {
   }
 
   function microActor(a, isPlayer, state, alive, x, y, scale, clock = 0) {
+    if (isPlayer && alive && charState === 2 && state.world) {
+      const rest = restPoseFor(state, a);
+      if (rest && drawRestPose(a, rest, scale)) return;
+    }
     const moving = alive && a.moving;
     const running = moving && (isPlayer ? state.running : a.kind === "runner" && a.alert > 0);
     const stride = strides.get(a) ?? {x:a.x, y:a.y, phase:(a.phase || 0) % 1};
@@ -1983,7 +2054,8 @@ const View = (() => {
     const alive = isPlayer || a.hp > 0;
     const [x, y] = p(a.x, a.y);
     const scale = a.kind === "brute" ? 1.28 : a.kind === "runner" ? .94 : 1;
-    shadow(a.x, a.y, alive ? 11 * scale : 15, alive ? 5 : 7, "#080e09aa");
+    const posed = isPlayer && darkLook && charState === 2 && restPoses && restPoseFor(state, a);
+    if (!posed) shadow(a.x, a.y, alive ? 11 * scale : 15, alive ? 5 : 7, "#080e09aa");
     if (alive && (inReach || a.windup > 0)) {
       ctx.save();
       ctx.strokeStyle = a.windup > 0 ? "#ff987d" : "#ebcf8b";
@@ -2817,6 +2889,8 @@ const View = (() => {
             }
             else if (hasHarvest(o)) label = "Harvest " + Data.crops[o.garden.crop].name.toLowerCase();
             else if (o.kind === "garden" && o.garden.crop && o.garden.moisture < Data.garden.minMoisture) label = "Garden · Needs water";
+            else if (o.action === "campaign-page" && !o.read) label += " · Story";
+            else if (["eva-diary", "vic-diary", "grotto-plate", "westfields-ledger", "ai-terminal"].includes(o.action) && !o.read) label += " · Story";
             else if (hasCache(o)) label += " · Cache";
             else if (hasNote(o)) label += " · Note";
             objectLabels.push({...marker(o.x,o.y,["locker","fridge","exit"].includes(o.kind)?47:34,label), object:o});

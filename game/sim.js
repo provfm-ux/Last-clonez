@@ -674,9 +674,9 @@ const Sim = (() => {
         else if (c.fathill.fear) detail += " Fear " + Math.min(c.fathill.fear, Data.fatHill.fearKills) + " of " + Data.fatHill.fearKills + ".";
       }
       if (goal.id === "amigo1.lockdown-chat" && !done) {
-        if (c.chat.done) { text = goal.fight; detail = goal.fightDetail; }
-        else if (c.chat.until > Date.now()) { text = goal.wait; detail = goal.waitDetail; }
-        else if (c.chat.used) detail += " Prompts used " + c.chat.used + " of " + Data.aiChat.prompts + ".";
+        const locked = s.world.region === "reservoir" && s.world.enemies.some(z => z.kind === "vic" && z.hp > 0 && z.guard);
+        if (c.chat.until > Date.now()) { text = goal.wait; detail = goal.waitDetail; }
+        else if (locked || c.chat.log.length) { text = goal.chat; detail = goal.chatDetail + (c.chat.used ? " Prompts used " + c.chat.used + " of " + Data.aiChat.prompts + "." : ""); }
       }
       if (goal.id === "fortress.last-boss") {
         if (done) { text = goal.done; detail = goal.doneDetail; }
@@ -710,7 +710,7 @@ const Sim = (() => {
     }
     if (goal.id === "viragem.zero") return region === "reservoir" ? find("vic-diary") : region === "fields" ? find("exit-reservoir") : region === Regions.home ? find("exit-fields") : find("exit-" + Regions.home);
     if (goal.id === "amigo1.lockdown-chat") {
-      if (region === "reservoir") return s.campaign.chat.done ? null : find("ai-terminal");
+      if (region === "reservoir") return s.world.enemies.some(z => z.kind === "vic" && z.hp > 0 && z.guard) || s.campaign.chat.log.length ? find("ai-terminal") : null;
       return region === "fields" ? find("exit-reservoir") : region === Regions.home ? find("exit-fields") : find("exit-" + Regions.home);
     }
     if (goal.id === "fortress.last-boss") {
@@ -754,7 +754,8 @@ const Sim = (() => {
       case "viragem.zero": return region !== "reservoir" ? closed || text.go : text.read;
       case "amigo1.lockdown-chat":
         if (region !== "reservoir") return closed || text.go;
-        return c.chat.done ? text.fight : c.chat.until > Date.now() ? text.wait : text.chat;
+        if (c.chat.until > Date.now()) return text.wait;
+        return s.world.enemies.some(z => z.kind === "vic" && z.hp > 0 && z.guard) || c.chat.log.length ? text.chat : text.hit;
       case "fortress.last-boss": {
         if (region !== "fortress") return closed || text.go;
         const pip = s.world.enemies.find(z => z.kind === "pip" && z.hp > 0);
@@ -1493,7 +1494,7 @@ const Sim = (() => {
   }
 
   // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
-  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:"", fields:{alerts:0, at:-1e9}, fathill:{fear:0, coat:false, vest:false}, chat:{used:0, until:0, done:false, log:[]}, opt:[], tide:{day:0, warned:0}});
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:"", fields:{alerts:0, at:-1e9}, fathill:{fear:0, coat:false, vest:false}, chat:{used:0, until:0, done:false, log:[]}, opt:[], tide:{day:0, warned:0}, epilogue:""});
   // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
   const isCampaign = s => s.difficulty === "campaign";
   const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
@@ -1512,6 +1513,7 @@ const Sim = (() => {
     const fathill = raw.fathill ?? {fear:0, coat:false, vest:false};
     if (!Number.isInteger(fathill.fear) || fathill.fear < 0 || fathill.fear > 999 || typeof fathill.coat !== "boolean" || typeof fathill.vest !== "boolean") throw new Error("Invalid campaign progress.");
     const fields = raw.fields ?? {alerts:0, at:-1e9};
+    if (raw.epilogue !== undefined && !["", "pending", "seen"].includes(raw.epilogue)) throw new Error("Invalid campaign progress.");
     const tide = raw.tide ?? {day:0, warned:0};
     if (!tide || !Number.isInteger(tide.day) || tide.day < 0 || !Number.isInteger(tide.warned) || tide.warned < 0) throw new Error("Invalid campaign progress.");
     const opt = raw.opt ?? [];
@@ -1520,7 +1522,7 @@ const Sim = (() => {
     if (!Number.isInteger(chat.used) || chat.used < 0 || chat.used > Data.aiChat.prompts || !Number.isFinite(chat.until) || chat.until < 0 || typeof chat.done !== "boolean" ||
         !Array.isArray(chat.log) || chat.log.length > Data.aiChat.maxLog || chat.log.some(l => !l || !["you","ai"].includes(l.who) || typeof l.text !== "string" || l.text.length > 400)) throw new Error("Invalid campaign progress.");
     if (!Number.isInteger(fields.alerts) || fields.alerts < 0 || fields.alerts > 999 || !Number.isFinite(fields.at)) throw new Error("Invalid campaign progress.");
-    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "", fields:{alerts:fields.alerts, at:fields.at}, fathill:{fear:fathill.fear, coat:fathill.coat, vest:fathill.vest}, chat:{used:chat.used, until:chat.until, done:chat.done, log:chat.log.map(l => ({who:l.who, text:l.text}))}, opt:[...opt], tide:{day:tide.day, warned:tide.warned},
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "", fields:{alerts:fields.alerts, at:fields.at}, fathill:{fear:fathill.fear, coat:fathill.coat, vest:fathill.vest}, chat:{used:chat.used, until:chat.until, done:chat.done, log:chat.log.map(l => ({who:l.who, text:l.text}))}, opt:[...opt], tide:{day:tide.day, warned:tide.warned}, epilogue:raw.epilogue ?? "",
       ridge:{nights:ridge.nights, night:night && {start:night.start, fail:night.fail, built:night.built}}};
   }
   // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
@@ -1769,7 +1771,18 @@ const Sim = (() => {
       if (Data.items[weapon(s).id]?.fire) z.burnUntil = s.elapsed + Data.fireRules.torchSeconds;
       return nearFire(s, z) || Data.items[weapon(s).id]?.fire ? amount * Data.pipFight.fireMult : amount;
     }
-    if (z.kind === "vic" && z.guard) { notify(s, Data.campaignText.vicBraced, true); return 0; }
+    if (z.kind === "vic") {                                     // fight first; at half health the assistant locks his helmet
+      if (z.guard) { notify(s, Data.campaignText.vicBraced, true); return 0; }
+      let dealt = weapon(s).id === "foundrymaul" ? amount : amount * .2;
+      if (dealt < amount) notify(s, Data.campaignText.vicWeak);
+      const half = Data.infected.vic.hp / 2;
+      if (!s.campaign?.chat.done && z.hp - dealt <= half) {
+        dealt = Math.max(0, z.hp - half);
+        z.guard = true;
+        notify(s, Data.campaignText.vicLocked, true);
+      }
+      return dealt;
+    }
     if (z.guard) {
       z.guardDmg = (z.guardDmg ?? 0) + amount;
       if (!z.guardBroken && z.guardDmg >= Data.fatHill.guardDamage) {
@@ -1841,7 +1854,7 @@ const Sim = (() => {
       if (term) world.objects.push({id:"ai-terminal", x:term.x+.5, y:term.y+.5, building:tower.id, zone:term.zone, tint:.6, kind:"terminal", action:"ai-terminal", name:"Assistant terminal", active:true, solid:false});
       if (vic) {
         const z = World.infected(world, "valve-vic", vic.x+.5, vic.y+.5, rules.mix, Level.seeded(0x71c0), "boss");
-        Object.assign(z, {kind:"vic", stats:Data.infected.vic, hp:Data.infected.vic.hp, outfit:"plain", guard:true, guardDmg:0, guardBroken:false, docile:false, lured:0, dormant:false});
+        Object.assign(z, {kind:"vic", stats:Data.infected.vic, hp:Data.infected.vic.hp, outfit:"plain", guard:false, guardDmg:0, guardBroken:false, docile:false, lured:0, dormant:false});
         world.enemies.push(z);
       }
     }
@@ -2018,6 +2031,7 @@ const Sim = (() => {
     if (!c || c.completed.includes("fortress.last-boss")) return;
     c.completed.push("fortress.last-boss");
     CampaignHints.progress(c.hints, s.minutes);
+    c.epilogue = "pending";
     notify(s, Data.campaignText.pipDown, true);
   }
 
@@ -2027,6 +2041,7 @@ const Sim = (() => {
   function aiSend(s, raw, now = Date.now()) {
     const c = s.campaign, A = Data.aiChat, chat = c?.chat;
     if (!chat || s.mode !== "play" || s.world.region !== "reservoir" || chat.done || c.completed.includes("amigo1.lockdown-chat")) return false;
+    if (s.world.enemies.some(z => z.kind === "vic" && z.hp > 0 && !z.guard) && !chat.log.length) return false;
     const text = String(raw ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
     if (!text) return false;
     chatLog(chat, "you", text);
@@ -2042,8 +2057,9 @@ const Sim = (() => {
       chat.done = true;
       chatLog(chat, "ai", A.win);
       const vic = s.world.enemies.find(z => z.kind === "vic" && z.hp > 0);
-      if (vic) { vic.guard = false; vic.guardBroken = false; }
       notify(s, Data.campaignText.vicHelmet, true);
+      if (vic) { vic.guard = false; vic.hp = 0; defeat(s, vic); }
+      else vicFinale(s);
       return true;
     }
     chatLog(chat, "ai", A.lose); chatLog(chat, "ai", A.wait);
@@ -2054,7 +2070,16 @@ const Sim = (() => {
 
   function useAiTerminal(s, o) {
     if (!s.campaign || s.mode !== "play" || o?.action !== "ai-terminal" || s.world.region !== "reservoir" || !s.world.objects.includes(o) || !reachableObject(s,o)) return false;
+    const vic = s.world.enemies.find(z => z.kind === "vic" && z.hp > 0);
+    if (vic && !vic.guard && !s.campaign.chat.log.length) { notify(s, Data.campaignText.aiLocked, true); return false; }
     if (!s.campaign.chat.log.length) chatLog(s.campaign.chat, "ai", Data.aiChat.intro);
+    return true;
+  }
+
+  // The epilogue dialog reads this once; the game marks it seen.
+  function seeEpilogue(s) {
+    if (s.campaign?.epilogue !== "pending") return false;
+    s.campaign.epilogue = "seen";
     return true;
   }
 
@@ -2062,7 +2087,6 @@ const Sim = (() => {
     const c = s.campaign;
     if (!c || c.completed.includes("amigo1.lockdown-chat")) return;
     c.completed.push("amigo1.lockdown-chat");
-    c.clues = Math.min(5, c.clues + 1);
     add(s.player.bag, "fortressmap", 1);
     CampaignHints.progress(c.hints, s.minutes);
     notify(s, Data.campaignText.vicDown, true);
@@ -4266,7 +4290,7 @@ const Sim = (() => {
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
       campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}, buffUntil:s.campaign.buffUntil,
-        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva, grotto:s.campaign.grotto, fields:{...s.campaign.fields}, fathill:{...s.campaign.fathill}, chat:{...s.campaign.chat, log:s.campaign.chat.log.map(l => ({...l}))}, opt:[...s.campaign.opt], tide:{...s.campaign.tide}} : undefined,
+        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva, grotto:s.campaign.grotto, fields:{...s.campaign.fields}, fathill:{...s.campaign.fathill}, chat:{...s.campaign.chat, log:s.campaign.chat.log.map(l => ({...l}))}, opt:[...s.campaign.opt], tide:{...s.campaign.tide}, epilogue:s.campaign.epilogue} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,
@@ -4632,7 +4656,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, aiSend, useAiTerminal, readVicDiary, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, aiSend, useAiTerminal, readVicDiary, seeEpilogue, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

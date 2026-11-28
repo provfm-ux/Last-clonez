@@ -2627,6 +2627,10 @@
         const previousDay = state.daily.day;
         for (let i = 0; i < steps && active(); i++) Sim.tick(state, delta / steps, input);
         updateLesson();
+        if (state.campaign?.epilogue === "pending" && !dialog.open && Sim.seeEpilogue(state)) {
+          save();
+          show(Data.epilogue.title, Data.epilogue.pages.map(t => "<p>" + esc(t) + "</p>").join("") + button("Stay", "resume", false, "primary"), "epilogue");
+        }
         if (state.interaction) {
           const o = state.interaction === "eva" ? state.world.npc : state.world.objects.find(o => o.id === state.interaction);
           if (o && o.active !== false && Sim.distance(state.player, o) <= 1.85 && Sim.lineOfSight(state, state.player, o)) {

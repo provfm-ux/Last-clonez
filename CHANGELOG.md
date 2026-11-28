@@ -1,6 +1,8 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Campaign: Amigo 1 now follows the story order. Fight Vic first (only the Foundry maul hurts him); at half health his helmet locks and the valve tower terminal wakes; winning the chat ends the fight. Vic no longer gives an extra coordinate.
+- Campaign: an epilogue after Pip falls closes the story (the friends were the preppers, the rumour was theirs, Eva's dream) and leaves the player in the fortress.
 - Campaign: the woman on the pier now controls the infected with her violin. While her coat is on and she sees you, she calls a group of up to 4 every 45 seconds (at most 8 alive); killing them in her sight is what frightens her. Called infected carry no supplies.
 - Campaign: added the eight optional areas (petrol station, clinic, market, farm, marina, school, train station, harvest). Each has one supply cache that appears on its calendar day (market: weekdays 08:00 to 18:00), some with infected around it. No clues. The tip names today's area. The school is now a real Primary school with a locked door (pry it or break a window); emptying it makes noise and calls a horde.
 - Campaign: the FatHill tide. The road is open from 06:00 to 18:00 on low-tide days; a warning comes at 16:00, and at 18:00 the tide drags the player back to the shore road, soaked and hurt, unless they carry the single-use rowboat from the marina.

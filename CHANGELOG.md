@@ -1,6 +1,8 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Sit and rest on sofas, armchairs and chairs (rest without sleeping; moving or danger ends it). Sleep still needs a bed.
+- Campaign: when the next step is days away or the place is closed, the tip suggests one concrete thing to do, from the player's own needs first (bandage, drink, eat, sleep, sit and rest), then preparing fire for the fortress, then a rotating list (garden, fishing, barricades, searching houses, repairs, skill books, water).
 - Fix (playtest): Use now picks the campaign story object first (assistant terminal, diaries, plate, ledger) instead of a nearby world note.
 - Fix (playtest): after the 18:00 tide the FatHill pier stays cut off: walking back pushes the player to the shore road again (no extra damage); the rowboat protects for the rest of that night. The tip says when the next low tide is.
 - Fix (playtest): the tip no longer sends the player to an optional area whose region is closed that day (the marina on day 21, the Ironworks station at weekends).

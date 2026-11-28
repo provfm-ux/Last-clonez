@@ -725,6 +725,20 @@ const Sim = (() => {
     return null;
   }
 
+  // A concrete idea for spare time (waiting for the next day, or the place is closed): from the player's own needs first.
+  function idleIdea(s, day) {
+    const p = s.player, T = Data.campaignTips.ideas, hour = Math.floor(s.minutes % 1440 / 60), night = hour >= 22 || hour < 6;
+    const has = id => p.bag.some(i => i.id === id);
+    if (p.wounds?.some(w => !w.bandaged)) return T.wounds;
+    if (p.hydration < 45) return T.drink;
+    if (p.hunger < 45) return T.eat;
+    if (p.fatigue >= 60 || night && p.fatigue >= 25) return T.sleep;
+    if (p.fatigue >= 35) return T.rest;
+    if (day >= 20 && !s.campaign.completed.includes("fortress.last-boss") && !has("torch") && !has("molotov")) return T.fire;
+    const rotate = T.spare;
+    return rotate[(day * 24 + hour) % rotate.length];
+  }
+
   // The campaign tip: always one concrete next step for the current objective, so the player never feels lost. Pure text from state.
   function campaignTip(s) {
     if (!isCampaign(s) || s.mode === "dead") return "";
@@ -733,40 +747,40 @@ const Sim = (() => {
     const extra = (() => { const id = optionalToday(s); return id ? T.optional.replace("{place}", Data.optionalAreas[id].place) : ""; })();
     if (!goal && c.completed.includes("fortress.last-boss")) return T.goals["fortress.last-boss"].done + extra;
     if (!goal) return T.idle + extra;
-    if (goal.opens) return T.waiting.replace("{day}", goal.opens) + extra;
+    if (goal.opens) return T.waiting.replace("{day}", goal.opens) + " " + idleIdea(s, day) + extra;
     const area = Data.campaignGoals.find(g => g.id === goal.id).area, closed = Campaign.closedReason(area, day, hour);
     const at = {coldvale:Regions.home, cinema:"cinema", pineridge:"ridge", ironworks:"ironworks", fathill:"coast", westfields:"fields", cindergrotto:Regions.cavern, viragem:"reservoir", amigo1:"reservoir", fortress:"fortress"}[area];
     const text = T.goals[goal.id], f = c.fathill, pages = s.world.objects.filter(o => o.action === "campaign-page" && o.read).length;
     switch (goal.id) {
       case "coldvale.houses": return region !== Regions.home ? T.back : text.replace("{n}", pages);
       case "cinema.statue": {
-        if (region !== "cinema") return closed || text.go;
+        if (region !== "cinema") return (closed ? closed + " " + idleIdea(s, day) : text.go);
         return s.world.objects.find(o => o.id === "cinema-statue")?.active ? text.take : text.escape;
       }
-      case "pineridge.two-nights": return region !== "ridge" ? closed || text.go : text.stay.replace("{n}", c.ridge.nights);
+      case "pineridge.two-nights": return region !== "ridge" ? (closed ? closed + " " + idleIdea(s, day) : text.go) : text.stay.replace("{n}", c.ridge.nights);
       case "eva.death": return region !== Regions.home && c.eva !== "" ? T.back : c.eva === "gone" ? text.diary : c.eva === "left" ? text.wait : text.follow;
-      case "ironworks.barricade": return region !== "ironworks" ? closed || text.go : text.cage;
+      case "ironworks.barricade": return region !== "ironworks" ? (closed ? closed + " " + idleIdea(s, day) : text.go) : text.cage;
       case "fathill.bosses":
-        if (region !== "coast") return closed || text.go;
+        if (region !== "coast") return (closed ? closed + " " + idleIdea(s, day) : text.go);
         if (tideIn(s) && c.tide.boat !== day) return text.tideIn.replace("{day}", Campaign.lowTide(day) && hour < 6 ? day : day + (Campaign.lowTide(day + 1) ? 1 : 2));
         if (hour >= Data.fatHill.tideWarn && hour < Data.fatHill.tideHour) return text.tide + (f.vest ? text.violin : f.coat ? text.david : "");
         if (f.vest) return text.violin;
         if (f.coat) return text.david;
         return text.fear.replace("{n}", Math.min(f.fear, Data.fatHill.fearKills)).replace("{max}", Data.fatHill.fearKills);
-      case "viragem.zero": return region !== "reservoir" ? closed || text.go : text.read;
+      case "viragem.zero": return region !== "reservoir" ? (closed ? closed + " " + idleIdea(s, day) : text.go) : text.read;
       case "amigo1.lockdown-chat":
-        if (region !== "reservoir") return closed || text.go;
+        if (region !== "reservoir") return (closed ? closed + " " + idleIdea(s, day) : text.go);
         if (c.chat.until > Date.now()) return text.wait;
         return s.world.enemies.some(z => z.kind === "vic" && z.hp > 0 && z.guard) || c.chat.log.length ? text.chat : text.hit;
       case "fortress.last-boss": {
-        if (region !== "fortress") return closed || text.go;
+        if (region !== "fortress") return (closed ? closed + " " + idleIdea(s, day) : text.go);
         const pip = s.world.enemies.find(z => z.kind === "pip" && z.hp > 0);
         return !pip ? text.done : pip.guard ? text.coat : text.fire;
       }
-      case "westfields.stealth": return region !== "fields" ? closed || text.go : c.fields.alerts ? text.noisy : text.sneak;
+      case "westfields.stealth": return region !== "fields" ? (closed ? closed + " " + idleIdea(s, day) : text.go) : c.fields.alerts ? text.noisy : text.sneak;
       case "cindergrotto.battery":
         if (region === Regions.cavern) return c.grotto === "reached" ? text.out : text.plate;
-        return closed || text.go;
+        return (closed ? closed + " " + idleIdea(s, day) : text.go);
     }
     return T.idle;
   }
@@ -3294,6 +3308,17 @@ const Sim = (() => {
     }
   }
 
+  // Seats (sofa, armchair, chair): sit and rest like on a bed (no sleep). Moving or danger ends it.
+  const seatKinds = new Set(["sofa", "armchair", "chair"]);
+  const isSeat = o => Boolean(o?.active && seatKinds.has(o.kind));
+  function restOnSeat(s, o) {
+    const p = s.player;
+    if (!isSeat(o) || p.vehicle || !reachableObject(s, o)) return false;
+    if (threats(s).length) { notify(s, "Infected are nearby. Find a safer place to rest.", true); return false; }
+    p.resting = true; p.path = []; s.target = null; s.interaction = null;
+    notify(s, "You sit down on the " + o.name.toLowerCase() + " and rest. Move to get up. Sleep needs a bed.");
+    return true;
+  }
   const isFurniture = o => Boolean(o && (o.action === "dismantle" ||
     (!o.action && ["armchair", "bench", "chair", "rug", "sofa", "table"].includes(o.kind))));
 
@@ -4662,7 +4687,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, aiSend, useAiTerminal, readVicDiary, seeEpilogue, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, isSeat, restOnSeat, aiSend, useAiTerminal, readVicDiary, seeEpilogue, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

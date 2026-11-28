@@ -339,7 +339,24 @@ const Data = (() => {
   const campaignTips = {
     idle:"The next story step will show here. Keep food, water and rest up, and explore for supplies.",
     back:"Follow the arrow back to Cold Vale: the next step starts there.",
-    waiting:"Nothing new opens until day {day}. Until then gather food and water, build your defences and keep your gear in good shape.",
+    waiting:"Nothing new opens until day {day}.",
+    ideas:{
+      wounds:"Meanwhile: bandage your wounds, then rest while they heal.",
+      drink:"Meanwhile: drink. Fill bottles at a tap or a rain collector and boil the water at a campfire.",
+      eat:"Meanwhile: eat. Cook at a campfire: a cooked meal fills you more than cold food.",
+      sleep:"Meanwhile: you are tired. Sleep in a bed until morning, with the door shut.",
+      rest:"Meanwhile: sit on a sofa, armchair or chair and rest for a while. It also helps wounds heal.",
+      fire:"Meanwhile: get ready for the fortress. Make torches (wood and cloth) and Molotov cocktails (bottle, cloth, fuel).",
+      spare:[
+        "Meanwhile: plant radishes or potatoes in a garden bed and water them.",
+        "Meanwhile: fish at a fishing spot and grill the catch at a campfire.",
+        "Meanwhile: board up the shelter windows and build a plank fence.",
+        "Meanwhile: search a house you have not opened yet for food, cloth and tools.",
+        "Meanwhile: repair your weapon and mend worn clothes at the workbench.",
+        "Meanwhile: read a skill book, or sit down and rest to save your strength.",
+        "Meanwhile: set up a rain collector and a campfire so you never run out of water."
+      ]
+    },
     optional:" Today you can also raid {place} for supplies.",
     goals:{
       "coldvale.houses":"Search the family houses around your shelter: three of them hide a torn page. Use opens each page. Pages read: {n} of 3.",

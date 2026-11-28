@@ -1723,7 +1723,8 @@
     if (o.delivery && Sim.readDispatchReport(state,o)) { save(); ledgerReport(o); return; }
     const id = objectIndex(o);
     if (Sim.isFurniture(o)) {
-      show(o.name, '<div class="item-actions">' + button("Dismantle…", "furnituremenu-" + id) +
+      show(o.name, (Sim.isSeat(o) ? "<p>Sit down to rest. Resting restores your strength and helps wounds heal; sleep needs a bed.</p>" : "") +
+        '<div class="item-actions">' + (Sim.isSeat(o) ? button("Sit and rest", "seatrest-" + id, false, "primary") : "") + button("Dismantle…", "furnituremenu-" + id) +
         button("Back", "interactions") + "</div>", "object-" + id);
       return;
     }
@@ -2213,6 +2214,10 @@
       const [kind, first, second] = action.split("-");
       const index = Number(first), o = state.world.objects[index];
       if (Sim.isFurniture(o) && Sim.reachableObject(state, o)) {
+        if (kind === "seatrest" && dialogView === "object-" + index) {
+          if (Sim.restOnSeat(state, o)) { close(); updateHud(); }
+          return;
+        }
         if (kind === "furnituremenu" && dialogView === "object-" + index) {
           show("Dismantle " + o.name + "?", "<p>This removes the furniture and leaves two scrap and one plank.</p>" +
             '<div class="item-actions">' + button("Dismantle", "furnitureconfirm-" + index, false, "danger") +

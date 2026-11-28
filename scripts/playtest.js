@@ -374,6 +374,18 @@ const scenarios = {
     return {pass: before === false && r.active && r.claimed, notes: "hidden on day 1: " + (before === false) + ", open on day 9: " + r.active + ", emptied with the real buttons: " + r.claimed +
       " (dialog: " + r.dialog + "), tip: " + tip.slice(0, 80), shot: true};
   },
+  async "seat-rest"(page) {
+    await startCampaign(page);
+    const id = await page.evaluate(() => { pt.calm(); pt.s().world.enemies = []; pt.s().player.fatigue = 50;
+      const seats = pt.s().world.objects.filter(o => ["sofa", "armchair", "chair"].includes(o.kind) && o.active);
+      return (seats.find(o => pt.beside(o) && Sim.nearby(pt.s()).every(n => n === o || n.action === "dismantle" || n.action === "door")) ?? seats.find(o => pt.beside(o)))?.id; });
+    if (!id) return {pass: false, notes: "No reachable seat"};
+    await use(page, id);
+    const sit = await page.$('[data-action^="seatrest-"]');
+    if (sit) { await sit.click(); await page.waitForTimeout(1500); }
+    const r = await page.evaluate(() => ({resting: pt.s().player.resting, fatigue: pt.s().player.fatigue, last: pt.s().messages.at(-1)?.text ?? "", tip: Sim.campaignTip(pt.s())}));
+    return {pass: Boolean(sit) && r.resting && r.fatigue < 50, notes: "Sit and rest button: " + Boolean(sit) + ", resting: " + r.resting + ", fatigue 50 > " + r.fatigue.toFixed(1) + " (" + r.last.slice(0, 60) + ")", shot: true};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

@@ -2408,6 +2408,36 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("violino: com o casaco caído ela deixa de chamar", f.world.enemies.length === n);
 }
 
+{ // tempo livre: descansar nas cadeiras e sugestões concretas enquanto se espera
+  const s = fresh("campaign"); s.world.enemies = [];
+  const seat = s.world.objects.find(o => ["sofa", "armchair", "chair"].includes(o.kind) && o.active);
+  check("livre: há sofás, cadeirões ou cadeiras em Cold Vale", Boolean(seat));
+  const spot = (() => { for (const r of [.7, .9, 1.2]) for (let a = 0; a < 16; a++) { const p = {x: seat.x + Math.cos(a * Math.PI / 8) * r, y: seat.y + Math.sin(a * Math.PI / 8) * r};
+    if (World.clear(s.world, p.x, p.y, .18)) { Object.assign(s.player, p); if (Sim.reachableObject(s, seat)) return true; } } return false; })();
+  s.player.fatigue = 50;
+  check("livre: sentar no sofá ou cadeira põe a descansar", spot && Sim.isSeat(seat) && Sim.restOnSeat(s, seat) && s.player.resting);
+  run(s, 300);
+  check("livre: a descansar sentado o cansaço desce", s.player.fatigue < 50, String(s.player.fatigue));
+  check("livre: uma mesa não é um assento", !Sim.isSeat(s.world.objects.find(o => o.kind === "table")));
+  const w = fresh("campaign"); Sim.testJump(w, 12, {}, {anyMode: true});
+  w.campaign.completed.push(...Data.campaignGoals.map(g => g.id).filter(id => !["amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"].includes(id)));
+  Object.assign(w.player, {hunger: 90, hydration: 90, fatigue: 10, wounds: []});
+  check("livre: à espera do dia seguinte a dica dá uma ideia concreta", /opens on day 14|until day 14/.test(Sim.campaignTip(w)) && /Meanwhile/.test(Sim.campaignTip(w)), Sim.campaignTip(w));
+  w.player.fatigue = 70;
+  check("livre: cansado, a ideia é dormir numa cama", /Sleep in a bed/.test(Sim.campaignTip(w)), Sim.campaignTip(w));
+  w.player.fatigue = 40;
+  check("livre: meio cansado, a ideia é sentar e descansar", /sofa, armchair or chair/.test(Sim.campaignTip(w)));
+  w.player.fatigue = 10; w.player.hunger = 30;
+  check("livre: com fome, a ideia é comer ou cozinhar", /Cook at a campfire/.test(Sim.campaignTip(w)));
+  const iron = fresh("campaign"); Sim.testJump(iron, 9, {}, {anyMode: true});
+  iron.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death");
+  Object.assign(iron.player, {hunger: 90, hydration: 90, fatigue: 10, wounds: []});
+  check("livre: com a área fechada (Ironworks ao fim de semana) também há ideia", /weekends/.test(Sim.campaignTip(iron)) && /Meanwhile/.test(Sim.campaignTip(iron)), Sim.campaignTip(iron));
+  w.player.hunger = 90; Sim.testJump(w, 22, {}, {anyMode: true}); Object.assign(w.player, {hunger: 90, hydration: 90, fatigue: 10});
+  w.campaign.completed.push("amigo1.lockdown-chat", "viragem.zero");
+  check("livre: perto da fortaleza, sem fogo, a ideia é fazer tochas e molotovs", /torches/.test(Sim.campaignTip(w)), Sim.campaignTip(w));
+}
+
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
   const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"];
   let empty = 0, total = 0, sample = "";

@@ -257,8 +257,11 @@ const Data = (() => {
     fathillDocile:"She is not fighting. Leave her.",
     fathillDone:"David goes down at your feet. The woman folds over him, tears the coat lining open and presses the third coordinate into your hand before he takes her, gently. They stay that way.",
     vicBraced:"The helmet shrugs it off. Whatever holds him together is still running, up in the valve tower.",
+    vicWeak:"The blow barely marks him. Only the Foundry maul hurts Vic.",
+    vicLocked:"Vic staggers, and the visor of his helmet snaps shut with a click. Up in the valve tower a screen lights up. Something is protecting him.",
+    aiLocked:"The screen is dark. Something on the other end is busy keeping Vic on his feet.",
     vicDown:"Vic goes down at last, and the tower falls quiet. In his jacket: a hand-drawn map. A fortress, a road, and five coordinates marked in a hand you recognise from the rumour.",
-    vicHelmet:"The assistant stands down and Vic's helmet drops from his hands. He is just a very strong man with nothing left to lose. End it.",
+    vicHelmet:"The assistant stands down. Vic's helmet unlocks, his legs give way, and the first friend lies still at last.",
     diaryEarly:"The pages are stuck together with something dark. You cannot make sense of them yet. Come back from day 15.",
     diaryRead:"VIC'S DIARY · He was the first one. ‘Patchwork called me Playtester 04. I was the swab. I am the test.’ The last page: ‘The rumour was us. We built the fortress for the end of the world, then started it.’",
     pipCoat:"The scorched firefighter's coat tears off Pip's back in strips. Underneath, the skin is raw and it steams. Get him near a fire.",
@@ -323,8 +326,8 @@ const Data = (() => {
     {id:"westfields.stealth", area:"westfields", text:"Slip through Westfields without a sound", detail:"From day 10. The farmer's ledger is in the Orchard farmhouse at the far west. Noise calls hordes, and infected that have noticed you will not let you read it. Keep to cover and use your knife."},
     {id:"cindergrotto.battery", area:"cindergrotto", text:"Read the surveyor's plate in Cinder Grotto", detail:"From day 12, through the survey tunnel on Pine Ridge. Bring a flashlight and spare batteries: the plate is in the far survey room and cannot be read in the dark.",
       reached:"Climb out of Cinder Grotto", reachedDetail:"You have read the plate. Get back up to Pine Ridge before the light dies."},
-    {id:"amigo1.lockdown-chat", area:"amigo1", text:"Stop the assistant and bring Vic down", detail:"Days 14 to 20. Greywater Reservoir, past Westfields. Carry the Foundry maul. The valve tower terminal still listens; Vic's helmet will not come off by force.",
-      fight:"Bring Vic down with the Foundry maul", fightDetail:"The assistant is off and the helmet is loose. Vic is still very strong.",
+    {id:"amigo1.lockdown-chat", area:"amigo1", text:"Bring Vic down, then stop the assistant", detail:"Days 14 to 20. Greywater Reservoir, past Westfields. Carry the Foundry maul: nothing lighter hurts him. Halfway through the fight his helmet locks and the valve tower terminal wakes up.",
+      chat:"Talk the assistant into standing down", chatDetail:"Vic's helmet has locked and no blow gets through. The valve tower terminal is listening: five prompts.",
       wait:"Survive until the assistant has tokens again", waitDetail:"The assistant is out of tokens and will resume in a few minutes. Survive the infected it called."},
     {id:"viragem.zero", area:"viragem", text:"Find out what happened to the first friend", detail:"Days 15 to 18. Greywater Reservoir, past Westfields. Vic kept a diary in the locked keeper's cottage; the key is in the pump house."},
     {id:"fortress.last-boss", area:"fortress", text:"Reach the fortress and end it with Pip", detail:"From day 25, with all five coordinates. Beyond Pine Ridge. Pip wears a scorched firefighter's coat; the mutation burns, so fight him near a campfire.",
@@ -345,7 +348,7 @@ const Data = (() => {
       "ironworks.barricade":{go:"Follow the arrow to the Ironworks. It is open on weekdays, 08:00 to 18:00.", cage:"Take the weapon cage apart in the machine shop with the toolboard hammer and crowbar. They wear out: do not waste them."},
       "fortress.last-boss":{go:"You have all five coordinates. Follow the arrow through Pine Ridge to the fortress road. Find the harpoon in the keep armoury: it finishes Pip below 100 hp. Bring fire: a torch, Molotov cocktails or a campfire, and a good weapon.", coat:"Beat Pip down until his coat comes apart. Hit hard and keep your distance from the escort.", fire:"His coat is off. Fire hurts him and keeps burning: hit him with a torch, throw a Molotov at his feet, or lead him to a fire.", done:"The fortress is yours. Garden, cook, collect water and kill at your pace."},
       "viragem.zero":{go:"Follow the arrow to Greywater Reservoir, past Westfields. The diary is in the locked keeper's cottage: look for the key in the pump house.", read:"Read Vic's diary in the keeper's cottage. Days 15 to 18 only."},
-      "amigo1.lockdown-chat":{go:"Follow the arrow to Greywater Reservoir, past Westfields. Carry the Foundry maul from the Ironworks.", chat:"Go up the valve tower and talk to the terminal. Five prompts: make the last one count, and use a joke the machine cannot ignore.", wait:"The assistant is out of tokens. Survive the infected it called until it comes back, then try the last prompt again.", fight:"The helmet is off. Hit Vic with the Foundry maul: nothing else hurts him."},
+      "amigo1.lockdown-chat":{go:"Follow the arrow to Greywater Reservoir, past Westfields. Carry the Foundry maul from the Ironworks.", hit:"Find Vic near the valve tower and fight him with the Foundry maul. Halfway down, his helmet locks: then the terminal opens.", chat:"Go up the valve tower and talk to the terminal. Five prompts: make the last one count, and use a joke the machine cannot ignore.", wait:"The assistant is out of tokens. Survive the infected it called until it comes back, then try the last prompt again."},
       "fathill.bosses":{go:"Follow the arrow to Bracken Coast. The road is open on low-tide days (even days), from 06:00 to 18:00.", tide:"The tide comes in at 18:00. Finish or get out, unless you carry the rowboat from the marina. ", fear:"Her violin calls infected to you: kill them where the woman on the pier can see. Her fear is {n} of {max}. The violin is in the net shed.", david:"Wear David's guard down, then shove his vest off.", violin:"Play the violin near David, then strike while he stands there."},
       "westfields.stealth":{go:"Follow the arrow to Westfields. Keep your knife and your footsteps quiet.", sneak:"Sneak west to the Orchard farmhouse and read the ledger. Do not fight: noise calls hordes.", noisy:"You made noise. Hide until the infected lose you, then read the ledger in the Orchard farmhouse."},
       "cindergrotto.battery":{go:"Follow the arrow to Pine Ridge and take the survey tunnel. You need a flashlight with batteries.", plate:"Find the surveyor's plate in the far survey room. Watch your flashlight battery.", out:"You have the plate. Climb back out to Pine Ridge before the light dies."}
@@ -373,6 +376,16 @@ const Data = (() => {
     winWords:["stand down", "token"]
   };
   // The last boss (docs/HISTORIA.md sections 7 and 10): a firefighter's coat falls under heavy damage; fire hurts the mutation.
+  // The ending (docs/HISTORIA.md sections 1 and 11): shown once after Pip falls. Player-facing, English.
+  const epilogue = {
+    title:"The fortress",
+    pages:[
+      "Pip lies still in the yard he helped to design. Behind the keep's desk you find the plans: the walls, the gardens, the two gates. Every page signed by the same two friends.",
+      "They were the preppers. They built this place for the end of the world, and then, with a survival game and an assistant they called Patchwork, they started it. The rumour on the radio was theirs. The coordinates were theirs. The first of them was Vic.",
+      "Eva never got here. She wanted to see it so much that she copied the whole rumour into her diary. You read it to the end, and you came anyway.",
+      "The doors lock from the inside. The gardens will grow, the collectors will fill, and the gates will let the infected in one at a time. Stay as long as you like. This is the last shelter."
+    ]
+  };
   // Optional areas (docs/HISTORIA.md section 9): one supply cache each, in a named place. Never a clue. guards = infected placed around it.
   const optionalAreas = {
     "opt.fuel":{region:"coldvale", place:"the petrol station", cache:"Forecourt tank hatch", loot:{fuel:3, food:2, emptybottle:2}, guards:0},
@@ -648,6 +661,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {optionalAreas,fireRules,pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {epilogue,optionalAreas,fireRules,pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

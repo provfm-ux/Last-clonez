@@ -2033,7 +2033,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   c.campaign.completed.push("westfields.stealth");
   check("ui.campaign-goals depois mostra a Cinder Grotto (dia 12)", Sim.pinnedGoal(c) === "Read the surveyor's plate in Cinder Grotto · opens on day 12", Sim.pinnedGoal(c));
   c.campaign.completed.push("cindergrotto.battery");
-  check("ui.campaign-goals depois mostra o primeiro amigo (dia 14)", /opens on day 14/.test(Sim.pinnedGoal(c)) && /Stop the assistant/.test(Sim.pinnedGoal(c)), Sim.pinnedGoal(c));
+  check("ui.campaign-goals depois mostra o primeiro amigo (dia 14)", /opens on day 14/.test(Sim.pinnedGoal(c)) && /Bring Vic down/.test(Sim.pinnedGoal(c)), Sim.pinnedGoal(c));
   c.campaign.completed.push("amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss");
   check("ui.campaign-goals com tudo feito por agora o objetivo avisa que há mais a caminho", /on its way/.test(Sim.pinnedGoal(c)) && Sim.destination(c) === null);
   const plain = fresh("survival"); plain.pinStory = true;
@@ -2188,12 +2188,25 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("fathill: saves antigos sem 'fathill' carregam e valores inválidos são recusados", Sim.restore(raw).campaign.fathill.fear === 0 && bad);
 }
 
-{ // amigo1.lockdown-chat + viragem.zero: o Vic no valve tower, o chat com o assistente, o diário na cabana
+{ // amigo1.lockdown-chat + viragem.zero: lutar com o Vic, a meio o capacete tranca e o chat abre; ganhar o chat acaba o combate
   const f = Sim.create(11, "campaign", "carer", 2, undefined, "reservoir");
   Sim.testJump(f, 15, {}, {anyMode: true});
+  f.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery");
   const vic = f.world.enemies.find(z => z.kind === "vic"), term = f.world.objects.find(o => o.id === "ai-terminal"), diary = f.world.objects.find(o => o.id === "vic-diary");
   const at = id => f.world.buildings.find(b => b.id === id)?.name;
-  check("amigo1: Vic, terminal e diário existem nos sítios certos", Boolean(vic && term && diary) && at(term.building) === "Valve tower" && at(diary.building) === "Keeper's cottage" && vic.guard && vic.hp === 150);
+  check("amigo1: Vic, terminal e diário existem nos sítios certos", Boolean(vic && term && diary) && at(term.building) === "Valve tower" && at(diary.building) === "Keeper's cottage" && !vic.guard && vic.hp === 150);
+  check("amigo1: a dica manda primeiro lutar com o Vic", /fight him with the Foundry maul/.test(Sim.campaignTip(f)), Sim.campaignTip(f));
+  Object.assign(f.player, {x: term.x, y: term.y});
+  check("amigo1: antes do capacete trancar o terminal está apagado", !Sim.useAiTerminal(f, term) && !Sim.aiSend(f, "hello", 1));
+  const swing = () => { f.player.cooldown = 0; f.player.stamina = 100; Object.assign(f.player, {x: vic.x - 1, y: vic.y}); Sim.attack(f, vic); };
+  f.player.bag.push({id:"bat", qty:1, condition:100, born:0, uid:"bt"}); f.player.weapon = "bat"; f.player.weaponUid = "bt";
+  swing(); const weak = 150 - vic.hp;
+  f.player.bag.push({id:"foundrymaul", qty:1, condition:100, born:0, uid:"fm-test"}); f.player.weapon = "foundrymaul"; f.player.weaponUid = "fm-test";
+  const before = vic.hp; swing(); const strong = before - vic.hp;
+  check("amigo1: só a maça da Foundry o fere a sério", weak > 0 && strong > weak * 3, weak + " vs " + strong);
+  for (let i = 0; i < 12 && !vic.guard; i++) swing();
+  check("amigo1: a meio da vida o capacete tranca e os golpes deixam de contar", vic.guard && vic.hp === 75 && (swing(), vic.hp === 75), String(vic.hp));
+  check("amigo1: com o capacete trancado a seta e a dica vão para o terminal", Sim.destination(f)?.id === "ai-terminal" && /terminal/.test(Sim.campaignTip(f)));
   Object.assign(f.player, {x: term.x, y: term.y});
   check("amigo1: o terminal abre a conversa", Sim.useAiTerminal(f, term) && f.campaign.chat.log.length === 1);
   const T0 = 1e6;
@@ -2207,14 +2220,10 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("amigo1: durante a pausa o assistente não responde", !f.campaign.chat.done && f.campaign.chat.log.slice(n).some(l => l.text === Data.aiChat.busy));
   const raw = JSON.parse(JSON.stringify(Sim.snapshot(f)));
   check("amigo1: a pausa e o registo guardam-se e carregam", Sim.restore(raw).campaign.chat.until === T0 + 300010 && Sim.restore(raw).campaign.chat.log.length === f.campaign.chat.log.length);
-  f.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery");
+  const clues = f.campaign.clues;
   Sim.aiSend(f, "Stand down, you are out of tokens", T0 + 400000);
-  check("amigo1: depois da pausa, 'stand down' + 'token' no 5º prompt desliga o assistente e tira o capacete",
-    f.campaign.chat.done && !vic.guard && Sim.campaignTip(f) === Data.campaignTips.goals["amigo1.lockdown-chat"].fight);
-  Object.assign(f.player, {x: vic.x - 1, y: vic.y}); f.player.weapon = "foundrymaul"; f.player.bag.push({id:"foundrymaul", qty:1, condition:100, born:0, uid:"fm-test"}); f.player.weaponUid = "fm-test"; vic.hp = 1; vic.stagger = 0; f.player.cooldown = 0;
-  for (let i = 0; i < 6 && vic.hp > 0; i++) { f.player.cooldown = 0; f.player.stamina = 100; Sim.attack(f, vic); }
-  check("amigo1: com o capacete fora o Vic cai, dá a 2ª pista (aqui a 1ª) e o mapa da fortaleza",
-    vic.hp <= 0 && f.campaign.completed.includes("amigo1.lockdown-chat") && f.campaign.clues === 1 && Sim.quantity(f.player.bag, "fortressmap") === 1, vic.hp + " " + f.campaign.clues);
+  check("amigo1: 'stand down' + 'token' depois da pausa acaba o combate: Vic cai e dá o mapa, sem pista extra",
+    f.campaign.chat.done && vic.hp <= 0 && f.campaign.completed.includes("amigo1.lockdown-chat") && Sim.quantity(f.player.bag, "fortressmap") === 1 && f.campaign.clues === clues);
   const p = Sim.create(11, "campaign", "carer", 2, undefined, "reservoir"); Sim.testJump(p, 15, {}, {anyMode: true});
   check("viragem: antes do dia 15 o diário recusa", (() => { const q = Sim.create(11, "campaign", "carer", 2, undefined, "reservoir"); Sim.testJump(q, 14, {}, {anyMode: true}); const d = q.world.objects.find(o => o.id === "vic-diary"); Object.assign(q.player, {x: d.x, y: d.y}); return !Sim.readVicDiary(q, d); })());
   const d2 = p.world.objects.find(o => o.id === "vic-diary"); Object.assign(p.player, {x: d2.x, y: d2.y});
@@ -2258,6 +2267,8 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("fortress: o fogo queima o Pip com o tempo", pip.hp < hp0 || pip.burning);
   pip.hp = 1; Object.assign(pip, {x: fire.x + 8, y: fire.y}); swing(); swing(); swing();
   check("fortress: o Pip a cair conclui o desafio final", pip.hp <= 0 && f.campaign.completed.includes("fortress.last-boss"), pip.hp + "");
+  check("fortress: depois do Pip o epílogo fica pendente uma vez e depois visto", f.campaign.epilogue === "pending" && Sim.seeEpilogue(f) && !Sim.seeEpilogue(f) && f.campaign.epilogue === "seen" &&
+    Data.epilogue.pages.length >= 3 && /preppers/.test(Data.epilogue.pages.join(" ")));
   check("fortress: depois da vitória fica uma dica de refúgio", /fortress is yours/.test(Sim.campaignTip(f)) || Sim.campaignTip(f).length > 20);
 }
 

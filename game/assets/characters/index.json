@@ -103,6 +103,30 @@
      "frames": 8,
      "scale": 0.1023
     }
+   },
+   "reach": {
+    "game": {
+     "file": "woman_reach_game.png",
+     "cell": [
+      90,
+      82
+     ],
+     "anchor": [
+      44,
+      81
+     ]
+    },
+    "mini": {
+     "file": "woman_reach_mini.png",
+     "cell": [
+      45,
+      41
+     ],
+     "anchor": [
+      22,
+      40
+     ]
+    }
    }
   },
   {
@@ -184,6 +208,30 @@
      ],
      "frames": 8,
      "scale": 0.1023
+    }
+   },
+   "reach": {
+    "game": {
+     "file": "david_reach_game.png",
+     "cell": [
+      103,
+      82
+     ],
+     "anchor": [
+      50,
+      81
+     ]
+    },
+    "mini": {
+     "file": "david_reach_mini.png",
+     "cell": [
+      52,
+      41
+     ],
+     "anchor": [
+      25,
+      40
+     ]
     }
    }
   },
@@ -267,6 +315,30 @@
      "frames": 8,
      "scale": 0.10471
     }
+   },
+   "reach": {
+    "game": {
+     "file": "friend_reach_game.png",
+     "cell": [
+      85,
+      82
+     ],
+     "anchor": [
+      41,
+      81
+     ]
+    },
+    "mini": {
+     "file": "friend_reach_mini.png",
+     "cell": [
+      42,
+      41
+     ],
+     "anchor": [
+      20,
+      40
+     ]
+    }
    }
   },
   {
@@ -348,6 +420,30 @@
      ],
      "frames": 8,
      "scale": 0.10336
+    }
+   },
+   "reach": {
+    "game": {
+     "file": "pip_reach_game.png",
+     "cell": [
+      103,
+      82
+     ],
+     "anchor": [
+      52,
+      81
+     ]
+    },
+    "mini": {
+     "file": "pip_reach_mini.png",
+     "cell": [
+      52,
+      41
+     ],
+     "anchor": [
+      26,
+      40
+     ]
     }
    }
   },
@@ -431,6 +527,30 @@
      "frames": 8,
      "scale": 0.10283
     }
+   },
+   "reach": {
+    "game": {
+     "file": "walker_reach_game.png",
+     "cell": [
+      87,
+      82
+     ],
+     "anchor": [
+      43,
+      81
+     ]
+    },
+    "mini": {
+     "file": "walker_reach_mini.png",
+     "cell": [
+      44,
+      41
+     ],
+     "anchor": [
+      22,
+      40
+     ]
+    }
    }
   },
   {
@@ -512,6 +632,30 @@
      ],
      "frames": 8,
      "scale": 0.09973
+    }
+   },
+   "reach": {
+    "game": {
+     "file": "runner_reach_game.png",
+     "cell": [
+      106,
+      77
+     ],
+     "anchor": [
+      50,
+      76
+     ]
+    },
+    "mini": {
+     "file": "runner_reach_mini.png",
+     "cell": [
+      52,
+      38
+     ],
+     "anchor": [
+      25,
+      38
+     ]
     }
    }
   },
@@ -595,6 +739,30 @@
      "frames": 8,
      "scale": 0.13264
     }
+   },
+   "reach": {
+    "game": {
+     "file": "brute_reach_game.png",
+     "cell": [
+      161,
+      105
+     ],
+     "anchor": [
+      80,
+      103
+     ]
+    },
+    "mini": {
+     "file": "brute_reach_mini.png",
+     "cell": [
+      80,
+      52
+     ],
+     "anchor": [
+      40,
+      52
+     ]
+    }
    }
   },
   {
@@ -676,6 +844,30 @@
      ],
      "frames": 8,
      "scale": 0.10178
+    }
+   },
+   "reach": {
+    "game": {
+     "file": "construction_reach_game.png",
+     "cell": [
+      84,
+      82
+     ],
+     "anchor": [
+      41,
+      81
+     ]
+    },
+    "mini": {
+     "file": "construction_reach_mini.png",
+     "cell": [
+      42,
+      41
+     ],
+     "anchor": [
+      20,
+      40
+     ]
     }
    }
   },
@@ -759,6 +951,30 @@
      "frames": 8,
      "scale": 0.1023
     }
+   },
+   "reach": {
+    "game": {
+     "file": "paramedic_reach_game.png",
+     "cell": [
+      86,
+      82
+     ],
+     "anchor": [
+      43,
+      81
+     ]
+    },
+    "mini": {
+     "file": "paramedic_reach_mini.png",
+     "cell": [
+      43,
+      41
+     ],
+     "anchor": [
+      22,
+      40
+     ]
+    }
    }
   },
   {
@@ -841,6 +1057,30 @@
      "frames": 8,
      "scale": 0.10471
     }
+   },
+   "reach": {
+    "game": {
+     "file": "hiker_reach_game.png",
+     "cell": [
+      87,
+      82
+     ],
+     "anchor": [
+      44,
+      81
+     ]
+    },
+    "mini": {
+     "file": "hiker_reach_mini.png",
+     "cell": [
+      44,
+      41
+     ],
+     "anchor": [
+      22,
+      40
+     ]
+    }
    }
   },
   {
@@ -922,6 +1162,30 @@
      ],
      "frames": 8,
      "scale": 0.10204
+    }
+   },
+   "reach": {
+    "game": {
+     "file": "police_reach_game.png",
+     "cell": [
+      87,
+      82
+     ],
+     "anchor": [
+      44,
+      81
+     ]
+    },
+    "mini": {
+     "file": "police_reach_mini.png",
+     "cell": [
+      44,
+      41
+     ],
+     "anchor": [
+      22,
+      40
+     ]
     }
    }
   },
@@ -3313,6 +3577,30 @@
      "frames": 8,
      "scale": 0.10178
     }
+   },
+   "reach": {
+    "game": {
+     "file": "missing_left_arm_reach_game.png",
+     "cell": [
+      85,
+      82
+     ],
+     "anchor": [
+      43,
+      81
+     ]
+    },
+    "mini": {
+     "file": "missing_left_arm_reach_mini.png",
+     "cell": [
+      42,
+      41
+     ],
+     "anchor": [
+      22,
+      40
+     ]
+    }
    }
   },
   {
@@ -3395,6 +3683,30 @@
      "frames": 8,
      "scale": 0.10309
     }
+   },
+   "reach": {
+    "game": {
+     "file": "missing_right_forearm_reach_game.png",
+     "cell": [
+      86,
+      82
+     ],
+     "anchor": [
+      43,
+      81
+     ]
+    },
+    "mini": {
+     "file": "missing_right_forearm_reach_mini.png",
+     "cell": [
+      43,
+      41
+     ],
+     "anchor": [
+      22,
+      40
+     ]
+    }
    }
   },
   {
@@ -3476,6 +3788,30 @@
      ],
      "frames": 8,
      "scale": 0.1023
+    }
+   },
+   "reach": {
+    "game": {
+     "file": "limping_reach_game.png",
+     "cell": [
+      99,
+      82
+     ],
+     "anchor": [
+      49,
+      81
+     ]
+    },
+    "mini": {
+     "file": "limping_reach_mini.png",
+     "cell": [
+      50,
+      41
+     ],
+     "anchor": [
+      24,
+      40
+     ]
     }
    }
   },
@@ -3613,6 +3949,30 @@
      "frames": 8,
      "scale": 0.10204
     }
+   },
+   "reach": {
+    "game": {
+     "file": "elderly_female_reach_game.png",
+     "cell": [
+      107,
+      82
+     ],
+     "anchor": [
+      49,
+      81
+     ]
+    },
+    "mini": {
+     "file": "elderly_female_reach_mini.png",
+     "cell": [
+      54,
+      41
+     ],
+     "anchor": [
+      24,
+      40
+     ]
+    }
    }
   },
   {
@@ -3695,6 +4055,30 @@
      "frames": 8,
      "scale": 0.37705
     }
+   },
+   "reach": {
+    "game": {
+     "file": "obese_male_reach_game.png",
+     "cell": [
+      155,
+      98
+     ],
+     "anchor": [
+      75,
+      95
+     ]
+    },
+    "mini": {
+     "file": "obese_male_reach_mini.png",
+     "cell": [
+      78,
+      49
+     ],
+     "anchor": [
+      38,
+      48
+     ]
+    }
    }
   },
   {
@@ -3776,6 +4160,30 @@
      ],
      "frames": 8,
      "scale": 0.37398
+    }
+   },
+   "reach": {
+    "game": {
+     "file": "obese_female_reach_game.png",
+     "cell": [
+      133,
+      98
+     ],
+     "anchor": [
+      68,
+      95
+     ]
+    },
+    "mini": {
+     "file": "obese_female_reach_mini.png",
+     "cell": [
+      66,
+      49
+     ],
+     "anchor": [
+      34,
+      47
+     ]
     }
    }
   }

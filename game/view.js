@@ -1928,7 +1928,7 @@ const View = (() => {
     return true;
   }
 
-  function drawCharacter(a, isPlayer, x, y, scale, direction, stride, clock) {
+  function drawCharacter(a, isPlayer, x, y, scale, direction, stride, clock, reachSide = 0) {
     charHand = null;
     if (charState < 0 || charTier === "off" || typeof Image !== "function" || typeof fetch !== "function") return false;
     if (charState === 0) {
@@ -1945,13 +1945,18 @@ const View = (() => {
     if (charState !== 2) return false;
     const entry = charEntries.get(characterFor(a, isPlayer)), t = entry?.tiers[charTier];
     if (!t) return false;
-    const walk = a.moving ? entry.walk?.[charTier] : null;       // baked walk cycle: rows = 8 frames, columns = 8 directions
+    // Reaching (infected winding up, swinging or holding the player): arms out. Straight on (S, N) the diagonal towards the victim.
+    const reachSrc = reachSide && entry.reach?.[charTier], reachImg = reachSrc && charImage(reachSrc.file);
+    const reaching = Boolean(reachImg && reachImg.naturalWidth === reachSrc.cell[0] * 8 && reachImg.naturalHeight === reachSrc.cell[1]);
+    const walk = a.moving && !reaching ? entry.walk?.[charTier] : null;   // baked walk cycle: rows = 8 frames, columns = 8 directions
     const walkImg = walk && charImage(walk.file);
     const baked = Boolean(walkImg && walkImg.naturalWidth === walk.cell[0] * 8 && walkImg.naturalHeight === walk.cell[1] * walk.frames);
-    const src = baked ? walk : t, img = baked ? walkImg : charImage(t.file);
+    const src = reaching ? reachSrc : baked ? walk : t, img = reaching ? reachImg : baked ? walkImg : charImage(t.file);
     if (img.naturalWidth !== src.cell[0] * 8 || img.naturalHeight !== src.cell[1] * (baked ? walk.frames : 1)) return false;   // not decoded yet
-    const index = direction & 4 ? (direction & 2 ? 0 : 4) : direction & 8 ? (direction & 1 ? 6 : 2) :
+    let index = direction & 4 ? (direction & 2 ? 0 : 4) : direction & 8 ? (direction & 1 ? 6 : 2) :
       direction & 2 ? (direction & 1 ? 7 : 1) : (direction & 1 ? 5 : 3);
+    if (reaching && index === 4) index = reachSide > 0 ? 3 : 5;
+    if (reaching && index === 0) index = reachSide > 0 ? 1 : 7;
     const kindScale = a.kind === "brute" ? 1.28 : a.kind === "runner" ? .94 : 1;   // already baked into those atlases
     const z = scale / kindScale * charTiers[charTier], vec = charVectors[index];
     let sheet = img;                                   // the player's skin, hair and jacket follow the character settings
@@ -2012,7 +2017,10 @@ const View = (() => {
     const profile = !axial && screenY <= screenX * .414;
     const direction = Number(across < 0) + 2 * Number(depth < 0 && !profile) +
       4 * Number(axial) + 8 * Number(profile);
-    const chars = alive && drawCharacter(a, isPlayer, x, y, scale, direction, stride.phase, clock);
+    const victim = state.player;
+    const reachSide = !isPlayer && alive && a.stats && (a.windup > 0 || a.swing > 0 || state.grab?.id === a.id) && victim ?
+      (Math.sign((victim.x - a.x) - (victim.y - a.y)) || 1) : 0;
+    const chars = alive && drawCharacter(a, isPlayer, x, y, scale, direction, stride.phase, clock, reachSide);
     const imported = chars || alive && a.stats && !isPlayer && drawZombieSprite(a, x, y, scale, direction, stride.phase, clock);
     if (!imported || chars && isPlayer) {
       const palette = isPlayer ? survivorPalette(a) : null;

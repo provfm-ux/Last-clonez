@@ -970,11 +970,21 @@ const View = (() => {
     }
     if (o.action === "mushroom") {
       if (o.harvested) return;
-      const cap = ["#c1a589","#8b6d55","#694d3e"];
-      f(-.17,-.12,0,.12,.12,5,cream);
-      f(-.25,-.20,5,.28,.28,4,cap);
-      f(.13,.06,0,.10,.10,3,cream);
-      f(.07,0,3,.22,.22,3,cap);
+      // A little patch of capped mushrooms: pale stem, domed cap with a dark rim, a highlight and a few spots.
+      const bitter = o.species === "bitterfold";
+      const capTop = bitter ? "#c9b46a" : "#b07a52", capRim = bitter ? "#8a7a3e" : "#6e4632", spot = bitter ? "#efe3b0" : "#e9d6b8";
+      shadow(x, y, 15, 5);
+      for (const [dx, dy, size] of [[-.22, -.08, 1], [.12, .1, .82], [.2, -.16, .62], [-.04, .2, .55]]) {
+        const [sx, sy] = p(x + dx, y + dy, 0), s = size;
+        ctx.fillStyle = "#e6dcc4"; ctx.fillRect(Math.round(sx - 1.5 * s), Math.round(sy - 7 * s), Math.max(2, Math.round(3 * s)), Math.round(7 * s));
+        ctx.fillStyle = "#bfb39a"; ctx.fillRect(Math.round(sx + .5 * s), Math.round(sy - 7 * s), Math.max(1, Math.round(1 * s)), Math.round(7 * s));
+        ctx.fillStyle = capRim; ctx.beginPath(); ctx.ellipse(sx, sy - 7 * s, 7 * s, 3 * s, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = capTop; ctx.beginPath(); ctx.ellipse(sx, sy - 8 * s, 6.5 * s, 5 * s, 0, Math.PI, Math.PI * 2); ctx.fill();
+        ctx.fillRect(Math.round(sx - 6.5 * s), Math.round(sy - 8.5 * s), Math.round(13 * s), Math.max(1, Math.round(1.5 * s)));
+        ctx.fillStyle = spot;
+        ctx.fillRect(Math.round(sx - 3 * s), Math.round(sy - 11 * s), Math.max(1, Math.round(1.6 * s)), Math.max(1, Math.round(1.4 * s)));
+        ctx.fillRect(Math.round(sx + 2 * s), Math.round(sy - 10 * s), Math.max(1, Math.round(1.2 * s)), Math.max(1, Math.round(1.2 * s)));
+      }
       if (o.colony === "active") {
         const glow = state.reduceFlicker || Math.floor(state.elapsed * 2) % 2 === 0 ? "#e8ac78" : "#a88767";
         line(p(x-.38,y-.01,1),p(x-.08,y+.18,1),glow,2);
@@ -1681,7 +1691,9 @@ const View = (() => {
     rollingpin: [[1,0,13,1,lightWood],[3,-2,8,5,woodGrip],[4,-2,6,1,lightWood],[4,2,6,1,"#825132"]]
   };
   const weaponSprites = new Map();
-  const weaponAngles = [-1.15, -.45, .38, .95, 0, -.25, 1.28];
+  const weaponAngles = [-1.15, -.45, .38, .95, 0, -.25, 1.28, -1.9, -.35, 1.2];   // 7-9: overhead chop (raised, mid, down)
+  const chopWeapons = new Set(["axe", "hatchet", "foundrymaul"]);
+  const chopPhase = t => t > .17 ? 7 : t > .09 ? 8 : 9;                                // swing time left -> chop phase
   const weaponExtent = 36;
 
   function drawHeldWeapon(id, x, y, side, phase) {
@@ -1863,7 +1875,7 @@ const View = (() => {
   }
 
   // Rest poses (Pixel Lab sheet, tools/pixelforge poses): sitting on a seat, lying on a bed, head out of a sleeping bag.
-  let restPoses = null;
+  let restPoses = null, deferredPose = null;
   const seatKinds = new Set(["sofa", "armchair", "chair"]);
   function restPoseFor(state, a) {
     const near = kinds => state.world.objects.filter(o => o.active && kinds(o) && Math.hypot(o.x - a.x, o.y - a.y) < 1.6)
@@ -2036,8 +2048,9 @@ const View = (() => {
       const grip = chars && charHand ? charHand : frame.grip && [left + Math.round(frame.grip[0] * scale), top + Math.round(frame.grip[1] * scale)];
       if (isPlayer && grip) {                  // the weapon goes in the sprite's hand, or on the procedural pose's grip point
         const phase = swing ? (heldId === "pistol" ? (a.swing > .145 ? 5 : a.swing > .09 ? 1 : 4) :
-          a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : pose === "ready" ? (heldId === "pistol" ? 4 : 0) : 6;
-        drawHeldWeapon(heldId, Math.round(grip[0]), Math.round(grip[1]), dx < dy ? -1 : 1, phase);
+          chopWeapons.has(heldId) ? chopPhase(a.swing) : a.swing > .125 ? 0 : a.swing > .06 ? 4 : 3) : pose === "ready" ? (heldId === "pistol" ? 4 : 0) : 6;
+        const side = dx < dy ? -1 : 1, lift = {7: [-3, -19], 8: [2, -10], 9: [3, 1]}[phase];   // the chop: the hand goes up, then down
+        drawHeldWeapon(heldId, Math.round(grip[0] + (lift ? lift[0] * side * scale : 0)), Math.round(grip[1] + (lift ? lift[1] * scale : 0)), side, phase);
       }
     }
     if (alive && (a.windup > 0 || a.stats && a.alert > 0)) {
@@ -2074,7 +2087,8 @@ const View = (() => {
     const [x, y] = p(a.x, a.y);
     const scale = a.kind === "brute" ? 1.28 : a.kind === "runner" ? .94 : 1;
     const posed = isPlayer && darkLook && charState === 2 && restPoses && restPoseFor(state, a);
-    if (!posed) shadow(a.x, a.y, alive ? 11 * scale : 15, alive ? 5 : 7, "#080e09aa");
+    if (posed) { deferredPose = {a, state, clock}; return; }   // drawn after the furniture, so the sofa never hides it
+    shadow(a.x, a.y, alive ? 11 * scale : 15, alive ? 5 : 7, "#080e09aa");
     if (alive && (inReach || a.windup > 0)) {
       ctx.save();
       ctx.strokeStyle = a.windup > 0 ? "#ff987d" : "#ebcf8b";
@@ -2177,7 +2191,7 @@ const View = (() => {
     }
     if (isPlayer && alive) {
       const id = a.swing > 0 && state.swingVisual ? state.swingVisual.weapon : Sim.weapon(state).id;
-      const phase = a.swing > 0 ? id === "pistol" ? 5 : a.swing > .12 ? 0 : a.swing > .06 ? 1 : 2 : 4;
+      const phase = a.swing > 0 ? id === "pistol" ? 5 : chopWeapons.has(id) ? chopPhase(a.swing) : a.swing > .12 ? 0 : a.swing > .06 ? 1 : 2 : 4;
       drawHeldWeapon(id,handX,handY,1,phase);
     }
     if (a.origin === "cinema-winner") {
@@ -2876,7 +2890,12 @@ const View = (() => {
         }
       }
     }
-    if (!menu && darkLook && occluded(world, player)) {   // x-ray: a wall or tall furniture in front, so draw a faint copy on top
+    if (deferredPose) {                                    // the survivor sitting, lying or in a bag: over the seat, bed or bag
+      const {a, state: st, clock: ck} = deferredPose; deferredPose = null;
+      const [px, py] = p(a.x, a.y);
+      microActor(a, true, st, true, px, py, 1, ck);
+    }
+    else if (!menu && darkLook && occluded(world, player)) {   // x-ray: a wall or tall furniture in front, so draw a faint copy on top
       const grabber = player.grabbed > 0 ? world.enemies.find(z => z.hp > 0 && Math.hypot(z.x - player.x, z.y - player.y) < 1.3) : null;
       ctx.save();
       ctx.globalAlpha = .42;
@@ -2894,7 +2913,7 @@ const View = (() => {
         const hasNote = o => Boolean(Sim.unreadClueAt(state, o));
         const hasCache = o => Sim.isSupplyCache(state, o);
         const hasHarvest = o => o.kind === "garden" && Boolean(Sim.gardenYield(state, o));
-        const held = Boolean(state.grab && player.grabbed > 0);             // while grabbed, only the fight matters on screen
+        const held = Boolean(state.grab && player.grabbed > 0) || player.resting;   // grabbed or resting: no labels over the survivor
         const actions = held ? [] : Sim.nearby(state).filter(o => (o.action || Sim.isFurniture(o)) && (!player.vehicle || o.action === "travel") &&
           !(o.action==="loot"&&o.searched&&!o.loot.length&&!Sim.canStore(o)&&!hasNote(o)&&!hasCache(o)));
         const priority = o => {

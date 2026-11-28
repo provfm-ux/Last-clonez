@@ -1,6 +1,9 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Combat: grabs are their own attack now. An infected that lands an attack may grab instead of hitting (walkers 32%, runners 15%, brutes 40%, bosses never): no damage yet, but it bites after 1.9 s (heavier damage, likelier bite wound). Break free by shoving, by attacking (each swing struggles 0.6 s off the hold) or by pulling away; a freed infected is staggered and open to a counter (x1.5 damage) for 1.6 s. On screen: "Break free!" countdown, "Counter!" over the infected, object labels hidden while held. The "Shorter grabs" assist still shortens the hold below the bite.
+- Combat: no stun-lock. From the third quick hit in a row an infected may push through (45%) and finish its attack.
+- Random finds: 3 to 5 seeded containers per region (backpacks, holdalls, cool boxes, courier satchels, trolleys, hiker stashes, school bags) with common, uncommon or rare loot (machete, crowbar, pistol, winter coat, sleeping bag, backpack) and a one-line story told when first opened. Labelled "· Find".
 - Shelter radio (external QA): the panel lists what the repair needs, why, how many you carry and how many are in the shelter, and where to look. "Pin checklist" keeps what is still missing on the HUD until the radio works.
 - Readability (external QA): when a wall or tall furniture stands in front of the survivor, a faint copy is drawn on top (with the infected holding them, if any).
 - Fortress: the two controlled entrances are real plank gates now (west and east, open at first). Close them to choose when the infected come in; they can break them.

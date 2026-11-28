@@ -306,7 +306,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   near.forEach((z, i) => Object.assign(z, {x: p.x + .6 + i * .1, y: p.y + .4, alert: 30, chaseX: p.x, chaseY: p.y}));
   for (let i = 0; i < 1500 && s.mode === "play" && !grabbed; i++) { Sim.tick(s, .033, idle); if (p.grabbed > 0) grabbed = true; }
   check("agarrar: um infetado pode agarrar o jogador", grabbed);
-  if (grabbed) { maxG = p.grabbed; check("agarrar: dura no máximo 2,2 s", maxG <= 2.2 + 1e-9, maxG.toFixed(2));
+  if (grabbed) { maxG = p.grabbed; check("agarrar: dura no máximo Data.grab.hold s", maxG <= Data.grab.hold + 1e-9, maxG.toFixed(2));
     check("agarrar: aparece nos moodles", Sim.moodles(s)[0]?.id === "grabbed");
     const shoved = Sim.shove(s); check("agarrar: empurrar liberta de imediato", p.grabbed === 0 || !shoved, shoved ? "libertado" : "sem alvo ao alcance (neutro)"); }
   for (const z of near) z.hp = 0; for (let i = 0; i < 200; i++) Sim.tick(s, .033, idle);
@@ -998,6 +998,7 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   const z = World.infected(run.world,"wear-test",p.x,p.y,"walkers",context.Level.seeded(17));
   Object.assign(z,{windup:.01,windupTarget:"player"});
   run.world.enemies.push(z);
+  p.grabCool = 5;                                   // this attack must be a blow, not a grab
   Sim.tick(run,.033);
   const worn = ["body","legs","feet"].map(slot => Sim.wornItem(run,slot)).filter(item => item?.condition < 100);
   check("roupa: um golpe danifica a roupa na zona atingida", worn.length > 0);
@@ -2528,6 +2529,35 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   const g0 = gates[0]; Object.assign(f.player, {x: g0.x + 1, y: g0.y}); f.world.enemies = [];
   check("fortaleza: um portão fecha-se e passa a bloquear", Sim.door(f, g0) && !g0.open && !context.World.clear(f.world, g0.x, g0.y, .2));
   check("fortaleza: portões fechados guardam-se e carregam", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(f)))).world.objects.find(o => o.id === g0.id).open === false);
+}
+
+{ // agarrões: o infetado agarra em vez de bater; quem fica parado é mordido; empurrar, bater ou puxar liberta e abre contra-ataque
+  const setup = () => {
+    const s = fresh("survival"), p = s.player; s.world.enemies = [];
+    const z = World.infected(s.world, "grabber", p.x + .7, p.y, "walkers", context.Level.seeded(3)); z.alert = 30; z.dormant = false; s.world.enemies.push(z);
+    p.bag.push({id:"bat", qty:1, condition:100, born:0, uid:"gb"}); p.weapon = "bat"; p.weaponUid = "gb";
+    let grabbed = false;
+    for (let i = 0; i < 60 && !grabbed; i++) { s.world.rng = () => 0; Object.assign(z, {windup: .01, windupTarget: "player", stagger: 0}); Sim.tick(s, .033, idle); grabbed = p.grabbed > 0; }
+    s.world.rng = context.Level.seeded(9);
+    return {s, p, z, grabbed};
+  };
+  const a = setup();
+  check("agarrões: um ataque pode ser um agarrão sem dano", a.grabbed && a.p.hp === 100 && Boolean(a.s.grab));
+  const hp = a.p.hp; for (let i = 0; i < 80 && a.s.mode === "play"; i++) Sim.tick(a.s, .033, idle);
+  check("agarrões: parado, ao fim de " + Data.grab.biteAt + " s é mordido", a.p.hp < hp && a.p.wounds.length > 0 && !a.s.grab, String(a.p.hp));
+  const b = setup(); b.p.stamina = 100; b.p.cooldown = 0;
+  check("agarrões: empurrar liberta, atordoa o infetado e abre contra-ataque", Sim.shove(b.s) && !(b.p.grabbed > 0) && b.z.stagger > 0 && b.z.exposed > b.s.elapsed);
+  b.p.cooldown = 0; const before = b.z.hp; b.z.hp = 500; Sim.attack(b.s, b.z);
+  const normal = Math.round(Data.items.bat.damage * (Data.combatStyles.blunt.damage.walker ?? 1));
+  check("agarrões: o contra-ataque faz mais dano", 500 - b.z.hp > normal, (500 - b.z.hp) + " vs " + normal);
+  const c = setup(); let swings = 0;
+  for (let i = 0; i < 6 && c.p.grabbed > 0; i++) { c.p.cooldown = 0; c.p.stamina = 100; c.z.hp = 500; Sim.attack(c.s, c.z); swings++; }
+  check("agarrões: bater várias vezes também liberta", !(c.p.grabbed > 0) && swings <= Math.ceil(Data.grab.hold / Data.grab.struggle), swings + " golpes");
+  const d = setup(); for (let i = 0; i < 60 && d.p.grabbed > 0; i++) Sim.tick(d.s, .033, {x: -1, y: 0});
+  check("agarrões: puxar (mover) também liberta, antes da mordida", !(d.p.grabbed > 0) && d.p.hp === 100, String(d.p.hp));
+  const boss = Sim.create(11, "campaign", "carer", 2, undefined, "fortress"), pip = boss.world.enemies.find(e => e.kind === "pip");
+  boss.world.rng = () => 0; Object.assign(pip, {x: boss.player.x + .7, y: boss.player.y});
+  check("agarrões: chefes não agarram", (() => { Object.assign(pip, {windup: .01, windupTarget: "player"}); Sim.tick(boss, .033, idle); return !(boss.player.grabbed > 0); })());
 }
 
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio

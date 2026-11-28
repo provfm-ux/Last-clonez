@@ -2861,7 +2861,10 @@ const View = (() => {
           const firearm = Sim.weaponData(state).firearm;
           const label = entity !== reachable ? "Closing in" : Sim.weaponProblem(state) ||
             (player.cooldown > 0 ? "Recovering" : firearm ? Math.round(Sim.aimChance(state, entity) * 100) + "% hit chance" : "In range");
-          marker(entity.x, entity.y, entity.kind === "brute" ? 79 : 66, entity.origin === "cinema-winner" ? "The El Gordo Winner" : label);
+          marker(entity.x, entity.y, entity.kind === "brute" ? 79 : 66, entity.origin === "cinema-winner" ? "The El Gordo Winner" : (entity.exposed ?? 0) > state.elapsed ? "Counter!" : label);
+        }
+        if (entry.kind === "player" && state.grab && player.grabbed > 0) {   // the grab: how long before it bites
+          marker(player.x, player.y, 88, "Break free! " + Math.max(0, Data.grab.biteAt - state.grab.t).toFixed(1) + " s", "#e3a289");
         }
       }
     }
@@ -2883,7 +2886,8 @@ const View = (() => {
         const hasNote = o => Boolean(Sim.unreadClueAt(state, o));
         const hasCache = o => Sim.isSupplyCache(state, o);
         const hasHarvest = o => o.kind === "garden" && Boolean(Sim.gardenYield(state, o));
-        const actions = Sim.nearby(state).filter(o => (o.action || Sim.isFurniture(o)) && (!player.vehicle || o.action === "travel") &&
+        const held = Boolean(state.grab && player.grabbed > 0);             // while grabbed, only the fight matters on screen
+        const actions = held ? [] : Sim.nearby(state).filter(o => (o.action || Sim.isFurniture(o)) && (!player.vehicle || o.action === "travel") &&
           !(o.action==="loot"&&o.searched&&!o.loot.length&&!Sim.canStore(o)&&!hasNote(o)&&!hasCache(o)));
         const priority = o => {
           if (o.action === "travel") return 4;
@@ -2911,6 +2915,7 @@ const View = (() => {
             else if (o.kind === "garden" && o.garden.crop && o.garden.moisture < Data.garden.minMoisture) label = "Garden · Needs water";
             else if (o.action === "campaign-page" && !o.read) label += " · Story";
             else if (["eva-diary", "vic-diary", "grotto-plate", "westfields-ledger", "ai-terminal"].includes(o.action) && !o.read) label += " · Story";
+            else if (o.id?.startsWith("find-") && !o.searched) label += " · Find";
             else if (hasCache(o)) label += " · Cache";
             else if (hasNote(o)) label += " · Note";
             objectLabels.push({...marker(o.x,o.y,["locker","fridge","exit"].includes(o.kind)?47:34,label), object:o});

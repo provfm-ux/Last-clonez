@@ -1880,6 +1880,17 @@ const View = (() => {
     return null;
   }
 
+  // Something drawn after the player hides them: a wall tile or tall solid furniture just in front (screen-below) of them.
+  const tallFurniture = new Set(["wardrobe", "fridge", "shelf", "cupboard", "locker", "bookcase", "sideboard", "generator", "tent", "car"]);
+  function occluded(world, a) {
+    const tx = Math.floor(a.x), ty = Math.floor(a.y);
+    for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) {
+      const t = World.tileAt(world, tx + dx, ty + dy);
+      if (t && t.solid && (t.kind === "wall" || t.surface === "rock")) return true;
+    }
+    return world.objects.some(o => o.active && o.solid && tallFurniture.has(o.kind) && o.x + o.y > a.x + a.y && Math.abs(o.x - a.x) < 1.4 && Math.abs(o.y - a.y) < 1.4);
+  }
+
   function drawPropSprite(name, x, y) {
     const set = restPoses?.props, sprite = set?.sprites[name];
     if (!sprite) return false;
@@ -2853,6 +2864,15 @@ const View = (() => {
           marker(entity.x, entity.y, entity.kind === "brute" ? 79 : 66, entity.origin === "cinema-winner" ? "The El Gordo Winner" : label);
         }
       }
+    }
+    if (!menu && darkLook && occluded(world, player)) {   // x-ray: a wall or tall furniture in front, so draw a faint copy on top
+      const grabber = player.grabbed > 0 ? world.enemies.find(z => z.hp > 0 && Math.hypot(z.x - player.x, z.y - player.y) < 1.3) : null;
+      ctx.save();
+      ctx.globalAlpha = .42;
+      if (grabber) { const [gx, gy] = p(grabber.x, grabber.y); microActor(grabber, false, state, true, gx, gy, grabber.kind === "brute" ? 1.28 : 1, clock); }
+      const [px, py] = p(player.x, player.y);
+      microActor(player, true, state, true, px, py, 1, clock);
+      ctx.restore();
     }
     if(!menu) {
       const track = Sim.nearbyTrack(state);

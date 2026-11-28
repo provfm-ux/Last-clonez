@@ -2238,7 +2238,18 @@ const Sim = (() => {
     note.read = true;
     notify(s, Data.campaignText.pages[note.page] ?? "The page is blank.");
     const read = s.world.objects.filter(o => o.action === "campaign-page" && o.read).length;
-    if (read < Data.campaignText.pages.length) { notify(s, "Torn pages found: " + read + " of " + Data.campaignText.pages.length + "."); return true; }
+    if (read < Data.campaignText.pages.length) {
+      notify(s, "Torn pages found: " + read + " of " + Data.campaignText.pages.length + ".");
+      // A geographic lead to the nearest unread page (the map points north, -y): which house, and roughly where.
+      const next = s.world.objects.filter(o => o.action === "campaign-page" && !o.read).sort((a,b) => distance(a, s.player) - distance(b, s.player))[0];
+      const house = next && s.world.buildings.find(b => b.id === next.building);
+      if (house) {
+        const dx = next.x - s.player.x, dy = next.y - s.player.y, a = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+        const dir = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][Math.round(a / 45) % 8];
+        notify(s, "The page mentions another house: " + house.name + ", to the " + dir + ".");
+      }
+      return true;
+    }
     if (!s.campaign.completed.includes("coldvale.houses")) {
       s.campaign.completed.push("coldvale.houses");
       s.campaign.clues = Math.min(5, s.campaign.clues + 1);
@@ -2761,6 +2772,25 @@ const Sim = (() => {
     const item = weapon(s), data = Data.items[item.id];
     return data?.damage && !data.firearm && item.condition > 0 ? item : null;
   };
+
+  // Climb through an open (or broken) window: step to the other side of the opening.
+  function climbThrough(s, o) {
+    const p = s.player;
+    if (s.mode !== "play" || p.vehicle || o?.action !== "door" || o.kind !== "window" || !o.open || o.boards || !reachableObject(s, o)) return false;
+    const len = Math.hypot(o.x - p.x, o.y - p.y) || 1;
+    const axis = o.axis === "x" ? [0, Math.sign(o.y - p.y) || 1] : o.axis === "y" ? [Math.sign(o.x - p.x) || 1, 0] : [(o.x - p.x) / len, (o.y - p.y) / len];
+    for (const step of [.85, 1, 1.2]) {
+      const to = {x: o.x + axis[0] * step, y: o.y + axis[1] * step};
+      if (World.clear(s.world, to.x, to.y, .18)) {
+        Object.assign(p, to, {path: []}); s.target = null; s.interaction = null;
+        noise(s, o.x, o.y, 4);
+        notify(s, "You climb through the window.");
+        return true;
+      }
+    }
+    notify(s, "The other side of the window is blocked.", true);
+    return false;
+  }
 
   function breachProblem(s, o, method) {
     if (s.player.vehicle || !reachableObject(s, o) || o.action !== "door" || o.open || o.boards || o.broken) return "The opening is blocked.";
@@ -4717,7 +4747,7 @@ const Sim = (() => {
     return s;
   }
 
-  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, isSeat, restOnSeat, aiSend, useAiTerminal, readVicDiary, seeEpilogue, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
+  return {create, isCampaign, campaignGoals, campaignGoal, campaignTip, noise, unreadNote, readCinemaNote, cinemaBuff, hurt, readEvaDiary, dismantleCage, readTerminal, readGrottoPlate, readFieldsLedger, climbThrough, isSeat, restOnSeat, aiSend, useAiTerminal, readVicDiary, seeEpilogue, campaignProblem, readCampaignPage, takeStatue, carriedSupply, testJump, fastForward, createControl, createRecommended, longHaulGoals, longHaulHint, difficultyOptions, setDifficulty, dangerRating, pinnedGoal, tick, weight, capacity, roomFor, quantity, available, nearby, reachableObject, containers, unreadClueAt, nearbyClues, readClue, collect, collectAll, use, drop,
     canStore, stash, isSupplyCache, nearbySupplyCache, canCarryCache, collectSupplyCache, canCarryBundle, isSpoiled, freshMinutes, healTime,
     canBelt, beltItem, setBelt, useBelt, activeLight, replaceBattery, sight, canSee,
     craft, recipeProblem, repairAmount, canMend, wornItem, place, contextual, door, canUnlock, canUnlatch, breach, breachProblem, barricade, unboard, isBarrier, removeBarrier, recruit, target, walkTo, approach, shove, attack,

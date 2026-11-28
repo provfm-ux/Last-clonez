@@ -471,6 +471,26 @@
     $("rules-btn").focus();
   }
 
+  // An imported save opens paused (the dialog stops the simulation) with where, when and how the survivor is.
+  function importSummary() {
+    const p = state.player, region = Regions.definitions[state.world.region].name, wounds = p.wounds.filter(w => !w.bandaged).length;
+    const near = Sim.threats(state).length, goal = Sim.pinnedGoal(state);
+    show("Save imported", "<p>" + esc(region) + " · Day " + day() + " · " + String(Math.floor(state.minutes % 1440 / 60)).padStart(2, "0") + ":" + String(Math.floor(state.minutes % 60)).padStart(2, "0") + "</p>" +
+      "<p>Health " + Math.ceil(p.hp) + " · " + (wounds ? wounds + (wounds === 1 ? " open wound" : " open wounds") : "no open wounds") +
+      (p.fracture > 0 ? " · broken leg" : "") + (near ? " · " + near + (near === 1 ? " infected" : " infected") + " close by" : "") + "</p>" +
+      (typeof goal === "string" ? "<p>" + esc(goal) + "</p>" : "") +
+      "<p>The game is paused. Nothing moves until you resume.</p>" + button("Resume", "resume", false, "primary"), "import-summary");
+  }
+
+  // Continue says what it will do: a survivor who died shows the summary, a living one resumes.
+  function continueLabel() {
+    let dead = false;
+    try { dead = JSON.parse(read(storageKey) || savedText || "null")?.mode === "dead"; } catch {}
+    const btn = $("continue-btn");
+    btn.innerHTML = '<svg class="icon"><use href="#play"/></svg> ' + (dead ? "View summary" : "Continue") + ' <svg class="icon end-icon"><use href="#arrow"/></svg>';
+    btn.title = dead ? "Your last survivor died. See the summary, or start a new game below." : "Resume your saved game.";
+  }
+
   function resumeSaved() {
     try {
       const primary = read(storageKey) || savedText;
@@ -546,6 +566,7 @@
     requestAnimationFrame(() => { if (!$("hero").hidden && !dialog.open) ($("continue-btn").hidden ? $("story-btn") : $("continue-btn")).focus({preventScroll:true}); }); // game-ui-ux: focus the primary action
     $("intro-btn").textContent = read(introKey) ? "Replay introduction" : "Beginner introduction";
     $("continue-btn").hidden = !savedText && !read(backupKey);
+    continueLabel();
     if (state.controlStart) $("start-point").value = state.controlStart;
     $("difficulty").value = state.difficulty;
     if (state.difficulty === "custom") customRules = state.rules;
@@ -1753,9 +1774,11 @@
         o.latched ? "The latch is on the inside. Use a crowbar or break the glass from outside." : "";
       show(o.name, "<p>" + condition + " · " + o.boards + " extra planks · Strength " + Math.round(o.hp) +
         "</p>" + (explanation ? "<p>" + explanation + "</p>" : "") +
+        (window && (o.open || broken) && !o.boards ? "<p>The window is open: climb through it, or walk straight through the gap.</p>" : "") +
         (force ? "<p>Breaking glass is loud. An equipped melee weapon keeps your hands clear of the glass.</p>" : "") +
         (feedback ? '<p class="bag-feedback" role="status">' + esc(feedback) + "</p>" : "") +
         '<div class="item-actions">' + (o.kind === "fence" || broken ? "" : button(o.open ? "Close" : o.locked ? "Unlock with key" : o.latched ? "Unlatch" : "Open", "door-" + id, blocked, "primary")) +
+        (window && (o.open || broken) && !o.boards ? button("Climb through", "climb-" + id, false, "primary") : "") +
         (pry ? button("Pry with crowbar", "pry-" + id, Boolean(Sim.breachProblem(state, o, "pry"))) : "") +
         (force ? button("Smash glass", "smash-" + id, Boolean(Sim.breachProblem(state, o, "smash")), "danger") : "") +
         (Sim.canListen(state,o) ? button("Listen", "listen-" + id) : "") +
@@ -1946,7 +1969,13 @@
     else if (choices.length) interactions(choices, talk);
     else if (talk) npcPanel();
     else if (Sim.inspectTrack(state)) { save(); updateHud(); }
-    else bag("nearby");
+    else {
+      // Nothing in reach: point at the closest thing a step or two away instead of opening an empty Nearby list.
+      const far = !Sim.containers(state).length && state.world.objects.filter(o => o.active && o.action && o.action !== "harvest" && !o.decor &&
+        Sim.distance(state.player, o) < 2.8).sort((a, b) => Sim.distance(state.player, a) - Sim.distance(state.player, b))[0];
+      if (far) { Sim.notify(state, "Move closer to the " + (far.action === "door" ? far.kind : far.name.toLowerCase()) + "."); updateHud(); }
+      else bag("nearby");
+    }
   }
 
   function strike(enemy = Sim.attackTarget(state)) {
@@ -2313,6 +2342,11 @@
         updateHud();
         return;
       }
+      if (kind === "climb" && dialogView === "object-" + index) {
+        if (Sim.climbThrough(state, o)) { save(); close(); updateHud(); }
+        else objectPanel(o, state.notice?.text ?? "");
+        return;
+      }
       if (["pry", "smash", "door"].includes(kind) && dialogView === "object-" + index && Sim.reachableObject(state, o)) {
         const before = state.notice;
         const changed = kind === "door" ? Sim.door(state, o) : Sim.breach(state, o, kind);
@@ -2376,6 +2410,7 @@
       activate(restored);
       save();
       Sim.notify(state, "Save imported.");
+      importSummary();
     } catch (error) { show("Import rejected", "<p>" + esc(error.message) + "</p><p>Your current game is still open.</p>", "save"); }
     event.target.value = "";
   });
@@ -2697,6 +2732,7 @@
   $("intro-btn").textContent = read(introKey) ? "Replay introduction" : "Beginner introduction";
   const canResume = Boolean(savedText || read(backupKey));
   $("continue-btn").hidden = !canResume;
+  continueLabel();
   const startPoint = $("start-point");
   startPoint.innerHTML = Object.entries(Data.control.starts).map(([id, point]) => '<option value="' + id + '">' + esc(point.name) + "</option>").join("");
   startPoint.value = "shelter";

@@ -2889,6 +2889,8 @@ const View = (() => {
             }
             else if (hasHarvest(o)) label = "Harvest " + Data.crops[o.garden.crop].name.toLowerCase();
             else if (o.kind === "garden" && o.garden.crop && o.garden.moisture < Data.garden.minMoisture) label = "Garden · Needs water";
+            else if (o.action === "campaign-page" && !o.read) label += " · Story";
+            else if (["eva-diary", "vic-diary", "grotto-plate", "westfields-ledger", "ai-terminal"].includes(o.action) && !o.read) label += " · Story";
             else if (hasCache(o)) label += " · Cache";
             else if (hasNote(o)) label += " · Note";
             objectLabels.push({...marker(o.x,o.y,["locker","fridge","exit"].includes(o.kind)?47:34,label), object:o});

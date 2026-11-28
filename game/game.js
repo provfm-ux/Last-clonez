@@ -496,7 +496,7 @@
     const left = Math.max(0, A.prompts - chat.used);
     show("Assistant terminal", lines + (chat.done ? '<p>The terminal is quiet.</p>' + button("Back", "resume") :
       '<p>' + (waiting ? "Out of tokens. Try again in " + Math.ceil((chat.until - Date.now()) / 60000) + " min." : "Prompts left: " + left) + '</p>' +
-      '<form id="ai-form"><input id="ai-input" maxlength="200" autocomplete="off" aria-label="Prompt"> <button class="primary" type="submit">Send</button></form>' + button("Back away", "resume")), "ai-chat");
+      '<form id="ai-form" class="ai-form"><input id="ai-input" maxlength="200" autocomplete="off" aria-label="Prompt" placeholder="Type a prompt"><button class="small-button primary" type="submit"' + (waiting ? " disabled" : "") + '>Send</button></form>' + button("Back away", "resume")), "ai-chat");
     $("ai-input")?.focus();
   }
 
@@ -631,7 +631,11 @@
     return list;
   }
 
-  const taskTarget = o => o && (o.action === "travel" || Sim.isSupplyCache(state, o) || Sim.unreadClueAt(state, o) || o.action === "radio" && state.supplyRun === "return" ||
+  // Campaign story objects come first under Use, ahead of world notes and loot, until they are done.
+  const storyActions = new Set(["campaign-page", "eva-diary", "cinema-statue", "cinema-note", "grotto-plate", "westfields-ledger", "vic-diary", "ai-terminal"]);
+  const storyTarget = o => Boolean(o && storyActions.has(o.action) && o.active !== false &&
+    (o.action === "ai-terminal" ? !state.campaign?.chat.done : o.action === "cinema-statue" ? o.active : !o.read));
+  const taskTarget = o => o && (storyTarget(o) || o.action === "travel" || Sim.isSupplyCache(state, o) || Sim.unreadClueAt(state, o) || o.action === "radio" && state.supplyRun === "return" ||
     Chronicle.isUnseen(state.ledger,o) && !Sim.sceneProblem(state,o) || Sim.unreadNote(o) ||
     o.action === "garden" || o.action === "campfire" && Sim.fireBatch(state, o));
   const nearbyExit = () => Sim.nearby(state).find(o => o.action === "travel");
@@ -640,6 +644,7 @@
     const rank = o => {
       if (o.action === "travel") return -2;
       if ((o.action === "campfire" && Sim.fireBatch(state, o)?.remaining === 0) || Sim.gardenYield(state, o)) return -1;
+      if (storyTarget(o)) return -.8;
       if (taskTarget(o)) return -.5;
       return o.action === "loot" && (o.loot.length || Sim.unreadClueAt(state, o)) ? 0 :
         o.action === "door" ? .2 : o.action === "harvest" ? 2 : .5;
@@ -681,6 +686,8 @@
   }
 
   function updateHud() {
+    const mapName = $("map-card-name"), regionName = Regions.definitions[state.world.region].name.toUpperCase();
+    if (mapName && mapName.textContent !== regionName) mapName.textContent = regionName;
     state.hideNavigation = navigation === "discover";
     $("map-btn").hidden = state.hideNavigation;
     $("map-card").hidden = state.hideNavigation;

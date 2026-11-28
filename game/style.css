@@ -571,6 +571,9 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 .map-pin-row .item-actions { flex:none; margin:0; }
 .pin-form { display:grid; gap:7px; margin:10px 0; padding:9px; border:1px solid #5e6a4e; border-radius:5px; }
 .pin-form label { font:650 11px var(--sans); color:#c5d1bc; }
+.ai-form { display:flex; gap:8px; margin:10px 0; }
+.ai-form input { flex:1; min-width:0; min-height:40px; padding:6px 9px; border:1px solid #4a5740; border-radius:4px; background:#222c21; color:#e5dfca; font:500 14px var(--mono, monospace); }
+.ai-form button { min-height:40px; }
 .pin-form input { display:block; width:100%; min-height:34px; margin-top:5px; padding:6px 8px; border:1px solid #4a5740; border-radius:4px; background:#222c21; color:#e5dfca; }
 .waypoint-actions { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:15px; }
 @media(max-width:540px) {
@@ -786,3 +789,5 @@ dialog.wide { width:min(840px,calc(100% - 24px)); }
 .setup-group { margin:6px 0; }
 .setup-group > summary { font-weight:700; }
 #longhaul-btn { margin:6px 0 8px; }
+
+#map-card-name { font:inherit; }

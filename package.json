@@ -10,7 +10,8 @@
     "index": "node scripts/code-index.js",
     "index:check": "node scripts/code-index.js --check",
     "build": "node scripts/build.js",
-    "serve": "npx --yes serve game"
+    "serve": "npx --yes serve game",
+    "test:campaign": "node tests/campaign-e2e.js"
   },
   "engines": {
     "node": ">=20"

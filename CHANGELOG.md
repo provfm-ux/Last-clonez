@@ -1,6 +1,12 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
+- Fix (playtest): Use now picks the campaign story object first (assistant terminal, diaries, plate, ledger) instead of a nearby world note.
+- Fix (playtest): after the 18:00 tide the FatHill pier stays cut off: walking back pushes the player to the shore road again (no extra damage); the rowboat protects for the rest of that night. The tip says when the next low tide is.
+- Fix (playtest): the tip no longer sends the player to an optional area whose region is closed that day (the marina on day 21, the Ironworks station at weekends).
+- Fix (playtest): after the ending the tip talks about the fortress instead of a next story step.
+- Fix (playtest): the minimap title shows the current region instead of always Cold Vale; the assistant chat input is styled.
+- Tests: `npm run test:campaign` plays days 7 to 40 end to end in the sim with save and load after every crossing; the browser playtest has a scenario for every new challenge.
 - Campaign: Amigo 1 now follows the story order. Fight Vic first (only the Foundry maul hurts him); at half health his helmet locks and the valve tower terminal wakes; winning the chat ends the fight. Vic no longer gives an extra coordinate.
 - Campaign: an epilogue after Pip falls closes the story (the friends were the preppers, the rumour was theirs, Eva's dream) and leaves the player in the fortress.
 - Campaign: the woman on the pier now controls the infected with her violin. While her coat is on and she sees you, she calls a group of up to 4 every 45 seconds (at most 8 alive); killing them in her sight is what frightens her. Called infected carry no supplies.

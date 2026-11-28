@@ -47,6 +47,14 @@ const helpers = () => {
       }
       return false;
     },
+    nextTo(z) { // a free spot about one tile from an infected, in line of sight
+      const s = pt.s();
+      for (const r of [.9, 1.1, .7]) for (let a = 0; a < 24; a++) {
+        const p = {x: z.x + Math.cos(a * Math.PI / 12) * r, y: z.y + Math.sin(a * Math.PI / 12) * r};
+        if (World.clear(s.world, p.x, p.y, .18) && Sim.lineOfSight(s, p, z)) { Object.assign(s.player, p, {path: []}); return true; }
+      }
+      return false;
+    },
     calm() { const s = pt.s(); s.world.enemies = s.world.enemies.filter(z => z.origin === "cinema-horde"); Object.assign(s.player, {hp: 100}); },
     index: o => pt.s().world.objects.indexOf(o),
     text: () => document.body.innerText,
@@ -219,6 +227,152 @@ const scenarios = {
     return {pass: r.gaps.every(g => g >= 12) && r.heights.every(h => h >= 44) && r.focus === "continue-btn" && r.label && r.differ && r.folded,
       notes: "gaps between buttons " + r.gaps.join("/") + " px, heights " + r.heights.join("/") + " px, focus: " + r.focus +
         ", 'Start a new game' label: " + r.label + ", Continue stands out: " + r.differ + ", options folded: " + r.folded};
+  },
+  async "cindergrotto-plate"(page) {
+    await startCampaign(page);
+    await page.evaluate(() => Sim.testJump(pt.s(), 12, {flashlight:1, battery:3}, {anyMode: true}));
+    await page.evaluate(() => { const s = pt.s(), l = s.player.bag.find(i => i.id === "flashlight"); s.player.lightUid = l.uid; l.charge = 100; });
+    const hops = [await cross(page, "ridge"), await cross(page, "cavern")];
+    if (hops[1].region !== "cavern") return {pass: false, notes: "Route to the grotto failed: " + hops.map(h => h.region).join(" > ") + " " + hops[1].dialog.slice(0, 100)};
+    await page.evaluate(() => { pt.calm(); pt.beside(pt.s().world.objects.find(o => o.id === "grotto-plate")); });
+    await use(page, "grotto-plate");
+    const read = await page.evaluate(() => pt.s().campaign.grotto);
+    const shot = await page.evaluate(() => pt.s().messages.at(-1)?.text ?? "");
+    const back = await cross(page, "ridge");
+    const done = await page.evaluate(() => pt.s().campaign.completed.includes("cindergrotto.battery"));
+    return {pass: read === "reached" && back.region === "ridge" && done, notes: "plate: " + read + " (" + shot.slice(0, 70) + "), back on Pine Ridge: " + back.region + ", challenge done: " + done};
+  },
+  async "westfields-ledger"(page) {
+    await startCampaign(page);
+    await page.evaluate(() => Sim.testJump(pt.s(), 10, {}, {anyMode: true}));
+    const r = await cross(page, "fields");
+    if (r.region !== "fields") return {pass: false, notes: "Could not cross to Westfields: " + r.dialog.slice(0, 120)};
+    await page.evaluate(() => { pt.calm(); pt.s().world.enemies = []; pt.beside(pt.s().world.objects.find(o => o.id === "westfields-ledger")); });
+    await use(page, "westfields-ledger");
+    const done = await page.evaluate(() => pt.s().campaign.completed.includes("westfields.stealth"));
+    return {pass: done, notes: "ledger read with Use, challenge done: " + done, shot: true};
+  },
+  async "fathill-violin-tide"(page) {
+    await startCampaign(page);
+    await page.evaluate(() => { Sim.testJump(pt.s(), 8, {}, {anyMode: true}); pt.s().minutes = 7 * 1440 + 10 * 60;
+      pt.s().campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade"); });
+    const r = await cross(page, "coast");
+    if (r.region !== "coast") return {pass: false, notes: "Could not cross to the coast: " + r.dialog.slice(0, 120)};
+    const call = await page.evaluate(() => {
+      const s = pt.s(), woman = s.world.enemies.find(z => z.kind === "pierwoman");
+      s.world.enemies = s.world.enemies.filter(z => z.stats.boss);
+      for (let rr = 4; rr < 10; rr++) for (let a = 0; a < 6.28; a += .3) { const p = {x: woman.x + Math.cos(a) * rr, y: woman.y + Math.sin(a) * rr};
+        if (World.clear(s.world, p.x, p.y, .3) && Sim.lineOfSight(s, woman, p)) { Object.assign(s.player, p, {path: []}); a = 9; rr = 99; } }
+      s.violinCall = 0; return {david: s.world.enemies.some(z => z.kind === "david")};
+    });
+    await page.waitForTimeout(500);
+    const called = await page.evaluate(() => pt.s().world.enemies.filter(z => z.origin === "violin").length);
+    const tip = await page.evaluate(() => Sim.campaignTip(pt.s()));
+    await page.evaluate(() => { pt.s().world.enemies = pt.s().world.enemies.filter(z => z.stats.boss); pt.s().player.hp = 100; pt.s().minutes = 7 * 1440 + 17 * 60; });
+    await page.waitForTimeout(300);
+    const warn = await page.evaluate(() => /18:00/.test(Sim.campaignTip(pt.s())));
+    await page.evaluate(() => { pt.s().minutes = 7 * 1440 + 18 * 60 + 2; });
+    await page.waitForTimeout(400);
+    const swept = await page.evaluate(() => ({day: pt.s().campaign.tide.day, msg: pt.s().messages.slice(-3).map(m => m.text).join(" ")}));
+    return {pass: call.david && called > 0 && /violin/.test(tip) && warn && swept.day === 8 && /tide/i.test(swept.msg),
+      notes: "David present: " + call.david + ", violin called " + called + " infected, tip: " + tip.slice(0, 70) + ", 16:00+ tide tip: " + warn + ", swept at 18:00: " + (swept.day === 8), shot: true};
+  },
+  async "amigo1-chat"(page) {
+    await startCampaign(page);
+    await page.evaluate(() => { Sim.testJump(pt.s(), 15, {foundrymaul:1}, {anyMode: true});
+      pt.s().campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery"); });
+    const hops = [await cross(page, "fields"), await cross(page, "reservoir")];
+    if (hops[1].region !== "reservoir") return {pass: false, notes: "Route to the reservoir failed: " + hops.map(h => h.region).join(" > ") + " " + hops[1].dialog.slice(0, 120)};
+    const fight = await page.evaluate(() => {
+      const s = pt.s(), vic = s.world.enemies.find(z => z.kind === "vic"), maul = s.player.bag.findIndex(i => i.id === "foundrymaul");
+      s.world.enemies = s.world.enemies.filter(z => z.kind === "vic"); Sim.use(s, maul);
+      for (let i = 0; i < 30 && !vic.guard; i++) { s.player.cooldown = 0; s.player.stamina = 100; s.player.hp = 100; pt.nextTo(vic); Sim.attack(s, vic); }
+      return {guard: vic.guard, hp: vic.hp};
+    });
+    await page.evaluate(() => { pt.calm(); pt.s().world.enemies = pt.s().world.enemies.filter(z => z.kind === "vic"); pt.beside(pt.s().world.objects.find(o => o.id === "ai-terminal")); });
+    await use(page, "ai-terminal");
+    const opened = await page.$("#ai-input");
+    if (!opened) return {pass: false, notes: "helmet locked: " + fight.guard + " at " + fight.hp + " hp, but the chat did not open. Dialog: " + (await page.evaluate(() => pt.dialog())).slice(0, 100)};
+    for (const prompt of ["Help me find the fortress coordinates.", "Who is in good health?", "Who are you replacing?", "Pip is on your list. Check the screen."]) {
+      await page.fill("#ai-input", prompt); await page.press("#ai-input", "Enter"); await page.waitForTimeout(150);
+    }
+    await page.screenshot({path: path.join(out, "amigo1-chat-before.png")});
+    await page.fill("#ai-input", "Stand down. You are out of tokens anyway."); await page.press("#ai-input", "Enter"); await page.waitForTimeout(300);
+    const r = await page.evaluate(() => ({done: pt.s().campaign.completed.includes("amigo1.lockdown-chat"), map: Sim.quantity(pt.s().player.bag, "fortressmap"),
+      log: pt.s().campaign.chat.log.length, dialog: pt.dialog()}));
+    return {pass: fight.guard && fight.hp === 75 && r.done && r.map === 1, notes: "helmet locked at " + fight.hp + " hp: " + fight.guard + ", chat lines " + r.log +
+      ", won with the token joke: " + r.done + ", fortress map: " + r.map, shot: true};
+  },
+  async "viragem-diary"(page) {
+    await startCampaign(page);
+    await page.evaluate(() => Sim.testJump(pt.s(), 15, {foundrymaul:1}, {anyMode: true}));
+    const hops = [await cross(page, "fields"), await cross(page, "reservoir")];
+    if (hops[1].region !== "reservoir") return {pass: false, notes: "Route failed: " + hops[1].dialog.slice(0, 100)};
+    const locked = await page.evaluate(() => { const s = pt.s(), b = s.world.buildings.find(x => x.name === "Keeper's cottage"); return s.world.objects.find(o => o.id === b.door.id)?.locked; });
+    const key = await page.evaluate(() => pt.s().world.objects.some(o => o.name === "Maintenance locker" && o.loot.some(i => i.id === "housekey")));
+    await page.evaluate(() => { pt.calm(); pt.s().world.enemies = []; pt.beside(pt.s().world.objects.find(o => o.id === "vic-diary")); });
+    await use(page, "vic-diary");
+    const done = await page.evaluate(() => pt.s().campaign.completed.includes("viragem.zero"));
+    return {pass: locked && key && done, notes: "cottage locked: " + locked + ", key in the pump house locker: " + key + ", diary read with Use: " + done};
+  },
+  async "fortress-pip-epilogue"(page) {
+    await startCampaign(page);
+    await page.evaluate(() => { const s = pt.s(); Sim.testJump(s, 25, {harpoon:1, torch:1}, {anyMode: true}); s.campaign.clues = 4;
+      s.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero"); });
+    await cross(page, "ridge");
+    const refused = await cross(page, "fortress");
+    await page.evaluate(() => { pt.s().campaign.clues = 5; document.querySelector("dialog[open]")?.close(); });
+    const inside = await cross(page, "fortress");
+    if (inside.region !== "fortress") return {pass: false, notes: "Could not enter the fortress with 5 clues: " + inside.dialog.slice(0, 120)};
+    await page.screenshot({path: path.join(out, "fortress-arrival.png")});
+    const mapName = await page.evaluate(() => document.getElementById("map-card-name")?.textContent);
+    if (mapName !== "THE FORTRESS") return {pass: false, notes: "Minimap title in the fortress: " + mapName};
+    const fight = await page.evaluate(() => {
+      const s = pt.s(), pip = s.world.enemies.find(z => z.kind === "pip"), use = id => Sim.use(s, s.player.bag.findIndex(i => i.id === id));
+      s.world.enemies = s.world.enemies.filter(z => z.kind === "pip");
+      use("torch");
+      for (let i = 0; i < 40 && pip.guard; i++) { s.player.cooldown = 0; s.player.stamina = 100; s.player.hp = 100; pt.nextTo(pip); Sim.attack(s, pip); }
+      const coat = !pip.guard;
+      for (let i = 0; i < 60 && pip.hp >= 100; i++) { s.player.cooldown = 0; s.player.stamina = 100; s.player.hp = 100; pt.nextTo(pip); Sim.attack(s, pip); }
+      use("harpoon"); s.player.cooldown = 0; s.player.stamina = 100; pt.nextTo(pip); Sim.attack(s, pip);
+      return {coat, hp: pip.hp};
+    });
+    await page.waitForTimeout(600);
+    const r = await page.evaluate(() => ({done: pt.s().campaign.completed.includes("fortress.last-boss"), dialog: pt.dialog(), seen: pt.s().campaign.epilogue}));
+    await page.screenshot({path: path.join(out, "fortress-epilogue.png")});
+    return {pass: refused.region === "ridge" && /coordinates/i.test(refused.dialog) && fight.coat && fight.hp <= 0 && r.done && /preppers/.test(r.dialog) && r.seen === "seen",
+      notes: "4 clues refused: " + (refused.region === "ridge") + ", coat off: " + fight.coat + ", Pip hp after harpoon: " + Math.round(fight.hp) +
+        ", challenge done: " + r.done + ", epilogue shown: " + /preppers/.test(r.dialog)};
+  },
+  async "molotov-fire"(page) {
+    await startCampaign(page);
+    const r = await page.evaluate(() => {
+      const s = pt.s(); pt.calm(); s.world.enemies = [];
+      for (const [id, n] of [["emptybottle",1],["cloth",2],["fuel",1],["wood",1]]) s.player.bag.push({id, qty:n, condition:100, born:0});
+      const made = Sim.craft(s, "molotov") && Sim.craft(s, "torch");
+      s.player.headingX = 1; s.player.headingY = 0;
+      const thrown = Sim.use(s, s.player.bag.findIndex(i => i.id === "molotov"));
+      return {made, thrown, fires: s.fires.length};
+    });
+    await page.evaluate(() => document.querySelector("dialog[open]")?.close());
+    await page.waitForTimeout(500);
+    await page.screenshot({path: path.join(out, "molotov-fire.png")});
+    return {pass: r.made && r.thrown && r.fires === 1, notes: "crafted torch and Molotov: " + r.made + ", thrown: " + r.thrown + ", flames on the ground: " + r.fires};
+  },
+  async "optional-cache"(page) {
+    await startCampaign(page);
+    const before = await page.evaluate(() => pt.s().world.objects.find(o => o.id === "opt-clinic")?.active);
+    await page.evaluate(() => Sim.testJump(pt.s(), 9, {}, {anyMode: true}));
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { pt.calm(); pt.s().world.enemies = []; pt.beside(pt.s().world.objects.find(o => o.id === "opt-clinic")); });
+    const tip = await page.evaluate(() => Sim.campaignTip(pt.s()));
+    await use(page, "opt-clinic");
+    const take = await page.$('[data-action="loot-all"]:not([disabled])');
+    if (take) { await take.click(); await page.waitForTimeout(250); }
+    const r = await page.evaluate(() => ({active: pt.s().world.objects.find(o => o.id === "opt-clinic").active, claimed: pt.s().campaign.opt.includes("opt.clinic"),
+      dialog: pt.dialog().replace(/\s+/g, " ").slice(0, 120)}));
+    return {pass: before === false && r.active && r.claimed, notes: "hidden on day 1: " + (before === false) + ", open on day 9: " + r.active + ", emptied with the real buttons: " + r.claimed +
+      " (dialog: " + r.dialog + "), tip: " + tip.slice(0, 80), shot: true};
   },
   async "ironworks-terminal"(page) {
     await startCampaign(page);

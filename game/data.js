@@ -273,6 +273,7 @@ const Data = (() => {
     violinCall:"On the pier the woman lifts her violin. The notes carry over the water, and the infected along the shore turn towards you.",
     tideTurning:"The water is creeping up the shingle. The tide comes in at 18:00.",
     tideSwept:"The tide comes in fast. It drags you back up the beach, soaked and bruised. FatHill waits for the next low tide.",
+    tideBack:"The water is too deep. The tide pushes you back to the shore road.",
     tideBoat:"The tide comes in. You hold on in the rowboat until the water settles. The boat is done after this.",
     schoolNoise:"The pile of chairs comes down with a crash that rings round the empty classrooms. Something outside heard it.",
     aiNone:"The terminal is dark. It only answers at the valve tower.",
@@ -349,7 +350,7 @@ const Data = (() => {
       "fortress.last-boss":{go:"You have all five coordinates. Follow the arrow through Pine Ridge to the fortress road. Find the harpoon in the keep armoury: it finishes Pip below 100 hp. Bring fire: a torch, Molotov cocktails or a campfire, and a good weapon.", coat:"Beat Pip down until his coat comes apart. Hit hard and keep your distance from the escort.", fire:"His coat is off. Fire hurts him and keeps burning: hit him with a torch, throw a Molotov at his feet, or lead him to a fire.", done:"The fortress is yours. Garden, cook, collect water and kill at your pace."},
       "viragem.zero":{go:"Follow the arrow to Greywater Reservoir, past Westfields. The diary is in the locked keeper's cottage: look for the key in the pump house.", read:"Read Vic's diary in the keeper's cottage. Days 15 to 18 only."},
       "amigo1.lockdown-chat":{go:"Follow the arrow to Greywater Reservoir, past Westfields. Carry the Foundry maul from the Ironworks.", hit:"Find Vic near the valve tower and fight him with the Foundry maul. Halfway down, his helmet locks: then the terminal opens.", chat:"Go up the valve tower and talk to the terminal. Five prompts: make the last one count, and use a joke the machine cannot ignore.", wait:"The assistant is out of tokens. Survive the infected it called until it comes back, then try the last prompt again."},
-      "fathill.bosses":{go:"Follow the arrow to Bracken Coast. The road is open on low-tide days (even days), from 06:00 to 18:00.", tide:"The tide comes in at 18:00. Finish or get out, unless you carry the rowboat from the marina. ", fear:"Her violin calls infected to you: kill them where the woman on the pier can see. Her fear is {n} of {max}. The violin is in the net shed.", david:"Wear David's guard down, then shove his vest off.", violin:"Play the violin near David, then strike while he stands there."},
+      "fathill.bosses":{go:"Follow the arrow to Bracken Coast. The road is open on low-tide days (even days), from 06:00 to 18:00.", tide:"The tide comes in at 18:00. Finish or get out, unless you carry the rowboat from the marina. ", tideIn:"The tide is in and the pier is cut off. Come back on day {day} from 06:00, or bring the rowboat from the marina.", fear:"Her violin calls infected to you: kill them where the woman on the pier can see. Her fear is {n} of {max}. The violin is in the net shed.", david:"Wear David's guard down, then shove his vest off.", violin:"Play the violin near David, then strike while he stands there."},
       "westfields.stealth":{go:"Follow the arrow to Westfields. Keep your knife and your footsteps quiet.", sneak:"Sneak west to the Orchard farmhouse and read the ledger. Do not fight: noise calls hordes.", noisy:"You made noise. Hide until the infected lose you, then read the ledger in the Orchard farmhouse."},
       "cindergrotto.battery":{go:"Follow the arrow to Pine Ridge and take the survey tunnel. You need a flashlight with batteries.", plate:"Find the surveyor's plate in the far survey room. Watch your flashlight battery.", out:"You have the plate. Climb back out to Pine Ridge before the light dies."}
     }
@@ -400,7 +401,7 @@ const Data = (() => {
   // Fire (torch, Molotov, flames on the ground): burn damage per second, how long a lit infected keeps burning, ground flames.
   const fireRules = {range:5, radius:1.9, seconds:12, burnPerSecond:9, torchSeconds:3, noise:7};
   const pipFight = {finishBelow:100, guardDamage:120, fireRange:2.6, fireMult:2.5, burnPerSecond:7, escort:8};
-  const fatHill = {callEvery:45, callSize:4, callCap:8, callRange:20, tideWarn:16, tideHour:18, tideHurt:15, fearKills:10, fearSight:18, guardDamage:450, lureSeconds:22, luredDamage:2, playRange:22};
+  const fatHill = {tideReach:12, tideAgain:2, callEvery:45, callSize:4, callCap:8, callRange:20, tideWarn:16, tideHour:18, tideHurt:15, fearKills:10, fearSight:18, guardDamage:450, lureSeconds:22, luredDamage:2, playRange:22};
   const cinemaPatrol = [[13.5,8.5],[19.5,12.5],[14.5,17.5],[7.5,12.5],[12.5,10.5]];
   const cinemaTrap = {horde:50, tensionEvery:6, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
   const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],

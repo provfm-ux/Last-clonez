@@ -492,6 +492,30 @@ const scenarios = {
     await page.screenshot({path: path.join(out, "xray-outline.png"), clip: {x: 270, y: 240, width: 340, height: 240}});
     return {pass: ok, notes: "player placed behind a wall: " + ok + " (see xray-outline.png)"};
   },
+  async "grab-escape"(page) { // a walker grabs; the real Shove button frees the survivor and opens a counter
+    await startCampaign(page);
+    const grabbed = await page.evaluate(() => { const s = pt.s(); pt.calm(); s.world.enemies = []; s.player.grabCool = 0;
+      const z = World.infected(s.world, "qa-grabber", s.player.x + .7, s.player.y, "walkers", Level.seeded(4)); Object.assign(z, {alert: 30, dormant: false});
+      s.world.enemies.push(z); const keep = s.world.rng; s.world.rng = () => 0;
+      Object.assign(z, {windup: .01, windupTarget: "player"}); Sim.tick(s, .033, {x: 0, y: 0}); s.world.rng = keep;
+      return s.player.grabbed > 0; });
+    await page.waitForTimeout(400);
+    await page.screenshot({path: path.join(out, "grab.png"), clip: {x: 270, y: 200, width: 360, height: 300}});
+    await page.click("#shove-btn");
+    await page.waitForTimeout(150);
+    const r = await page.evaluate(() => { const s = pt.s(), z = s.world.enemies.find(e => e.id === "qa-grabber"); return {free: !(s.player.grabbed > 0), exposed: (z?.exposed ?? 0) > s.elapsed, hp: s.player.hp}; });
+    return {pass: grabbed && r.free && r.exposed && r.hp === 100, notes: "grabbed: " + grabbed + ", Shove freed: " + r.free + ", counter window open: " + r.exposed + ", health " + r.hp + " (see grab.png)"};
+  },
+  async "random-find"(page) { // a seeded random find opens with Use and tells its little story
+    await startCampaign(page);
+    const id = await page.evaluate(() => { pt.calm(); pt.s().world.enemies = []; const f = pt.s().world.objects.filter(o => o.id.startsWith("find-")).find(o => pt.beside(o)); return f?.id; });
+    if (!id) return {pass: false, notes: "No reachable random find"};
+    await use(page, id);
+    const take = await page.$('[data-action="loot-all"]:not([disabled])');
+    if (take) { await take.click(); await page.waitForTimeout(300); }
+    const r = await page.evaluate(id => { const o = pt.s().world.objects.find(x => x.id === id); return {name: o.name, story: o.storyRead, msg: pt.s().messages.slice(-3).map(m => m.text).join(" | ")}; }, id);
+    return {pass: Boolean(take) && r.story, notes: r.name + ": " + r.msg.slice(0, 180)};
+  },
   async "ironworks-terminal"(page) {
     await startCampaign(page);
     await page.evaluate(() => Sim.testJump(pt.s(), 6, {}, {anyMode: true}));

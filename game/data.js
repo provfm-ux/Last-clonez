@@ -424,6 +424,29 @@ const Data = (() => {
     "opt.station":{region:"ironworks", place:"the freight depot at the Ironworks", cache:"Wagon toolbox", building:"Freight depot", loot:{battery:5, flashlight:1}, guards:2},
     "opt.harvest":{region:"fields", place:"the hay barn in Westfields", cache:"Harvest sacks", building:"Hay barn", loot:{fresh:6, potato:4, radish:4, food:3}, guards:0}
   };
+  // Random finds: a few seeded containers per region, each a different little story. Loot is rolled by tier.
+  const randomFinds = {
+    perRegion:[3, 5], tiers:[["common", .68], ["uncommon", .26], ["rare", .06]],
+    loot:{
+      common:[["food",1,2],["water",1,2],["bandage",1,2],["cloth",1,3],["tape",1,2],["battery",1,2],["nails",4,8],["scrap",1,3],["wood",1,2],["cannedbeans",1,2],["berries",2,4]],
+      uncommon:[["painkiller",1,2],["disinfectant",1,1],["flashlight",1,1],["raincoat",1,1],["emptybottle",1,2],["fuel",1,1],["ammo",3,6],["radishseed",2,3],["splint",1,1],["tape",2,3]],
+      rare:[["machete",1,1],["crowbar",1,1],["pistol",1,1],["wintercoat",1,1],["sleepingbag",1,1],["backpack",1,1]]
+    },
+    kinds:[
+      {name:"Abandoned backpack", kind:"crate", stories:["A name tag on the strap: ‘If found, I went north.’", "The zip is broken. Someone packed in a hurry and never came back for it.", "A school timetable is folded in the front pocket. Tuesday is circled."]},
+      {name:"Dropped holdall", kind:"crate", stories:["Gym kit, a towel and a list: ‘Mum’s pills, charger, water’. Only the first is crossed out.", "The handle is snapped clean. Whoever carried it ran."]},
+      {name:"Cool box", kind:"crate", stories:["The ice melted long ago. A note on the lid: ‘Picnic cancelled. Sorry, kids.’", "Fishing flies stuck in the foam lid, sorted by colour."]},
+      {name:"Courier's satchel", kind:"crate", stories:["Undelivered parcels. One is addressed to the Night Reel cinema.", "A delivery sheet signed by nobody, for forty houses in a row."]},
+      {name:"Overturned trolley", kind:"crate", stories:["Someone made it this far from the shop and no further.", "The receipt is longer than the trolley. Tins, water and a birthday candle."]},
+      {name:"Hiker's stash", kind:"crate", stories:["Wrapped in a bin bag under a rock. A map with an X drawn over Pine Ridge.", "A hiker's notebook: ‘Day 4. Quiet. Too quiet to sleep.’"]},
+      {name:"Child's school bag", kind:"crate", stories:["A drawing of a house with a red door and five stick people. One is crossed out.", "Spelling homework: shelter, water, brave."]}
+    ]
+  };
+  // Grabs: an infected that lands a hit may hold on. Break free before biteAt (seconds) by shoving, by attacking (each swing
+  // struggles `struggle` seconds off the hold) or by pulling away (moving struggles at `pull` x time); a freed infected is
+  // staggered and open to a counter (x counterMult damage for `counter` s). Held too long, it bites (x biteDamage, bite wound likelier).
+  const grab = {pushThrough:.45, chance:{walker:.32, runner:.15, brute:.4}, hold:2.6, assistHold:1.3, biteAt:1.9, struggle:.6, pull:.6, counter:1.6, counterMult:1.5,
+    biteDamage:1.4, biteWound:3, stagger:1.1, cool:3};
   // Shelter radio repair (external QA): what it needs, why, and where to look. Same amounts as the radio action in sim.js.
   const radioNeeds = [
     {id:"part", qty:2, why:"replace the burnt-out radio board", where:"the drawer marked MISC in the workshop, or the police station"},
@@ -696,6 +719,6 @@ const Data = (() => {
       text:"Good to hear your voice. Keep the supplies. I’d put you on the rota, but the pigeon ate the corner with your name on it."
     }
   };
-  return {radioNeeds,camping,epilogue,optionalAreas,fireRules,pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
+  return {randomFinds,grab,radioNeeds,camping,epilogue,optionalAreas,fireRules,pipFight,aiChat,campaignTips,fatHill,items,recipes,skillBooks,combatStyles,modes,modeAdvice,assistFields,pressureLevels,ruleFields,sandboxTuning,occupations,traits,traitLoadout,worldRules,legacyRules,zombieCarry,campaignText,campaignGoals,routeBudget,cinemaPatrol,cinemaTrap,pineRidge,evaDeparture,ironworks,utilities,flashlight,beltDefaults,pinKinds,maxMapPins,roles,appearances,survivorStyle,character,characterNameLimit,control,infected,outfits,skills,skillMax,skillXp,skillGroups,weaponSkills,seasons,seasonDays,fracture,
     rainCollector,waterBatch,fireRecipes,wildResources,fishingMinutes,fishingStock,garden,crops,supplyCache,story,saveVersion:1};
 })();

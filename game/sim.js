@@ -535,6 +535,7 @@ const Sim = (() => {
         CampaignHints.track(s.campaign.hints, "coldvale.houses", s.minutes);
       }
     }
+    if (region !== "cinema") placeRandomFinds(world, seed, region);
     if (difficulty === "longhaul") {
       s.longHaul = newLongHaul();
       s.waypoint = "";
@@ -939,6 +940,7 @@ const Sim = (() => {
     item.qty -= amount;
     if (!item.qty) object.loot.splice(index, 1);
     object.searched = true;
+    if (object.story && !object.storyRead) { object.storyRead = true; notify(s, object.name + ": " + object.story); }
     if (object.optional && s.campaign && !s.campaign.opt.includes(object.optional)) {
       s.campaign.opt.push(object.optional);
       if (object.optional === "opt.school") { s.atmosphere.nextWave = Math.min(s.atmosphere.nextWave, s.atmosphere.time); noise(s, object.x, object.y, 10); notify(s, Data.campaignText.schoolNoise, true); }
@@ -1917,6 +1919,36 @@ const Sim = (() => {
     if (cottage) {
       const t = spotIn(world, cottage).reverse()[0];
       if (t) world.objects.push({id:"vic-diary", x:t.x+.5, y:t.y+.5, building:cottage.id, zone:t.zone, tint:.54, kind:"record", action:"vic-diary", name:"Vic's diary", read:false, active:true, solid:false});
+    }
+  }
+
+  // Random finds: a few seeded containers per region (own rng from seed and region, fixed ids "find-<region>-<n>", placed after
+  // everything else), each with a tier-rolled loot and a one-line story told when first opened.
+  function placeRandomFinds(world, seed, region) {
+    const F = Data.randomFinds, rng = Level.seeded((seed ^ [...region].reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0, 2166136261) ^ 0x5f1d) >>> 0);
+    const count = F.perRegion[0] + Math.floor(rng() * (F.perRegion[1] - F.perRegion[0] + 1));
+    const taken = new Set(world.objects.map(o => Math.floor(o.y) * world.width + Math.floor(o.x)));
+    const pick = list => list[Math.floor(rng() * list.length) % list.length];
+    let placed = 0;
+    for (let tries = 0; tries < 400 && placed < count; tries++) {
+      const x = 3 + Math.floor(rng() * (world.width - 6)), y = 3 + Math.floor(rng() * (world.height - 6)), t = World.tileAt(world, x, y);
+      if (!t || t.solid || taken.has(y * world.width + x) || !World.clear(world, x + .5, y + .5, .35) || Math.hypot(x + .5 - world.start.x, y + .5 - world.start.y) < 6 ||
+          [...taken].some(k => Math.hypot(k % world.width - x, Math.floor(k / world.width) - y) < 1.2)) continue;
+      if (!World.route(world, world.start.x, world.start.y, x + .5, y + .5, 0, true).length) continue;
+      const roll = rng();
+      let acc = 0, tier = "common";
+      for (const [name, share] of F.tiers) { acc += share; if (roll < acc) { tier = name; break; } }
+      const loot = [];
+      const put = ([id, lo, hi]) => { if (!loot.some(i => i.id === id)) add(loot, id, lo + Math.floor(rng() * (hi - lo + 1)), id === "flashlight" ? {uid:"find-" + region + "-" + placed + "-light", charge:0} : {}); };
+      put(pick(F.loot[tier]));
+      put(pick(F.loot.common));
+      if (tier !== "common" || rng() < .5) put(pick(F.loot.common));
+      for (const item of loot) if (Data.items[item.id].damage || Data.items[item.id].slot) item.condition = 45 + Math.floor(rng() * 45);
+      const kind = pick(F.kinds);
+      world.objects.push({id:"find-" + region + "-" + placed, x:x + .5, y:y + .5, kind:kind.kind, name:kind.name, zone:t.zone, building:t.building ?? null,
+        tint:.6, action:"loot", active:true, solid:false, searched:false, loot, story:pick(kind.stories), tier});
+      taken.add(y * world.width + x);
+      placed++;
     }
   }
 
@@ -3602,13 +3634,23 @@ const Sim = (() => {
     hear(s,w.firearm ? "shot" : "strike",w.firearm ? p : z);
     const matchup = Data.combatStyles[w.combat].damage[z.kind] ?? 1;
     const amount = hit ? Math.round(w.damage * matchup * damageFactor(s) * (w.firearm ? 1 : 1 + level(s, "strength") * .03) * (item.condition < 20 ? .8 : 1)) : 0;
-    const dealt = bossDamage(s, z, amount);
+    const counter = hit && (z.exposed ?? 0) > s.elapsed;  // a freshly shaken-off infected takes a counter hit
+    const dealt = bossDamage(s, z, counter ? Math.round(amount * Data.grab.counterMult) : amount);
     z.hp = Math.max(0, z.hp - dealt);
+    if (counter) { z.exposed = 0; s.effects.push({x: z.x, y: z.y - .3, text: "COUNTER", color: "#f0d27a", life: .8, impact: .35}); }
+    if (p.grabbed > 0) {                                  // every swing while held struggles against the grip
+      p.grabbed = Math.max(0, p.grabbed - Data.grab.struggle);
+      if (!p.grabbed || z.hp <= 0) releaseGrab(s, true, z.hp <= 0 ? "" : "You fight your way free. Hit it again!");
+    }
     if (hit && Data.items[item.id]?.fire && !z.stats.boss) z.burnUntil = s.elapsed + Data.fireRules.torchSeconds;
     if (hit) {
       if (z.hp > 0) hearZombie(s,"hit",z);
       z.flash = .2;
-      if ((z.kind !== "brute" && !z.stats.boss) || matchup >= 1) {
+      // Rapid hits stop stunning: from the third hit in a row an infected may push through and finish its attack (no stun-lock).
+      z.chain = (s.elapsed - (z.chainAt ?? -9) < 1.5 ? (z.chain ?? 0) : 0) + 1; z.chainAt = s.elapsed;
+      const shrug = z.chain >= 3 && !w.firearm && s.world.rng() < Data.grab.pushThrough;
+      if (shrug) s.effects.push({x: z.x, y: z.y - .4, text: "PUSHES ON", color: "#d9a35b", life: .6});
+      if (!shrug && ((z.kind !== "brute" && !z.stats.boss) || matchup >= 1)) {
         z.stagger = Math.max(z.stagger, z.kind === "runner" && w.combat === "reach" ? .48 : .28);
         z.swing = 0;
         endWindup(z);
@@ -3653,9 +3695,56 @@ const Sim = (() => {
     const push = brute ? .18 : .6;
     if (World.clear(s.world, near.x + dx * push, near.y + dy * push)) { near.x += dx * push; near.y += dy * push; }
     s.effects.push({x: near.x, y: near.y, text: brute ? "BRACED" : "SHOVED", color: "#c9d6ae", life: .65});
-    if (p.grabbed > 0) { p.grabbed = 0; p.grabCool = 3; notify(s, "You shoved the infected away and broke free."); }
+    if (p.grabbed > 0) releaseGrab(s, true, "You shove it off and break free. Hit it now!");
     noise(s, p.x, p.y, 3);
     return true;
+  }
+
+  // The grab: track how long the infected has held on; bite at Data.grab.biteAt; let go if it dies or is pushed away.
+  function updateGrab(s, dt) {
+    const p = s.player, G = Data.grab, g = s.grab;
+    const z = g && s.world.enemies.find(e => e.id === g.id);
+    if (!g || !z || z.hp <= 0 || z.stagger > 0 || distance(z, p) > 1.7) { releaseGrab(s, false, ""); return; }
+    g.t += dt;
+    z.moving = false; z.windup = 0;
+    if (!(p.grabbed > 0)) { releaseGrab(s, true, assistHold(s) ? "You shake it off." : ""); return; }
+    if (g.t >= G.biteAt) bite(s, z);
+  }
+  const assistHold = s => assist(s, "grabs");
+
+  // Instead of a blow, an infected sometimes reaches out and grabs: no damage yet, but it bites if you do not break free.
+  function tryGrab(s, z) {
+    const p = s.player, G = Data.grab;
+    if (p.grabbed > 0 || p.grabCool > 0 || p.vehicle || z.stats.boss || p.flash > 0 || s.world.rng() >= (G.chance[z.kind] ?? G.chance.walker)) return false;
+    p.grabbed = assistHold(s) ? G.assistHold : G.hold;
+    s.grab = {id: z.id, t: 0};
+    p.resting = false; p.path = [];
+    s.effects.push({x: p.x, y: p.y, text: "GRABBED", color: "#e3a289", life: 1, impact: .4});
+    notify(s, "An infected grabs you! Shove it, hit it or pull away before it bites.", true);
+    return true;
+  }
+
+  function releaseGrab(s, broke, text) {
+    const p = s.player, G = Data.grab, z = s.grab && s.world.enemies.find(e => e.id === s.grab.id);
+    p.grabbed = 0; p.grabCool = G.cool; s.grab = null;
+    if (broke && z && z.hp > 0) {
+      z.stagger = Math.max(z.stagger, G.stagger); z.exposed = s.elapsed + G.counter; endWindup(z);
+      s.effects.push({x: z.x, y: z.y, text: "FREE", color: "#c9d6ae", life: .7});
+    }
+    if (text) notify(s, text, true);
+  }
+
+  function bite(s, z) {
+    const p = s.player, G = Data.grab;
+    const amount = z.stats.damage * infectedDamage(s) * G.biteDamage;
+    p.hp = Math.max(0, p.hp - amount); p.flash = .75; p.resting = false;
+    const infected = s.world.rng() < Math.min(.9, (s.rules.bite ?? 6) / 100 * G.biteWound);
+    if (p.wounds.length < 6) p.wounds.push({part: "arm", type: infected ? "bite" : "cut", bleed: .2, bandaged: false, clean: false, infection: 0, age: 0});
+    if (!p.hp) s.deathCause = "a " + z.stats.name.toLowerCase() + "'s bite";
+    s.effects.push({x: p.x, y: p.y, text: "BITTEN −" + Math.round(amount), color: "#e07a6a", life: 1.1, impact: .7});
+    hearZombie(s, "attack", z);
+    s.grab = null; p.grabbed = 0; p.grabCool = G.cool;
+    notify(s, infected ? "It bites down. The wound looks bad: clean and bandage it." : "It sinks its teeth in, but only tears your sleeve and skin.", true);
   }
 
   function hurt(s, z) {
@@ -3669,11 +3758,6 @@ const Sim = (() => {
       p.flash = .3;
       if (!car.hp) { exitVehicle(s, true); notify(s, "The vehicle was wrecked.", true); }
       return;
-    }
-    if (!(p.grabbed > 0) && !(p.grabCool > 0) && s.world.rng() < (z.kind === "brute" ? .5 : z.kind === "runner" ? .2 : .3)) {
-      p.grabbed = assist(s, "grabs") ? .9 : 2.2;
-      s.effects.push({x: p.x, y: p.y, text: "GRABBED", color: "#e3a289", life: 1});
-      notify(s, "An infected grabs you. Shove it or struggle free!", true);
     }
     if (z.kind === "brute" && !(p.fracture > 0) && s.world.rng() < .08) breakLeg(s, "A heavy blow breaks your leg.");
     const roll = s.world.rng(), bite = (s.rules.bite ?? 6) / 100, type = roll < bite ? "bite" : roll < bite + .4 ? "cut" : "scratch";
@@ -3808,8 +3892,9 @@ const Sim = (() => {
 
   function updatePlayer(s, dt, input) {
     const p = s.player;
-    if (p.grabbed > 0 && p.grabbed - dt <= 0) p.grabCool = 4;
+    const held = p.grabbed > 0;
     for (const key of ["cooldown", "flash", "swing", "staminaDelay", "medicine", "grabbed", "grabCool"]) p[key] = Math.max(0, (p[key] ?? 0) - dt);
+    if (held) updateGrab(s, dt);
     const manual = input.x || input.y;
     if (manual) { p.path = []; s.target = null; s.interaction = null; p.resting = false; }
     if (p.vehicle) { updateVehicle(s, dt, input); return; }
@@ -3845,7 +3930,10 @@ const Sim = (() => {
     } else p.moving = follow(s, p, speed * dt);
     const travelled = Math.hypot(p.x-startX,p.y-startY);
     if (!p.path.length) s.dash = false;
-    if (p.grabbed > 0 && p.moving) { p.grabbed = Math.max(0, p.grabbed - dt * 1.2); if (!p.grabbed) p.grabCool = 4; }
+    if (p.grabbed > 0 && p.moving) {                     // pulling away struggles the hold loose
+      p.grabbed = Math.max(0, p.grabbed - dt * Data.grab.pull);
+      if (!p.grabbed) releaseGrab(s, true, "You twist free. Hit it now!");
+    }
     if (!World.clear(s.world, p.x, p.y)) unstick(s, true);
     else if ((manual || p.path.length) && !p.moving) {
       s.stuck = (s.stuck ?? 0) + dt;
@@ -3999,7 +4087,7 @@ const Sim = (() => {
           z.swing = .18;
           hearZombie(s,"attack",z);
           if ((pending === p || canTargetEva(npc)) && distance(z, pending) < 1.15 && lineOfSight(s, z, pending)) {
-            if (pending === p) hurt(s, z);
+            if (pending === p) { if (!tryGrab(s, z)) hurt(s, z); }
             else {
               npc.hp = Math.max(0, npc.hp - z.stats.damage * infectedDamage(s));
               npc.flash = .5;
@@ -4526,7 +4614,7 @@ const Sim = (() => {
         region === "ridge" && data.mapRevision !== Regions.mapRevision && ["exit-" + Regions.cavern,"cave-gear"].includes(o.id) ||
         Chronicle.isFixture(o) && (ledgerVersion === 0 || ledgerVersion === 1 && entry?.extra || ledgerVersion < (entry?.added ?? 0)) ||
         data.fieldRevision === undefined && FieldStories.isFixture(o) || oldMap && Atmosphere.isFixture(o) ||
-        campaignFixtures.has(o.id);
+        campaignFixtures.has(o.id) || o.id.startsWith("find-");
     };
     const validTimer = (until, recipe) => Number.isFinite(until) && until > 0 && until <= data.minutes + recipe.minutes;
     const validStation = (o, original) => {

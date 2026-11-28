@@ -16,7 +16,7 @@ for (const file of files)
 let seed = 7; const random = () => (seed = seed * 16807 % 2147483647) / 2147483647;
 const context = {console, Math: Object.assign(Object.create(Math), {random}), Date, JSON, structuredClone};
 context.globalThis = context.window = context; vm.createContext(context); vm.runInContext(source, context);
-const {Sim, Data, World} = context, ctxRegions = context.Regions, ctxAtmosphere = context.Atmosphere;
+const {Sim, Data, World, Campaign} = context, ctxRegions = context.Regions, ctxAtmosphere = context.Atmosphere;
 
 let failures = 0;
 const check = (name, passed, detail = "") => { if (!passed) failures++; if (passed && quiet) return; console.log((passed ? "PASS " : "FAIL ") + name + (detail ? "  [" + detail + "]" : "")); };
@@ -2307,6 +2307,78 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("arpão: com o Pip acima de 100 hp só faz dano normal", pip.hp > 0 && pip.hp < 250 && pip.hp > 100 - 1, String(pip.hp));
   pip.hp = 99; strike();
   check("arpão: abaixo de 100 hp mata o Pip e fecha o desafio", pip.hp <= 0 && f.campaign.completed.includes("fortress.last-boss"));
+}
+
+{ // áreas opcionais: um esconderijo por área, aberto no dia marcado, nunca dá pista
+  const town = Sim.create(11, "campaign", "carer", 2);
+  const cache = (w, id) => w.world.objects.find(o => o.id === id);
+  const names = {"opt-fuel":"fuel", "opt-clinic":"clinic", "opt-market":"market"};
+  check("opcional: posto, clínica, mercado e escola existem em Cold Vale",
+    Object.entries(names).every(([id, type]) => town.world.buildings.find(b => b.id === cache(town, id)?.building)?.type === type) && Boolean(cache(town, "opt-school")));
+  check("opcional: antes do dia marcado o esconderijo está oculto", ["opt-fuel", "opt-clinic", "opt-school"].every(id => cache(town, id).active === false));
+  Sim.testJump(town, 9, {}, {anyMode: true}); Sim.tick(town, .033, idle);
+  check("opcional: no dia 9 a clínica abre e o posto também, a escola ainda não", cache(town, "opt-clinic").active && cache(town, "opt-fuel").active && !cache(town, "opt-school").active);
+  const mk = Sim.create(11, "campaign", "carer", 2); Sim.testJump(mk, 16, {}, {anyMode: true}); Sim.tick(mk, .033, idle);
+  check("opcional: o mercado fica fechado ao fim de semana (dia 16)", cache(mk, "opt-market").active === false);
+  const fields = Sim.create(11, "campaign", "carer", 2, undefined, "fields"), coast = Sim.create(11, "campaign", "carer", 2, undefined, "coast"), iron = Sim.create(11, "campaign", "carer", 2, undefined, "ironworks");
+  const inB = (w, id) => w.world.buildings.find(b => b.id === cache(w, id)?.building)?.name;
+  check("opcional: quinta, colheita, marina e estação estão nos edifícios certos",
+    inB(fields, "opt-farm") === "Orchard farmhouse" && inB(fields, "opt-harvest") === "Hay barn" && inB(coast, "opt-marina") === "Net shed" && inB(iron, "opt-station") === "Freight depot");
+  check("opcional: nenhum esconderijo dá pistas", Object.values(Data.optionalAreas).every(a => !Object.keys(a.loot).includes("clue")) && Object.keys(Data.optionalAreas).every(id => Campaign.areas[id]?.kind === "optional"));
+  const box = cache(town, "opt-clinic"); Object.assign(town.player, {x: box.x, y: box.y});
+  town.world.enemies = [];
+  check("opcional: tirar o saque regista a área como feita", Sim.collect(town, box, 0) > 0 && town.campaign.opt.includes("opt.clinic"));
+  check("opcional: a dica menciona o que se pode vasculhar hoje", /raid/.test(Sim.campaignTip(town)) || town.campaign.opt.length > 0);
+  const back = Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(town))));
+  check("opcional: o registo guarda-se e carrega", back.campaign.opt.includes("opt.clinic"));
+  const old = JSON.parse(JSON.stringify(Sim.snapshot(town))); delete old.campaign.opt;
+  let bad = false; try { const broken = JSON.parse(JSON.stringify(Sim.snapshot(town))); broken.campaign.opt = ["opt.x"]; Sim.restore(broken); } catch { bad = true; }
+  check("opcional: saves antigos sem 'opt' carregam e valores inválidos são recusados", Sim.restore(old).campaign.opt.length === 0 && bad);
+}
+
+{ // fathill.tide e a escola: a maré sobe às 18:00 (o barco da marina segura), a escola está trancada e faz barulho
+  const C = Campaign;
+  check("tide: FatHill só abre das 06:00 às 18:00 num dia de maré baixa", C.isOpen("fathill", 8, 10) && !C.isOpen("fathill", 8, 19) && /tide is in/i.test(C.closedReason("fathill", 8, 19)));
+  const c = Sim.create(11, "campaign", "carer", 2, undefined, "coast");
+  Sim.testJump(c, 8, {}, {anyMode: true});
+  c.minutes = 7 * 1440 + 17 * 60; c.world.enemies = [];
+  c.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade");
+  Sim.tick(c, .033, idle);
+  check("tide: às 17:00 há aviso e a dica fala da maré", c.campaign.tide.warned === 8 && /18:00/.test(Sim.campaignTip(c)), Sim.campaignTip(c));
+  const pier = {x: c.player.x, y: c.player.y}, hp = c.player.hp;
+  c.minutes = 7 * 1440 + 18 * 60 + 1; Sim.tick(c, .033, idle);
+  const exit = c.world.objects.find(o => o.id === "exit-coldvale");
+  check("tide: às 18:00 sem barco a maré arrasta o jogador para a estrada, molhado e magoado",
+    c.campaign.tide.day === 8 && c.player.hp < hp && c.player.wetness >= 90 && Math.hypot(c.player.x - exit.x, c.player.y - exit.y) < 5, c.player.x + "," + c.player.y);
+  const b = Sim.create(11, "campaign", "carer", 2, undefined, "coast"); Sim.testJump(b, 8, {}, {anyMode: true}); b.world.enemies = [];
+  b.player.bag.push({id:"rowboat", qty:1, condition:100, born:0}); const at = {x: b.player.x, y: b.player.y};
+  b.minutes = 7 * 1440 + 18 * 60 + 1; Sim.tick(b, .033, idle);
+  check("tide: com o barco fica no sítio e o barco gasta-se", b.player.x === at.x && Sim.quantity(b.player.bag, "rowboat") === 0);
+  check("tide: o estado da maré guarda-se e carrega", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(b)))).campaign.tide.day === 8);
+  const coast = Sim.create(11, "campaign", "carer", 2, undefined, "coast");
+  check("tide: o barco está na marina", coast.world.objects.find(o => o.id === "opt-marina")?.loot.some(i => i.id === "rowboat"));
+  const town = Sim.create(11, "campaign", "carer", 2), box = town.world.objects.find(o => o.id === "opt-school"), school = town.world.buildings.find(x => x.id === box.building);
+  const door = town.world.objects.find(o => o.id === school.door.id);
+  check("escola: é a Primary school, com a porta trancada", school.name === "Primary school" && door.locked && !door.open);
+  Sim.testJump(town, 22, {}, {anyMode: true}); Sim.tick(town, .033, idle); town.world.enemies = [];
+  Object.assign(town.player, {x: box.x, y: box.y}); town.atmosphere.nextWave = town.atmosphere.time + 900;
+  check("escola: tirar o saque faz barulho e chama a horda", Sim.collect(town, box, 0) > 0 && town.atmosphere.nextWave <= town.atmosphere.time);
+}
+
+{ // a mulher do pontão chama infetados com o violino enquanto tem o casaco e te vê
+  const f = Sim.create(11, "campaign", "carer", 2, undefined, "coast"); Sim.testJump(f, 8, {}, {anyMode: true});
+  f.minutes = 7 * 1440 + 10 * 60;
+  const woman = f.world.enemies.find(z => z.kind === "pierwoman");
+  f.world.enemies = f.world.enemies.filter(z => z.stats.boss);
+  const spot = (() => { for (let r = 3; r < 9; r++) for (let a = 0; a < 6.28; a += .4) { const p = {x: woman.x + Math.cos(a) * r, y: woman.y + Math.sin(a) * r}; if (World.clear(f.world, p.x, p.y, .3)) return p; } })();
+  Object.assign(f.player, spot);
+  f.violinCall = 0; Sim.tick(f, .033, idle);
+  const called = f.world.enemies.filter(z => z.origin === "violin");
+  check("violino: à vista da mulher, ela chama um grupo de infetados que vem ter contigo", called.length > 0 && called.length <= Data.fatHill.callSize && called.every(z => z.alert > 0), String(called.length));
+  for (let i = 0; i < 5; i++) { f.violinCall = 0; Sim.tick(f, .033, idle); }
+  check("violino: nunca há mais de 8 chamados vivos", f.world.enemies.filter(z => z.origin === "violin" && z.hp > 0).length <= Data.fatHill.callCap);
+  woman.guard = false; woman.docile = true; const n = f.world.enemies.length; f.violinCall = 0; Sim.tick(f, .033, idle);
+  check("violino: com o casaco caído ela deixa de chamar", f.world.enemies.length === n);
 }
 
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio

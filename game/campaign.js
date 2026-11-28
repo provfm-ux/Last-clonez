@@ -21,7 +21,7 @@ const Campaign = (() => {
     ironworks:{name:"Ironworks", kind:"clue", from:6, weekdays:true, hours:[8, 18],
       closed:{weekend:"The line computer keeps the Ironworks gates locked at weekends. They reopen on Monday.",
         hours:"Ironworks opens at 08:00. The line computer keeps the gates shut overnight."}},
-    fathill:{name:"FatHill", kind:"clue", from:8, tide:true, clue:3},
+    fathill:{name:"FatHill", kind:"clue", from:8, tide:true, clue:3, hours:[6, 18], closed:{hours:"The tide is in over the FatHill road. Cross between 06:00 and 18:00 on a low-tide day."}},
     westfields:{name:"Westfields", kind:"clue", from:10, clue:4},
     cindergrotto:{name:"Cinder Grotto", kind:"clue", from:12, clue:5, requires:{items:["flashlight", "battery"], text:"a flashlight with batteries"}},
     amigo1:{name:"The first friend", kind:"clue", from:14, to:20, requires:{items:["foundrymaul"], text:"the Foundry maul from the Ironworks"}},

@@ -747,6 +747,7 @@ const Sim = (() => {
       case "ironworks.barricade": return region !== "ironworks" ? closed || text.go : text.cage;
       case "fathill.bosses":
         if (region !== "coast") return closed || text.go;
+        if (hour >= Data.fatHill.tideWarn && hour < Data.fatHill.tideHour) return text.tide + (f.vest ? text.violin : f.coat ? text.david : "");
         if (f.vest) return text.violin;
         if (f.coat) return text.david;
         return text.fear.replace("{n}", Math.min(f.fear, Data.fatHill.fearKills)).replace("{max}", Data.fatHill.fearKills);
@@ -889,7 +890,10 @@ const Sim = (() => {
     item.qty -= amount;
     if (!item.qty) object.loot.splice(index, 1);
     object.searched = true;
-    if (object.optional && s.campaign && !s.campaign.opt.includes(object.optional)) s.campaign.opt.push(object.optional);
+    if (object.optional && s.campaign && !s.campaign.opt.includes(object.optional)) {
+      s.campaign.opt.push(object.optional);
+      if (object.optional === "opt.school") { s.atmosphere.nextWave = Math.min(s.atmosphere.nextWave, s.atmosphere.time); noise(s, object.x, object.y, 10); notify(s, Data.campaignText.schoolNoise, true); }
+    }
     if (s.longHaul && object.id === longHaulCache && item.id === "fuel" && !s.longHaul.supplied) {
       s.longHaul.supplied = true;
       notify(s,"Supplies secured. Bring that fuel home. You’re giving this shelter a second chance.");
@@ -1489,7 +1493,7 @@ const Sim = (() => {
   }
 
   // Campaign state (HISTORIA.md section 16): clues found, challenge ids completed, hint progress.
-  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:"", fields:{alerts:0, at:-1e9}, fathill:{fear:0, coat:false, vest:false}, chat:{used:0, until:0, done:false, log:[]}, opt:[]});
+  const newCampaign = () => ({clues:0, completed:[], hints:CampaignHints.empty(), buffUntil:0, ridge:{nights:0, night:null}, eva:"", grotto:"", fields:{alerts:0, at:-1e9}, fathill:{fear:0, coat:false, vest:false}, chat:{used:0, until:0, done:false, log:[]}, opt:[], tide:{day:0, warned:0}});
   // cinema.buff: after the cinema escape, sleep at night is safer and panic rises slower for a few nights.
   const isCampaign = s => s.difficulty === "campaign";
   const cinemaBuff = s => Boolean(s.campaign && s.campaign.buffUntil > s.minutes);
@@ -1508,13 +1512,15 @@ const Sim = (() => {
     const fathill = raw.fathill ?? {fear:0, coat:false, vest:false};
     if (!Number.isInteger(fathill.fear) || fathill.fear < 0 || fathill.fear > 999 || typeof fathill.coat !== "boolean" || typeof fathill.vest !== "boolean") throw new Error("Invalid campaign progress.");
     const fields = raw.fields ?? {alerts:0, at:-1e9};
+    const tide = raw.tide ?? {day:0, warned:0};
+    if (!tide || !Number.isInteger(tide.day) || tide.day < 0 || !Number.isInteger(tide.warned) || tide.warned < 0) throw new Error("Invalid campaign progress.");
     const opt = raw.opt ?? [];
     if (!Array.isArray(opt) || opt.length > 8 || opt.some((id,i) => !Object.hasOwn(Data.optionalAreas, id) || opt.indexOf(id) !== i)) throw new Error("Invalid campaign progress.");
     const chat = raw.chat ?? {used:0, until:0, done:false, log:[]};
     if (!Number.isInteger(chat.used) || chat.used < 0 || chat.used > Data.aiChat.prompts || !Number.isFinite(chat.until) || chat.until < 0 || typeof chat.done !== "boolean" ||
         !Array.isArray(chat.log) || chat.log.length > Data.aiChat.maxLog || chat.log.some(l => !l || !["you","ai"].includes(l.who) || typeof l.text !== "string" || l.text.length > 400)) throw new Error("Invalid campaign progress.");
     if (!Number.isInteger(fields.alerts) || fields.alerts < 0 || fields.alerts > 999 || !Number.isFinite(fields.at)) throw new Error("Invalid campaign progress.");
-    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "", fields:{alerts:fields.alerts, at:fields.at}, fathill:{fear:fathill.fear, coat:fathill.coat, vest:fathill.vest}, chat:{used:chat.used, until:chat.until, done:chat.done, log:chat.log.map(l => ({who:l.who, text:l.text}))}, opt:[...opt],
+    return {clues:raw.clues, completed:[...raw.completed], hints:CampaignHints.restore(raw.hints), buffUntil:raw.buffUntil ?? 0, eva:raw.eva ?? "", grotto:raw.grotto ?? "", fields:{alerts:fields.alerts, at:fields.at}, fathill:{fear:fathill.fear, coat:fathill.coat, vest:fathill.vest}, chat:{used:chat.used, until:chat.until, done:chat.done, log:chat.log.map(l => ({who:l.who, text:l.text}))}, opt:[...opt], tide:{day:tide.day, warned:tide.warned},
       ridge:{nights:ridge.nights, night:night && {start:night.start, fail:night.fail, built:night.built}}};
   }
   // coldvale.houses: one torn page in each of three family homes, picked by a hash of the seed (no shared rng).
@@ -1863,8 +1869,13 @@ const Sim = (() => {
       else if (id === "opt.fuel") b = world.buildings.find(x => x.type === "fuel");
       else if (id === "opt.clinic") b = world.buildings.find(x => x.type === "clinic");
       else if (id === "opt.market") b = world.buildings.find(x => x.type === "market");
-      else if (id === "opt.school") b = world.buildings.filter(x => x.type === "home" && x.id !== world.base?.id).sort((a,c) => c.w * c.h - a.w * a.h || String(a.id).localeCompare(String(c.id)))[0];
+      else if (id === "opt.school") b = world.buildings.filter(x => x.type === "home" && x.id !== world.base?.id && !x.base).sort((a,c) => c.w * c.h - a.w * a.h || String(a.id).localeCompare(String(c.id)))[0];
       if (!b) continue;
+      if (id === "opt.school") {                                // the largest family house becomes the primary school, doors locked
+        b.name = "Primary school";
+        const door = world.objects.find(o => o.id === b.door?.id);
+        if (door) Object.assign(door, {open:false, locked:true});
+      }
       const spots = roomSpots(world, b), spot = spots[spots.length - 1];
       if (!spot) continue;
       world.objects.push({id:id.replace("opt.", "opt-"), x:spot.x+.5, y:spot.y+.5, building:b.id, zone:spot.zone, tint:.58, kind:"crate", name:area.cache, action:"loot", optional:id,
@@ -1884,6 +1895,23 @@ const Sim = (() => {
       const open = Campaign.isOpen(o.optional, day, hour);
       if (o.active !== open) o.active = open;
     }
+  }
+
+  // fathill.tide: on the coast the tide comes in at 18:00. Without the marina's rowboat it drags the player back to the shore road.
+  function updateTide(s) {
+    if (s.world.region !== "coast" || s.mode !== "play") return;
+    const t = s.campaign.tide, F = Data.fatHill, day = runDay(s.minutes), hour = s.minutes % 1440 / 60;
+    if (hour >= F.tideWarn && hour < F.tideHour && t.warned !== day) { t.warned = day; notify(s, Data.campaignText.tideTurning, true); }
+    if (hour < F.tideHour || t.day === day) return;
+    t.day = day;
+    const p = s.player;
+    if (p.bag.some(i => i.id === "rowboat")) { remove(p.bag, "rowboat", 1); notify(s, Data.campaignText.tideBoat, true); return; }
+    if (p.vehicle) return;
+    const back = s.world.objects.find(o => o.id === "exit-" + Regions.home) ?? s.world.start;
+    const spot = arrivalPosition(s, {x:back.x, y:back.y + (back.y < s.world.height / 2 ? 2 : -2)}, true) ?? s.world.start;
+    Object.assign(p, {x:spot.x, y:spot.y, path:[], moving:false, hp:Math.max(1, p.hp - F.tideHurt), wetness:Math.max(p.wetness, 90)});
+    s.target = null; s.interaction = null;
+    notify(s, Data.campaignText.tideSwept, true);
   }
 
   // The first optional area open today whose cache has not been emptied yet.
@@ -4002,7 +4030,7 @@ const Sim = (() => {
     updateOutdoor(s, minutes, raining);
     if (s.longHaul && s.player.hp > 0) updateLongHaul(s);
     if (s.campaign) { updateCinemaTrap(s); updateCinemaBuff(s); }
-    if (isCampaign(s)) { updatePineRidge(s); updateEva(s); updateOptional(s); }
+    if (isCampaign(s)) { updatePineRidge(s); updateEva(s); updateOptional(s); updateTide(s); }
     if (isCampaign(s) && s.campaign.hints.objective) {
       const hint = CampaignHints.next(s.campaign.hints, s.minutes);
       if (hint) notify(s, "Hint: " + hint);
@@ -4212,7 +4240,7 @@ const Sim = (() => {
       fungalAlert:s.fungalAlert ? {...s.fungalAlert} : null, nextFungalAlert:s.nextFungalAlert,
       longHaul:s.longHaul ? {...s.longHaul} : undefined,
       campaign:s.campaign ? {clues:s.campaign.clues, completed:[...s.campaign.completed], hints:{...s.campaign.hints}, buffUntil:s.campaign.buffUntil,
-        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva, grotto:s.campaign.grotto, fields:{...s.campaign.fields}, fathill:{...s.campaign.fathill}, chat:{...s.campaign.chat, log:s.campaign.chat.log.map(l => ({...l}))}, opt:[...s.campaign.opt]} : undefined,
+        ridge:{nights:s.campaign.ridge.nights, night:s.campaign.ridge.night && {...s.campaign.ridge.night}}, eva:s.campaign.eva, grotto:s.campaign.grotto, fields:{...s.campaign.fields}, fathill:{...s.campaign.fathill}, chat:{...s.campaign.chat, log:s.campaign.chat.log.map(l => ({...l}))}, opt:[...s.campaign.opt], tide:{...s.campaign.tide}} : undefined,
       difficultyOptions:s.difficultyOptions, difficultyChanges:s.difficultyChanges,
       recoveryUsed:s.recoveryUsed, shelterIdleSince:s.shelterIdleSince,
       nextEvent: s.nextEvent, deathCause: s.deathCause, afterlifePending:s.afterlifePending ?? false, flags: {...s.flags}, messages: s.messages, clues: [...s.clues], supplyRun: s.supplyRun,

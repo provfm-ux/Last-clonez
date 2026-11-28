@@ -1,7 +1,8 @@
 # Last CloneZ — registo de alterações (cumulativo)
 
 ## Em desenvolvimento
-- Campaign: added the eight optional areas (petrol station, clinic, market, farm, marina, school, train station, harvest). Each has one supply cache that appears on its calendar day (market: weekdays 08:00 to 18:00), some with infected around it. No clues. The tip names today's area. The marina gives bait and tackle; the boat for the FatHill tide comes with that mechanic.
+- Campaign: added the eight optional areas (petrol station, clinic, market, farm, marina, school, train station, harvest). Each has one supply cache that appears on its calendar day (market: weekdays 08:00 to 18:00), some with infected around it. No clues. The tip names today's area. The school is now a real Primary school with a locked door (pry it or break a window); emptying it makes noise and calls a horde.
+- Campaign: the FatHill tide. The road is open from 06:00 to 18:00 on low-tide days; a warning comes at 16:00, and at 18:00 the tide drags the player back to the shore road, soaked and hurt, unless they carry the single-use rowboat from the marina.
 - Added the harpoon (fortress keep armoury): very long reach, very slow swing; it finishes Pip once he is below 100 hp.
 - Added the torch and the Molotov cocktail recipes (always available). The torch sets infected alight on a hit; a thrown Molotov leaves flames on the ground for 12 seconds. Both, and campfires, hurt Pip twice as much and make him burn.
 - Campaign: added the fortress (day 25, all five coordinates) beyond Pine Ridge and the last boss. Pip's firefighter coat comes off under heavy damage; fire (stone rings, built campfires) hurts the mutation twice as much and keeps burning. The fortress keeps a keep, larder, gardens and water as the endgame refuge.

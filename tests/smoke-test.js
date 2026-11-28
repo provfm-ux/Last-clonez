@@ -2336,6 +2336,35 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
   check("opcional: saves antigos sem 'opt' carregam e valores inválidos são recusados", Sim.restore(old).campaign.opt.length === 0 && bad);
 }
 
+{ // fathill.tide e a escola: a maré sobe às 18:00 (o barco da marina segura), a escola está trancada e faz barulho
+  const C = Campaign;
+  check("tide: FatHill só abre das 06:00 às 18:00 num dia de maré baixa", C.isOpen("fathill", 8, 10) && !C.isOpen("fathill", 8, 19) && /tide is in/i.test(C.closedReason("fathill", 8, 19)));
+  const c = Sim.create(11, "campaign", "carer", 2, undefined, "coast");
+  Sim.testJump(c, 8, {}, {anyMode: true});
+  c.minutes = 7 * 1440 + 17 * 60; c.world.enemies = [];
+  c.campaign.completed.push("coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade");
+  Sim.tick(c, .033, idle);
+  check("tide: às 17:00 há aviso e a dica fala da maré", c.campaign.tide.warned === 8 && /18:00/.test(Sim.campaignTip(c)), Sim.campaignTip(c));
+  const pier = {x: c.player.x, y: c.player.y}, hp = c.player.hp;
+  c.minutes = 7 * 1440 + 18 * 60 + 1; Sim.tick(c, .033, idle);
+  const exit = c.world.objects.find(o => o.id === "exit-coldvale");
+  check("tide: às 18:00 sem barco a maré arrasta o jogador para a estrada, molhado e magoado",
+    c.campaign.tide.day === 8 && c.player.hp < hp && c.player.wetness >= 90 && Math.hypot(c.player.x - exit.x, c.player.y - exit.y) < 5, c.player.x + "," + c.player.y);
+  const b = Sim.create(11, "campaign", "carer", 2, undefined, "coast"); Sim.testJump(b, 8, {}, {anyMode: true}); b.world.enemies = [];
+  b.player.bag.push({id:"rowboat", qty:1, condition:100, born:0}); const at = {x: b.player.x, y: b.player.y};
+  b.minutes = 7 * 1440 + 18 * 60 + 1; Sim.tick(b, .033, idle);
+  check("tide: com o barco fica no sítio e o barco gasta-se", b.player.x === at.x && Sim.quantity(b.player.bag, "rowboat") === 0);
+  check("tide: o estado da maré guarda-se e carrega", Sim.restore(JSON.parse(JSON.stringify(Sim.snapshot(b)))).campaign.tide.day === 8);
+  const coast = Sim.create(11, "campaign", "carer", 2, undefined, "coast");
+  check("tide: o barco está na marina", coast.world.objects.find(o => o.id === "opt-marina")?.loot.some(i => i.id === "rowboat"));
+  const town = Sim.create(11, "campaign", "carer", 2), box = town.world.objects.find(o => o.id === "opt-school"), school = town.world.buildings.find(x => x.id === box.building);
+  const door = town.world.objects.find(o => o.id === school.door.id);
+  check("escola: é a Primary school, com a porta trancada", school.name === "Primary school" && door.locked && !door.open);
+  Sim.testJump(town, 22, {}, {anyMode: true}); Sim.tick(town, .033, idle); town.world.enemies = [];
+  Object.assign(town.player, {x: box.x, y: box.y}); town.atmosphere.nextWave = town.atmosphere.time + 900;
+  check("escola: tirar o saque faz barulho e chama a horda", Sim.collect(town, box, 0) > 0 && town.atmosphere.nextWave <= town.atmosphere.time);
+}
+
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
   const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"];
   let empty = 0, total = 0, sample = "";

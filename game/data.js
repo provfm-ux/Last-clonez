@@ -14,6 +14,7 @@ const Data = (() => {
       detail:"Congratulations. You survived the raffle. The winner didn't."},
     bat: {combat:"blunt", name:"Wooden bat", group:"Weapons", weight:1.4, damage:25, range:1.4, delay:.55, effort:6, noise:3, wear:.6, icon:"bat"},
     torch: {combat:"blunt", name:"Torch", group:"Weapons", weight:.6, damage:13, range:1.4, delay:.6, effort:6, noise:1, wear:.9, icon:"bat", fire:true, detail:"Sets infected alight for a few seconds. Burns down with use"},
+    rowboat: {name:"Rowboat", group:"Equipment", weight:3.5, icon:"pack", detail:"Single use. Keeps you on the water when the FatHill tide comes in"},
     harpoon: {combat:"heavy", name:"Harpoon", group:"Weapons", weight:4.2, damage:55, range:2.7, delay:2.4, effort:16, noise:3, wear:.5, icon:"bat", detail:"Huge reach, very slow swing. Finishes Pip when he is below 100 hp"},
     molotov: {name:"Molotov cocktail", group:"Equipment", weight:.6, use:"molotov", icon:"bolt", detail:"Throw it where you face or at your target. The flames burn on the ground for a few seconds"},
     pipe: {combat:"blunt", name:"Steel pipe", group:"Weapons", weight:1.8, damage:31, range:1.4, delay:.68, effort:8, noise:4, wear:.35, icon:"bat"},
@@ -266,6 +267,10 @@ const Data = (() => {
     pipBurning:"Pip screams as the flames take hold of the mutation.",
     pipDown:"Pip falls, and the whole fortress goes quiet. The doors can be locked from the inside now. Stay as long as you like: the gardens, the larder and the water are yours.",
     fortressLocked:"The coordinates are incomplete. Five are needed, and the road only appears with all of them.",
+    tideTurning:"The water is creeping up the shingle. The tide comes in at 18:00.",
+    tideSwept:"The tide comes in fast. It drags you back up the beach, soaked and bruised. FatHill waits for the next low tide.",
+    tideBoat:"The tide comes in. You hold on in the rowboat until the water settles. The boat is done after this.",
+    schoolNoise:"The pile of chairs comes down with a crash that rings round the empty classrooms. Something outside heard it.",
     aiNone:"The terminal is dark. It only answers at the valve tower.",
     violinNone:"Nothing near enough to hear it.",
     violinGuarded:"He hears it. The vest keeps him braced against the sound.",
@@ -311,7 +316,7 @@ const Data = (() => {
     {id:"pineridge.two-nights", area:"pineridge", text:"Survive two nights at Pine Ridge", detail:"From day 3. No barricades: bring a bedroll, wood and water. Stay warm."},
     {id:"eva.death", area:"eva", text:"Look after Eva", detail:"Until day 5. She keeps talking about the fortress rumour.", gone:"Read Eva's diary at the shelter"},
     {id:"ironworks.barricade", area:"ironworks", text:"Get the strong weapon", detail:"Ironworks machine shop, weekdays 08:00-18:00. The toolboard hammer and crowbar wear out: do not waste them."},
-    {id:"fathill.bosses", area:"fathill", text:"Face the woman on the pier and David", detail:"Bracken Coast, from day 8, on low-tide days (even days). She is afraid for him: the infected you kill where she can see frighten her. There is a violin in the net shed.",
+    {id:"fathill.bosses", area:"fathill", text:"Face the woman on the pier and David", detail:"Bracken Coast, from day 8, on low-tide days (even days), between 06:00 and 18:00: then the tide comes in. She is afraid for him: the infected you kill where she can see frighten her. There is a violin in the net shed.",
       coat:"Take David down", coatDetail:"Her coat has fallen and she no longer fights. Wear David's guard down, shove his vest off and play the violin near him.",
       vest:"Play the violin near David", vestDetail:"His life vest is off. He will come to the violin and stand for it. Hit him while he does."},
     {id:"westfields.stealth", area:"westfields", text:"Slip through Westfields without a sound", detail:"From day 10. The farmer's ledger is in the Orchard farmhouse at the far west. Noise calls hordes, and infected that have noticed you will not let you read it. Keep to cover and use your knife."},
@@ -340,7 +345,7 @@ const Data = (() => {
       "fortress.last-boss":{go:"You have all five coordinates. Follow the arrow through Pine Ridge to the fortress road. Find the harpoon in the keep armoury: it finishes Pip below 100 hp. Bring fire: a torch, Molotov cocktails or a campfire, and a good weapon.", coat:"Beat Pip down until his coat comes apart. Hit hard and keep your distance from the escort.", fire:"His coat is off. Fire hurts him and keeps burning: hit him with a torch, throw a Molotov at his feet, or lead him to a fire.", done:"The fortress is yours. Garden, cook, collect water and kill at your pace."},
       "viragem.zero":{go:"Follow the arrow to Greywater Reservoir, past Westfields. The diary is in the locked keeper's cottage: look for the key in the pump house.", read:"Read Vic's diary in the keeper's cottage. Days 15 to 18 only."},
       "amigo1.lockdown-chat":{go:"Follow the arrow to Greywater Reservoir, past Westfields. Carry the Foundry maul from the Ironworks.", chat:"Go up the valve tower and talk to the terminal. Five prompts: make the last one count, and use a joke the machine cannot ignore.", wait:"The assistant is out of tokens. Survive the infected it called until it comes back, then try the last prompt again.", fight:"The helmet is off. Hit Vic with the Foundry maul: nothing else hurts him."},
-      "fathill.bosses":{go:"Follow the arrow to Bracken Coast. The road is open on low-tide days (even days).", fear:"Kill infected where the woman on the pier can see you: her fear is {n} of {max}. The violin is in the net shed.", david:"Wear David's guard down, then shove his vest off.", violin:"Play the violin near David, then strike while he stands there."},
+      "fathill.bosses":{go:"Follow the arrow to Bracken Coast. The road is open on low-tide days (even days), from 06:00 to 18:00.", tide:"The tide comes in at 18:00. Finish or get out, unless you carry the rowboat from the marina. ", fear:"Kill infected where the woman on the pier can see you: her fear is {n} of {max}. The violin is in the net shed.", david:"Wear David's guard down, then shove his vest off.", violin:"Play the violin near David, then strike while he stands there."},
       "westfields.stealth":{go:"Follow the arrow to Westfields. Keep your knife and your footsteps quiet.", sneak:"Sneak west to the Orchard farmhouse and read the ledger. Do not fight: noise calls hordes.", noisy:"You made noise. Hide until the infected lose you, then read the ledger in the Orchard farmhouse."},
       "cindergrotto.battery":{go:"Follow the arrow to Pine Ridge and take the survey tunnel. You need a flashlight with batteries.", plate:"Find the surveyor's plate in the far survey room. Watch your flashlight battery.", out:"You have the plate. Climb back out to Pine Ridge before the light dies."}
     }
@@ -373,15 +378,15 @@ const Data = (() => {
     "opt.clinic":{region:"coldvale", place:"the village clinic", cache:"Waiting room cabinet", loot:{bandage:4, painkiller:2, disinfectant:2, splint:1}, guards:3},
     "opt.market":{region:"coldvale", place:"the market", cache:"Back-shelf crates", loot:{food:4, water:4, cannedbeans:2}, guards:0},
     "opt.farm":{region:"fields", place:"the Orchard farmhouse in Westfields", cache:"Kitchen garden basket", building:"Orchard farmhouse", loot:{radishseed:2, strawberryseed:1, fresh:4, potato:3}, guards:2},
-    "opt.marina":{region:"coast", place:"the net shed on the Bracken pier", cache:"Marina tackle box", building:"Net shed", loot:{bait:3, tape:2, cloth:2, rawfish:2}, guards:0},
-    "opt.school":{region:"coldvale", place:"the big house with the school sign in Cold Vale", cache:"Cloakroom pile", loot:{wood:6, nails:8, scrap:2, cloth:2}, guards:4},
+    "opt.marina":{region:"coast", place:"the net shed on the Bracken pier", cache:"Marina tackle box", building:"Net shed", loot:{rowboat:1, bait:3, tape:2, cloth:2}, guards:0},
+    "opt.school":{region:"coldvale", place:"the primary school in Cold Vale (locked: pry the door or break a window)", cache:"Cloakroom pile", loot:{wood:6, nails:8, scrap:2, cloth:2}, guards:4},
     "opt.station":{region:"ironworks", place:"the freight depot at the Ironworks", cache:"Wagon toolbox", building:"Freight depot", loot:{battery:5, flashlight:1}, guards:2},
     "opt.harvest":{region:"fields", place:"the hay barn in Westfields", cache:"Harvest sacks", building:"Hay barn", loot:{fresh:6, potato:4, radish:4, food:3}, guards:0}
   };
   // Fire (torch, Molotov, flames on the ground): burn damage per second, how long a lit infected keeps burning, ground flames.
   const fireRules = {range:5, radius:1.9, seconds:12, burnPerSecond:9, torchSeconds:3, noise:7};
   const pipFight = {finishBelow:100, guardDamage:120, fireRange:2.6, fireMult:2.5, burnPerSecond:7, escort:8};
-  const fatHill = {fearKills:10, fearSight:18, guardDamage:450, lureSeconds:22, luredDamage:2, playRange:22};
+  const fatHill = {tideWarn:16, tideHour:18, tideHurt:15, fearKills:10, fearSight:18, guardDamage:450, lureSeconds:22, luredDamage:2, playRange:22};
   const cinemaPatrol = [[13.5,8.5],[19.5,12.5],[14.5,17.5],[7.5,12.5],[12.5,10.5]];
   const cinemaTrap = {horde:50, tensionEvery:6, windowHits:3, buffNights:3, sleepDamage:.5, panicRate:.5};
   const zombieCarry = {oneIn:8, origins:["", "horde", "nest"],

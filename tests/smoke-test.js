@@ -2498,15 +2498,25 @@ const findTile = (s, test) => { const w = s.world; for (let y = 3; y < w.height 
     w.player.x.toFixed(2) + "," + w.player.y.toFixed(2));
 }
 
+{ // QA: ligaduras na oficina (campanha) e dica quando se sangra sem ligaduras
+  const c = fresh("campaign"), shop = c.world.buildings.find(b => b.type === "workshop");
+  check("qa: a oficina tem ligaduras na campanha", c.world.objects.some(o => o.building === shop.id && o.loot?.some(i => i.id === "bandage" && i.qty >= 2)));
+  Sim.testJump(c, 12, {}, {anyMode: true});
+  c.campaign.completed.push(...Data.campaignGoals.map(g => g.id).filter(id => !["amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"].includes(id)));
+  c.player.bag = c.player.bag.filter(i => i.id !== "bandage");
+  c.player.wounds.push({part:"arm", type:"cut", bleed:.18, bandaged:false, clean:false, infection:0, age:0});
+  check("qa: a sangrar sem ligaduras, a dica diz como fazer uma e onde há", /Tear a piece of cloth/.test(Sim.campaignTip(c)) && /workshop/.test(Sim.campaignTip(c)), Sim.campaignTip(c));
+}
+
 { // ui.campaign-tip: na campanha há sempre uma dica concreta do que fazer, em qualquer dia, objetivo ou sítio
   const goalsOrder = ["coldvale.houses", "cinema.statue", "pineridge.two-nights", "eva.death", "ironworks.barricade", "fathill.bosses", "westfields.stealth", "cindergrotto.battery", "amigo1.lockdown-chat", "viragem.zero", "fortress.last-boss"];
   let empty = 0, total = 0, sample = "";
-  for (let day = 1; day <= 30; day++) for (let done = 0; done <= goalsOrder.length; done++) {
-    const s = fresh("campaign"); Sim.testJump(s, day, {}, {anyMode: true});
-    s.campaign.completed.push(...goalsOrder.slice(0, done));
+  const base = fresh("campaign");                     // one game, jumped forward day by day: the tip only reads state
+  for (let day = 1; day <= 30; day++) { Sim.testJump(base, day, {}, {anyMode: true}); for (let done = 0; done <= goalsOrder.length; done++) {
+    const s = base; s.campaign.completed = goalsOrder.slice(0, done);
     const tip = Sim.campaignTip(s); total++;
     if (typeof tip !== "string" || tip.length < 20) { empty++; sample = day + "/" + done; }
-  }
+  } }
   check("ui.campaign-tip em 30 dias x 12 estados de progresso há sempre uma dica", empty === 0, empty + " vazias de " + total + " " + sample);
   const t0 = fresh("campaign");
   check("ui.campaign-tip no início explica as páginas", /torn page/.test(Sim.campaignTip(t0)) && /0 of 3/.test(Sim.campaignTip(t0)), Sim.campaignTip(t0));

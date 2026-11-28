@@ -346,6 +346,7 @@ const Data = (() => {
     waiting:"Nothing new opens until day {day}.",
     ideas:{
       wounds:"Meanwhile: bandage your wounds, then rest while they heal.",
+      woundsNone:"Meanwhile: you are bleeding and out of bandages. Tear a piece of cloth into two bandages, or take the first-aid kit in the workshop.",
       drink:"Meanwhile: drink. Fill bottles at a tap or a rain collector and boil the water at a campfire.",
       eat:"Meanwhile: eat. Cook at a campfire: a cooked meal fills you more than cold food.",
       sleep:"Meanwhile: you are tired. Sleep in a bed until morning, with the door shut.",
